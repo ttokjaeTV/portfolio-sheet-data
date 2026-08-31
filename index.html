@@ -176,7 +176,12 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .btn-ghost{background:none;border:1px solid var(--border);border-radius:9px;padding:7px 13px;
   font-size:12px;font-weight:700;color:var(--ink-mute);cursor:pointer;font-family:inherit}
 .btn-ghost:hover{background:var(--bg-alt);color:var(--accent);border-color:var(--accent)}
+.trend-tools{display:flex;align-items:center;gap:8px}
+.trend-tools select{padding:7px 10px;border:1px solid var(--border);border-radius:9px;
+  background:var(--white);font-size:12px;font-weight:700;font-family:inherit;color:var(--ink)}
 .trend-canvas{height:260px;margin:10px 0 6px}
+#trend-table{margin:4px 0 14px}
+#trend-table:empty{display:none}
 .trend-empty{padding:34px 20px;text-align:center;color:var(--ink-mute);font-size:13px;font-weight:600;
   background:var(--bg-alt);border-radius:12px}
 .trend-log{display:flex;flex-direction:column;gap:1px;background:var(--border);
@@ -695,15 +700,20 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 <div class="card">
   <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 07 / 자산 추이</span></div>
   <div class="card-desc">
-    도구를 열 때마다 그날의 전체 평가금액을 하루 한 번 기록합니다.
-    계좌를 추가하거나 지운 날도 함께 표시해, 자산이 늘어난 게 시장 덕인지 새로 넣은 돈 덕인지 구분할 수 있습니다.<br>
+    도구를 열 때마다 그날의 원금(매입금액)과 평가금액을 계좌별로 하루 한 번 기록합니다.
+    둘을 겹쳐 그리므로 그 사이 간격이 곧 수익금입니다.
+    자산이 늘어난 게 시장 덕인지 새로 넣은 돈 덕인지는 <b>추가 입금</b> 칸으로 구분할 수 있습니다.<br>
     <b>기록은 이 브라우저에만 쌓입니다.</b> 다른 기기에서도 이어 보려면 STEP 01 위의 저장 파일을 옮겨 주세요.
   </div>
   <div class="trend-head">
     <div class="trend-stats" id="trend-stats"></div>
-    <button class="btn-ghost" id="btn-trend-clear" type="button">기록 지우기</button>
+    <div class="trend-tools">
+      <span id="trend-acct"></span>
+      <button class="btn-ghost" id="btn-trend-clear" type="button">기록 지우기</button>
+    </div>
   </div>
   <div class="trend-canvas"><canvas id="chart-trend"></canvas></div>
+  <div class="table-wrap" id="trend-table"></div>
   <div class="trend-log" id="trend-log"></div>
 </div>
 
@@ -1298,7 +1308,7 @@ function render(){
   renderAcctHoldings(valid,cash);
   renderDetail(valid,val);
   renderInsight(valid,byAsset,val,byAcct);
-  snapshot(val,buy,cashSum,valid.length);
+  snapshot(val,buy,cashSum,valid.length,byAcct);
   renderTrend();
 }
 
@@ -1306,7 +1316,7 @@ function render(){
 // 하루에 한 건만 남긴다. 같은 날 여러 번 열면 마지막 값으로 덮어쓴다.
 // 과거는 만들어 낼 수 없으므로 이 기능을 켠 날부터 쌓인다.
 const today=()=>{ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10); };
-let chartTrend=null;
+let chartTrend=null, trendAcct='';
 
 function logEvent(kind,a,b){
   state.events=state.events||[];
@@ -1314,19 +1324,60 @@ function logEvent(kind,a,b){
   if(state.events.length>500) state.events=state.events.slice(-500);
 }
 
-function snapshot(val,buy,cash,n){
+function snapshot(val,buy,cash,n,byAcct){
   if(!(n>0)) return;                       // 종목이 없으면 기록하지 않는다
   state.hist=state.hist||[];
   const d=today(), last=state.hist[state.hist.length-1];
-  const row={d,val:Math.round(val),buy:Math.round(buy),cash:Math.round(cash),n};
+  // 계좌별로도 남긴다. 어느 계좌가 자산을 끌어올렸는지 보려면 이게 있어야 한다.
+  const acc={};
+  for(const a in (byAcct||{})){
+    const t=byAcct[a];
+    if(t.val||t.buy) acc[a]=[Math.round(t.buy),Math.round(t.val)];
+  }
+  const row={d,val:Math.round(val),buy:Math.round(buy),cash:Math.round(cash),n,acc};
   if(last&&last.d===d) state.hist[state.hist.length-1]=row;
   else state.hist.push(row);
   if(state.hist.length>1200) state.hist=state.hist.slice(-1200);
   save();
 }
 
+// 계좌별 원금·평가·수익금과, 첫 기록 이후 무엇이 얼마나 늘었는지.
+function renderTrendTable(hist){
+  const box=document.getElementById('trend-table');
+  if(!box) return;
+  if(hist.length<1){ box.innerHTML=''; return; }
+  const last=hist[hist.length-1], first=hist[0];
+  const names=accts().filter(a=>(last.acc||{})[a]);
+  if(!names.length){ box.innerHTML=''; return; }
+  const row=(nm,b,v,b0,v0,color)=>{
+    const pl=v-b, rr=b>0?pl/b*100:0;
+    const dIn=b-(b0??b), dVal=v-(v0??v);
+    return `<tr style="--kc:${color}">
+      <td class="tl kind-cell">${esc(nm)}</td>
+      <td>${won(b)}</td><td>${won(v)}</td>
+      <td class="${cls(pl)}">${(pl>=0?'+':'')+won(pl)}</td>
+      <td class="${cls(rr)}">${pct(rr)}</td>
+      <td>${dIn>0?'+'+wonShort(dIn)+'원':'—'}</td>
+      <td class="${cls(dVal)}">${(dVal>=0?'+':'')+wonShort(dVal)}원</td></tr>`;
+  };
+  box.innerHTML=`<table class="data-table narrow">
+    <thead><tr><th class="tl">계좌</th><th>원금</th><th>평가금액</th><th>수익금</th><th>수익률</th>
+      <th>추가 입금<br><span class="th-sub">${esc(first.d)} 이후</span></th>
+      <th>평가금액 변화<br><span class="th-sub">${esc(first.d)} 이후</span></th></tr></thead>
+    <tbody>${names.map(a=>{
+      const t=last.acc[a], t0=(first.acc||{})[a];
+      return row(a,t[0],t[1],t0&&t0[0],t0&&t0[1],kindColor(a));
+    }).join('')}</tbody>
+    <tfoot><tr><td class="tl">합계</td><td>${won(last.buy)}</td><td>${won(last.val)}</td>
+      <td class="${cls(last.val-last.buy)}">${(last.val-last.buy>=0?'+':'')+won(last.val-last.buy)}</td>
+      <td class="${cls(last.val-last.buy)}">${pct(last.buy>0?(last.val-last.buy)/last.buy*100:0)}</td>
+      <td>${last.buy-first.buy>0?'+'+wonShort(last.buy-first.buy)+'원':'—'}</td>
+      <td class="${cls(last.val-first.val)}">${(last.val-first.val>=0?'+':'')+wonShort(last.val-first.val)}원</td></tr></tfoot>
+  </table>`;
+}
+
 function renderTrend(){
-  const hist=(state.hist||[]).slice();
+  let hist=(state.hist||[]).slice();
   const box=document.getElementById('chart-trend');
   const statBox=document.getElementById('trend-stats');
   const logBox=document.getElementById('trend-log');
@@ -1341,29 +1392,56 @@ function renderTrend(){
       <span class="tl-k ${k[0]}">${k[1]}</span><span class="tl-t">${t}</span></div>`;
   }).join('');
 
-  if(hist.length<2){
+  // 계좌를 고르면 그 계좌만 그린다
+  const pool=new Set();
+  hist.forEach(r=>{ for(const a in (r.acc||{})) pool.add(a); });
+  const list=accts().filter(a=>pool.has(a));
+  if(trendAcct&&!list.includes(trendAcct)) trendAcct='';
+  const selBox=document.getElementById('trend-acct');
+  if(selBox) selBox.innerHTML=list.length>1
+    ? `<select id="trend-acct-sel"><option value="">전체 계좌</option>`
+      +list.map(a=>`<option value="${esc(a)}" ${a===trendAcct?'selected':''}>${esc(a)}</option>`).join('')
+      +`</select>` : '';
+
+  // 고른 계좌 기준으로 시계열을 만든다. 그 계좌 기록이 없는 날은 건너뛴다.
+  const seq=hist.map(r=>{
+    if(!trendAcct) return {d:r.d,buy:r.buy,val:r.val};
+    const t=(r.acc||{})[trendAcct];
+    return t?{d:r.d,buy:t[0],val:t[1]}:null;
+  }).filter(Boolean);
+
+  if(seq.length<2){
     if(chartTrend){ chartTrend.destroy(); chartTrend=null; }
-    wrap.innerHTML='<div class="trend-empty">기록이 하루치뿐입니다. 내일 다시 열면 흐름이 그려집니다.</div>';
-    statBox.innerHTML=hist.length
-      ? `<div class="trend-s"><div class="trend-s-l">${hist[0].d} 기록</div>
-         <div class="trend-s-v">${won(hist[0].val)}</div></div>` : '';
+    wrap.innerHTML='<div class="trend-empty">'+(seq.length
+      ? '기록이 하루치뿐입니다. 내일 다시 열면 흐름이 그려집니다.'
+      : '이 계좌는 아직 기록이 없습니다.')+'</div>';
+    statBox.innerHTML=seq.length
+      ? `<div class="trend-s"><div class="trend-s-l">${seq[0].d} 기록</div>
+         <div class="trend-s-v">${won(seq[0].val)}</div></div>` : '';
+    renderTrendTable(hist);
     return;
   }
   if(!wrap.querySelector('canvas')) wrap.innerHTML='<canvas id="chart-trend"></canvas>';
   const el=document.getElementById('chart-trend');
 
-  const first=hist[0], last=hist[hist.length-1];
+  const first=seq[0], last=seq[seq.length-1];
+  const pl=last.val-last.buy, ror=last.buy>0?pl/last.buy*100:0;
   const diff=last.val-first.val, rate=first.val>0?diff/first.val*100:0;
-  const peak=hist.reduce((m,r)=>r.val>m.val?r:m,hist[0]);
+  const inflow=last.buy-first.buy;            // 원금이 늘었으면 그만큼 새로 넣은 돈이다
   statBox.innerHTML=`
-    <div class="trend-s"><div class="trend-s-l">현재</div><div class="trend-s-v">${won(last.val)}</div></div>
-    <div class="trend-s"><div class="trend-s-l">${first.d} 이후</div>
-      <div class="trend-s-v ${cls(diff)}">${(diff>=0?'+':'')+won(diff)} (${rate>=0?'+':''}${rate.toFixed(1)}%)</div></div>
-    <div class="trend-s"><div class="trend-s-l">최고 ${peak.d}</div><div class="trend-s-v">${won(peak.val)}</div></div>
-    <div class="trend-s"><div class="trend-s-l">기록</div><div class="trend-s-v">${hist.length}일</div></div>`;
+    <div class="trend-s"><div class="trend-s-l">평가금액</div><div class="trend-s-v">${won(last.val)}</div></div>
+    <div class="trend-s"><div class="trend-s-l">원금 (매입금액)</div><div class="trend-s-v">${won(last.buy)}</div></div>
+    <div class="trend-s"><div class="trend-s-l">수익금</div>
+      <div class="trend-s-v ${cls(pl)}">${(pl>=0?'+':'')+won(pl)} (${ror>=0?'+':''}${ror.toFixed(1)}%)</div></div>
+    <div class="trend-s"><div class="trend-s-l">${first.d} 이후 증가</div>
+      <div class="trend-s-v ${cls(diff)}">${(diff>=0?'+':'')+won(diff)}
+        <span style="font-size:11px;font-weight:700;color:var(--ink-mute)">
+          ${inflow>0?`원금 ${wonShort(inflow)}원 추가`:'추가 입금 없음'}</span></div></div>`;
+  hist=seq;
 
   // 계좌를 건드린 날은 점을 크게 찍는다. 자산이 뛴 게 시장 때문인지 입금 때문인지 갈라 보려는 것이다.
   const evDay=new Set((state.events||[]).map(e=>e.d));
+  renderTrendTable((state.hist||[]));
   const evText={};
   (state.events||[]).forEach(e=>{
     const t=e.k==='add'?`계좌 추가: ${e.a}`:e.k==='del'?`계좌 삭제: ${e.a}`:`이름 변경: ${e.a} → ${e.b}`;
@@ -1389,7 +1467,13 @@ function renderTrend(){
           callbacks:{
             title:c=>c[0].label,
             label:c=>c.dataset.label+' '+won(c.parsed.y),
-            afterBody:c=>evText[c[0].label]||[]}}},
+            afterBody:c=>{
+              const r=hist[c[0].dataIndex]||{};
+              const pl=(r.val||0)-(r.buy||0);
+              const rr=r.buy>0?pl/r.buy*100:0;
+              return [`수익금 ${(pl>=0?'+':'')+won(pl)} (${rr>=0?'+':''}${rr.toFixed(1)}%)`]
+                .concat(evText[c[0].label]||[]);
+            }}}},
       scales:{
         x:{grid:{display:false},ticks:{maxTicksLimit:7,font:{size:10},color:'#8A7B6C',
           callback(i){ const d=this.getLabelForValue(i); return d?d.slice(5).replace('-','.'):''; }}},
@@ -1579,6 +1663,9 @@ document.addEventListener('change',e=>{
     else h.acct=t.value;
     save(); render();
   }
+});
+document.addEventListener('change',e=>{
+  if(e.target.id==='trend-acct-sel'){ trendAcct=e.target.value; renderTrend(); }
 });
 document.addEventListener('click',e=>{
   // 자산 추이 기록 지우기
