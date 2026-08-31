@@ -1584,8 +1584,11 @@ function nums(line,hit){
   // 매입금액 = 평가금액 - 평가손익 검산을 아예 못 한다.
   //   목레버리지 -3,463,518  511  15,118   ← 이 -3,463,518 이 있어야 15,118 을 확정한다
   const out=[];
-  // 뒤에 붙는 단위도 숫자의 끝으로 본다. "현금 548주" 의 548 을 놓치고 있었다.
-  const re=/(^|[\s(₩$])([-−–])?(\d[\d.,]*\d|\d)(?=$|[\s)원주좌개]|$)/g;
+  // 뒤에 무엇이 붙든 한글·숫자만 아니면 숫자의 끝으로 본다.
+  // 단위를 하나씩 열거하면 OCR 이 흘려 쓴 글자를 못 따라간다.
+  //   2,107주 → 2,107F      50,051,785원 → 50,051,785¥      63,141,510원 → 63,141,510¢!
+  // 다만 영문+숫자가 이어지면 종목코드다(0184E0 → 184 로 잘리던 문제).
+  const re=/(^|[\s(₩$])([-−–])?(\d[\d.,]*\d|\d)(?![0-9]|[A-Za-z]\d)/g;
   let m;
   while((m=re.exec(s))){
     const v=parseFloat(fixThousands(m[3]))*(m[2]?-1:1);
@@ -1751,6 +1754,12 @@ function buildReview(shots){
    "개인형IRP" · "위탁(국내수수료우대)" · "연금저축" 같은 문구가 잔고 화면 상단에 찍힌다. */
 function detectAcct(text){
   const t=text||'';
+  // 탭 바에는 안 쓰는 상품 이름까지 다 적혀 있다.
+  //   발행어음 연금저축 퇴직연금 신탁 CD/CP …   ← 퇴직연금 이 먼저 걸려 IRP 로 샌다
+  //   270-86-167247 [A0] [연금저축전용] 종합계좌  ← 계좌번호가 있는 이 줄이 답이다
+  // 그래서 계좌번호 줄을 먼저 보고, 거기서 못 가리면 전체를 본다.
+  const acctLine=(t.split('\n').find(l=>
+    /\d{2,}\s*-\s*\d{2,}\s*-\s*\d+|\d{6,}\s*-\s*\d{2}/.test(l))||'');
   const rules=[
     [/개인형\s*IRP|\bIRP\b|퇴직연금|DC형/i, /IRP|DC\b|퇴직/i],
     [/연금저축/,                              /연금저축|연금/],
@@ -1759,8 +1768,11 @@ function detectAcct(text){
     [/(?<!V)ISA(?![A-Z])|중개형/i,           /ISA/i],
     [/해외주식|위탁|종합|일반계좌|주식계좌/,        /일반|위탁|종합/]
   ];
-  for(const [inText,inName] of rules)
-    if(inText.test(t)){ const hit=accts().find(a=>inName.test(a)); if(hit) return hit; }
+  for(const src of [acctLine,t]){
+    if(!src) continue;
+    for(const [inText,inName] of rules)
+      if(inText.test(src)){ const hit=accts().find(a=>inName.test(a)); if(hit) return hit; }
+  }
   return null;
 }
 
