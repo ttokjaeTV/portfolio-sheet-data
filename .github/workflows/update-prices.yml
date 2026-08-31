@@ -1,0 +1,46 @@
+name: ETF 시세 CSV 갱신
+
+on:
+  schedule:
+    # UTC 기준. KST = UTC+9
+    # 00:00~06:50 UTC = 09:00~15:50 KST (장중), 평일만
+    - cron: "*/10 0-6 * * 1-5"
+    # 장 마감 정산분 1회 (16:40 KST)
+    - cron: "40 7 * * 1-5"
+  workflow_dispatch:        # 수동 실행 버튼
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-prices
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: CSV 생성
+        run: python scripts/build_etf_prices.py
+
+      - name: 변경분만 커밋
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- data/etf_prices.csv; then
+            echo "변경 없음"
+            exit 0
+          fi
+
+          git add data/etf_prices.csv
+          git commit -m "시세 갱신: $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')"
+          git push
