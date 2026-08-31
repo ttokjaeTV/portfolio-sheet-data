@@ -152,7 +152,15 @@ input::placeholder{color:#BFB6A6;font-weight:500}
   background:var(--bg-alt);border-radius:14px}
 .cash-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
 .acct-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
-.acct-card{background:var(--bg-alt);border:1px solid var(--border);border-radius:14px;padding:16px}
+.acct-card{background:var(--bg-alt);border:1px solid var(--border);border-radius:14px;padding:16px;
+  border-top:3px solid var(--kc,var(--accent));position:relative}
+/* 성격별 색을 아주 옅게 깔아 카드끼리도 구분되게 한다.
+   글자 대비를 해치지 않도록 8% 만 섞는다. */
+.acct-card::after{content:'';position:absolute;inset:0;border-radius:0 0 13px 13px;
+  background:var(--kc,var(--accent));opacity:.05;pointer-events:none}
+.acct-card>*{position:relative;z-index:1}
+.acct-card-nm::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;
+  background:var(--kc,var(--accent));margin-right:7px;flex:none}
 .acct-card-nm{font-size:14px;font-weight:800;margin-bottom:14px;display:flex;
   align-items:center;gap:7px;flex-wrap:wrap}
 .acct-card input{background:var(--white)}
@@ -1197,7 +1205,7 @@ function renderCash(){
   document.getElementById('cash-grid').innerHTML=accts().map(a=>{
     const tag = isIRP(a) ? '<span class="tagline">70% 한도</span>'
               : (isTaxAdv(a) ? '<span class="tagline">절세</span>' : '');
-    return `<div class="acct-card">
+    return `<div class="acct-card" style="--kc:${kindColor(a)}">
       <div class="acct-card-nm">${esc(a)}${tag}</div>
       <label class="label">비고 (증권사 · 계좌번호)</label>
       <input type="text" data-note="${esc(a)}" value="${esc((state.notes||{})[a]??'')}"
