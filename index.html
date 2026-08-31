@@ -122,6 +122,26 @@ input::placeholder{color:#BFB6A6;font-weight:500}
   align-items:center;gap:7px;flex-wrap:wrap}
 .acct-card input{background:var(--white)}
 .acct-note{font-size:11px;color:var(--ink-mute);font-weight:600;display:block;margin-top:2px}
+.acct-hold{margin-top:14px;padding-top:12px;border-top:1px dashed var(--border)}
+.acct-hold>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;
+  font-size:12.5px;font-weight:800;color:var(--ink-soft)}
+.acct-hold>summary::-webkit-details-marker{display:none}
+.acct-hold>summary::after{content:'▾';margin-left:auto;font-size:11px;color:var(--ink-mute);
+  transition:transform .15s ease}
+.acct-hold[open]>summary::after{transform:rotate(180deg)}
+.acct-hold>summary:hover{color:var(--accent)}
+.acct-hold-sum b{color:var(--accent)}
+.acct-hold-body{margin-top:10px}
+.acct-hold-em{font-size:11.5px;font-weight:600;color:var(--ink-mute)}
+.acct-hold-list{display:flex;flex-wrap:wrap;gap:5px}
+.hchip{display:inline-flex;align-items:center;gap:5px;background:var(--white);
+  border:1px solid var(--border);border-radius:7px;padding:4px 8px;font-size:11px;
+  font-weight:700;color:var(--ink-soft);max-width:100%}
+.hchip b{color:var(--accent);font-weight:800}
+.hchip.more{background:transparent;border-style:dashed;color:var(--ink-mute)}
+.acct-hold-go{margin-top:10px;background:transparent;border:none;padding:0;cursor:pointer;
+  font-family:inherit;font-size:11.5px;font-weight:800;color:var(--accent)}
+.acct-hold-go:hover{text-decoration:underline}
 
 /* OCR */
 .drop{border:2px dashed var(--border);border-radius:16px;padding:32px;text-align:center;
@@ -903,6 +923,39 @@ function editAccount(i){
   save(); renderAccts(); renderCash(); render();
 }
 
+/* 계좌 카드에 그 계좌에 담긴 종목을 보여준다.
+   비고를 적을 때 어떤 계좌인지 바로 알아볼 수 있게 하기 위해서다.
+   입력칸을 다시 그리면 포커스를 잃으므로 이 영역만 갱신한다. */
+function renderAcctHoldings(rows,cash){
+  document.querySelectorAll('details[data-hold]').forEach(box=>{
+    const a=box.dataset.hold;
+    const sum=box.querySelector('.acct-hold-sum');
+    const body=box.querySelector('.acct-hold-body');
+    if(!sum||!body) return;
+    const mine=rows.filter(r=>r.acct===a);
+    const c=cash[a]||0;
+    const val=mine.reduce((s,r)=>s+r.val,0)+c;
+
+    if(!mine.length&&!c){
+      sum.textContent='보유 종목 없음';
+      body.innerHTML='<div class="acct-hold-em">이 계좌에 등록된 종목이 없습니다.</div>';
+      return;
+    }
+    sum.innerHTML=`보유 종목 <b>${mine.length?new Set(mine.map(r=>r.code)).size:0}</b>종목 · ${won(val)}`;
+
+    // 같은 종목은 합쳐서 보여준다 (정수주·소수점주 따로 나오면 지저분하다)
+    const by={};
+    mine.forEach(r=>{ by[r.code]=by[r.code]||{name:r.name,val:0}; by[r.code].val+=r.val; });
+    const list=Object.values(by).sort((x,y)=>y.val-x.val);
+    body.innerHTML=`
+      ${c?`<div class="acct-hold-em">예수금 ${won(c)} 포함</div>`:''}
+      <div class="acct-hold-list">${list.map(t=>
+        `<span class="hchip" title="${esc(t.name)}">${esc(t.name.length>18?t.name.slice(0,17)+'…':t.name)}
+          <b>${wonShort(t.val)}</b></span>`).join('')||'<span class="acct-hold-em">종목 없음</span>'}</div>
+      ${list.length?`<button class="acct-hold-go" data-arow="${esc(a)}" type="button">이 계좌만 자세히 보기 →</button>`:''}`;
+  });
+}
+
 function renderSummaryNotes(){
   document.querySelectorAll('#acct-body tr').forEach(tr=>{
     const td=tr.querySelector('td'); if(!td) return;
@@ -925,6 +978,10 @@ function renderCash(){
         placeholder="예: 미래에셋 1234, 키움 연금" maxlength="40">
       <label class="label" style="margin-top:12px">예수금 (원)</label>
       <input type="number" data-cash="${esc(a)}" value="${esc(state.cash[a]??'')}" placeholder="0" min="0" step="1000">
+      <details class="acct-hold" data-hold="${esc(a)}">
+        <summary><span class="acct-hold-sum">보유 종목</span></summary>
+        <div class="acct-hold-body"></div>
+      </details>
     </div>`;
   }).join('');
 }
@@ -974,6 +1031,7 @@ function render(){
   drawDonut('chart-acct',chartAcct,acctData,c=>chartAcct=c);
 
   renderGauge(valid,cash);
+  renderAcctHoldings(valid,cash);
   renderDetail(valid,val);
   renderInsight(valid,byAsset,val,byAcct);
 }
@@ -1157,9 +1215,12 @@ document.addEventListener('click',e=>{
   // 계좌별 요약표의 행을 눌러도 같은 계좌만 보기
   const ar=e.target.closest('[data-arow]');
   if(ar){
-    detailFilter = detailFilter===ar.dataset.arow ? '' : ar.dataset.arow;
+    const a=ar.dataset.arow;
+    // 계좌 카드의 버튼은 항상 그 계좌를 보여주고, 요약표 행은 눌렀다 놨다 전환한다
+    detailFilter = (ar.classList.contains('acct-hold-go')||detailFilter!==a) ? a : '';
     render();
-    document.getElementById('acct-filter').scrollIntoView({behavior:'smooth',block:'center'});
+    const t=document.getElementById('acct-filter');
+    if(t) t.scrollIntoView({behavior:'smooth',block:'center'});
     return;
   }
   // 검수 행을 누르면 캡처에서 읽어온 위치를 표시
