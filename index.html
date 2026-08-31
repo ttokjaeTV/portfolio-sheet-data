@@ -1380,14 +1380,14 @@ function inferQtyAvg(list,price,fxMul){
       if(!fallback){
         const at=list.indexOf(q);
         const a2=list.slice(at+1).find(x=>x>0&&x!==c.cur&&x>=c.cur*0.05&&x<=c.cur*20);
-        if(a2!==undefined) fallback={qty:q,avg:a2,sure:false};
+        if(a2!==undefined) fallback={qty:q,avg:a2,sure:false,guess:true};
       }
       //   그것도 없으면 매수단가 열 없이 매수금액만 찍는 화면이다. 나눠서 만든다.
       if(!fallback){
         for(const buy of list){
           if(buy<=0||buy===q||buy===c.cur||buy===val) continue;
           const a3=buy/q;
-          if(a3>=c.cur*0.05&&a3<=c.cur*20){ fallback={qty:q,avg:+a3.toFixed(4),sure:false}; break; }
+          if(a3>=c.cur*0.05&&a3<=c.cur*20){ fallback={qty:q,avg:+a3.toFixed(4),sure:false,derived:true}; break; }
         }
       }
     }
@@ -1400,7 +1400,11 @@ let shotAcct=[], shotCols=[];
    검산으로 확인된 값은 그대로 쓰고, 추정값은 그 열이 화면에 있을 때만 넣는다. */
 function pick(g,h,cols,k){
   if(g&&g.sure) return g[k];
-  if(!cols[k]) return '';            // 화면에 없는 열은 비워 둔다
+  // 산수로 구한 값은 화면에 그 열이 없어도 쓴다.
+  //   매입단가 열이 없어도 매수금액 ÷ 수량 으로 구할 수 있다
+  //   10,772,730 ÷ 735 = 14,656.78
+  if(g&&g.derived&&g[k]!=='' ) return g[k];
+  if(!cols[k]) return '';            // 화면에도 없고 산수로도 못 구하면 비워 둔다
   if(g) return g[k];
   return (k==='qty'?h.n[0]:h.n[1])??'';
 }
@@ -1696,9 +1700,11 @@ function renderReview(){
   const miss=[];
   shotCols.forEach((c,si)=>{ if(!c) return;
     const nm=(ocrShots[si]||{}).name||('캡처'+(si+1));
-    const m=[]; if(!c.qty) m.push('<span class="need">보유수량</span>');
-    if(!c.avg) m.push('<span class="need">매입단가</span>');
-    if(m.length&&ocrRows.some(r=>r.src===si)) miss.push(`${esc(nm)} — ${m.join('·')} 열이 없습니다`);
+    const rows=ocrRows.filter(r=>r.src===si);
+    const m=[];
+    if(rows.some(r=>r.qty==='')) m.push('<span class="need">보유수량</span>');
+    if(rows.some(r=>r.avg==='')) m.push('<span class="need">매입단가</span>');
+    if(m.length&&rows.length) miss.push(`${esc(nm)} — ${m.join('·')} 열이 없습니다`);
   });
   const missBox=document.getElementById('col-warn');
   if(missBox){
