@@ -116,6 +116,12 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .empty-note{padding:28px;text-align:center;color:var(--ink-mute);font-size:14px;font-weight:600;
   background:var(--bg-alt);border-radius:14px}
 .cash-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.acct-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px}
+.acct-card{background:var(--bg-alt);border:1px solid var(--border);border-radius:14px;padding:16px}
+.acct-card-nm{font-size:14px;font-weight:800;margin-bottom:14px;display:flex;
+  align-items:center;gap:7px;flex-wrap:wrap}
+.acct-card input{background:var(--white)}
+.acct-note{font-size:11px;color:var(--ink-mute);font-weight:600;display:block;margin-top:2px}
 
 /* OCR */
 .drop{border:2px dashed var(--border);border-radius:16px;padding:32px;text-align:center;
@@ -316,6 +322,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   .holding-row .row-calc{grid-column:1/-1;text-align:left;padding-top:6px;border-top:1px dashed var(--border)}
   .holding-row>div:last-child{grid-column:1/-1}
   .cash-grid{grid-template-columns:1fr}
+  .acct-grid{grid-template-columns:1fr}
   .chart-container{height:260px}
   .insight-box{padding:24px 18px;border-radius:16px}.insight-title{font-size:18px}
   .insight-cta{flex-direction:column;align-items:stretch}.cta-link{justify-content:center}
@@ -484,9 +491,12 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 
 <!-- STEP 03 : 예수금 -->
 <div class="card">
-  <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 03 / 예수금</span></div>
-  <div class="card-desc">계좌에 남아 있는 현금(원화)입니다. 자산 비중과 IRP 안전자산 계산에 반영됩니다.</div>
-  <div class="cash-grid" id="cash-grid"></div>
+  <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 03 / 계좌 정보</span></div>
+  <div class="card-desc">
+    계좌마다 어느 증권사인지, 계좌번호 뒷자리가 무엇인지 적어두면 나중에 헷갈리지 않습니다.
+    예수금은 계좌에 남아 있는 현금(원화)이며 자산 비중과 IRP 안전자산 계산에 반영됩니다.
+  </div>
+  <div class="acct-grid" id="cash-grid"></div>
 </div>
 
 <!-- STEP 04 : 전체 현황 -->
@@ -866,19 +876,41 @@ function editAccount(i){
     state.accounts=list.filter((_,k)=>k!==i);
     state.holdings=state.holdings.filter(h=>(h.acct||list[0])!==old);
     delete state.cash[old];
+    if(state.notes) delete state.notes[old];
   }else{                                     // 이름 변경
     if(nm!==old&&list.includes(nm)){ alert('이미 있는 계좌 이름입니다.'); return; }
     state.accounts=list.map((a,k)=>k===i?nm:a);
     state.holdings.forEach(h=>{ if((h.acct||list[0])===old) h.acct=nm; });
     if(state.cash[old]!==undefined){ state.cash[nm]=state.cash[old]; delete state.cash[old]; }
+    if(state.notes&&state.notes[old]!==undefined){ state.notes[nm]=state.notes[old]; delete state.notes[old]; }
   }
   save(); renderAccts(); renderCash(); render();
 }
 
+function renderSummaryNotes(){
+  document.querySelectorAll('#acct-body tr').forEach(tr=>{
+    const td=tr.querySelector('td'); if(!td) return;
+    const a=(td.childNodes[0]||{}).textContent;
+    const note=(state.notes||{})[a&&a.trim()];
+    let el=td.querySelector('.acct-note');
+    if(note){ if(!el){ el=document.createElement('span'); el.className='acct-note'; td.appendChild(el); } el.textContent=note; }
+    else if(el) el.remove();
+  });
+}
+
 function renderCash(){
-  document.getElementById('cash-grid').innerHTML=accts().map(a=>
-    `<div><label class="label">${a}</label>
-      <input type="number" data-cash="${a}" value="${esc(state.cash[a]??'')}" placeholder="0" min="0" step="1000"></div>`).join('');
+  document.getElementById('cash-grid').innerHTML=accts().map(a=>{
+    const tag = isIRP(a) ? '<span class="tagline">70% 한도</span>'
+              : (isTaxAdv(a) ? '<span class="tagline">절세</span>' : '');
+    return `<div class="acct-card">
+      <div class="acct-card-nm">${esc(a)}${tag}</div>
+      <label class="label">비고 (증권사 · 계좌번호)</label>
+      <input type="text" data-note="${esc(a)}" value="${esc((state.notes||{})[a]??'')}"
+        placeholder="예: 미래에셋 1234, 키움 연금" maxlength="40">
+      <label class="label" style="margin-top:12px">예수금 (원)</label>
+      <input type="number" data-cash="${esc(a)}" value="${esc(state.cash[a]??'')}" placeholder="0" min="0" step="1000">
+    </div>`;
+  }).join('');
 }
 
 let chartAsset=null, chartAcct=null;
@@ -908,7 +940,9 @@ function render(){
   document.getElementById('acct-body').innerHTML=accts().map(a=>{
     const d=byAcct[a]; if(!d.val&&!d.buy) return '';
     const p=d.val-d.buy, rr=d.buy>0?(p/d.buy*100):0, w=val>0?(d.val/val*100):0;
-    return `<tr><td class="tl">${a}</td><td>${won(d.buy)}</td><td>${won(d.val)}</td>
+    const note=(state.notes||{})[a];
+    return `<tr><td class="tl">${esc(a)}${note?`<span class="acct-note">${esc(note)}</span>`:''}</td>
+      <td>${won(d.buy)}</td><td>${won(d.val)}</td>
       <td class="${cls(p)}">${(p>=0?'+':'')+won(p)}</td><td class="${cls(rr)}">${pct(rr)}</td><td>${w.toFixed(1)}%</td></tr>`;
   }).join('')||'<tr><td colspan="6" style="text-align:center;color:#8B8276;padding:24px">데이터가 없습니다</td></tr>';
   document.getElementById('acct-foot').innerHTML= val>0
@@ -1059,6 +1093,10 @@ document.addEventListener('input',e=>{
     else { render(); refocus(i,k); }
   }
   if(t.dataset.cash){ state.cash[t.dataset.cash]=t.value; save(); render(); refocusCash(t.dataset.cash); }
+  if(t.dataset.note!==undefined&&t.dataset.note){
+    if(!state.notes) state.notes={};
+    state.notes[t.dataset.note]=t.value; save(); renderSummaryNotes();
+  }
 });
 function renderCalcOnly(){ /* 검색 중에는 입력칸을 다시 그리지 않는다 */ }
 function refocus(i,k){
@@ -1104,7 +1142,7 @@ document.getElementById('chk-merge').onchange=e=>{
 document.getElementById('btn-add').onclick=()=>{ state.holdings.push({acct:accts()[0],code:'',qty:'',avg:''}); save(); render(); };
 document.getElementById('btn-clear').onclick=()=>{
   if(!confirm('입력한 내용을 모두 지웁니다. 계속할까요?')) return;
-  state={holdings:[],cash:{},merge:state.merge}; save(); renderCash(); render();
+  state={holdings:[],cash:{},notes:{},accounts:state.accounts,merge:state.merge}; save(); renderCash(); render();
 };
 document.getElementById('btn-sample').onclick=()=>{
   state={holdings:[
@@ -1139,7 +1177,7 @@ document.getElementById('file-json').onchange=e=>{
       const d=j.data||j;
       if(!d||!Array.isArray(d.holdings)) throw new Error('형식이 맞지 않습니다');
       if(!confirm('현재 입력 내용을 파일 내용으로 바꿉니다. 계속할까요?')) return;
-      state={holdings:d.holdings,cash:d.cash||{},merge:!!d.merge};
+      state={holdings:d.holdings,cash:d.cash||{},notes:d.notes||{},accounts:d.accounts,merge:!!d.merge};
       document.getElementById('chk-merge').checked=!!state.merge;
       save(); renderCash(); render();
       alert(`불러왔습니다. 종목 ${state.holdings.length}건`);
