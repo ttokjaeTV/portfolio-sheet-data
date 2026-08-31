@@ -57,8 +57,8 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 .idx-x{background:none;border:1px solid var(--border);border-radius:9px;width:32px;height:32px;
   font-size:16px;font-weight:800;color:var(--ink-mute);cursor:pointer;flex:none;line-height:1}
 .idx-x:hover{background:var(--bg-alt)}
-.idx-ranges{display:flex;gap:6px;padding:14px 22px 0}
-.idx-r{flex:1;padding:7px 0;border:1px solid var(--border);background:var(--white);
+.idx-ranges{display:flex;flex-wrap:wrap;gap:6px;padding:14px 22px 0}
+.idx-r{flex:1 1 0;min-width:56px;padding:7px 2px;border:1px solid var(--border);background:var(--white);
   border-radius:9px;font-size:12px;font-weight:800;color:var(--ink-mute);cursor:pointer;font-family:inherit}
 .idx-r.on{background:var(--dark-warm);border-color:var(--dark-warm);color:var(--white)}
 .idx-canvas{padding:12px 16px 4px;height:260px}
@@ -71,6 +71,7 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
   .idx-back{padding:10px}
   .idx-v{font-size:22px}
   .idx-canvas{height:200px;padding:10px 8px 2px}
+  .idx-r{font-size:11px;min-width:48px}
 }
 .board-note{font-size:11px;color:var(--ink-mute);font-weight:600;text-align:right;
   margin:-20px 2px 26px;line-height:1.6}
@@ -805,14 +806,15 @@ function renderBoard(rows){
   board.style.gridTemplateColumns=`repeat(${items.length},1fr)`;
   const stamp=items[0][5]||'';
   document.getElementById('board-note').textContent=
-    `기준 ${stamp} · 타일을 누르면 1년 흐름 · 해외지수는 전 거래일 종가, 환율은 하나은행 고시 매매기준율`;
+    `기준 ${stamp} · 타일을 누르면 5년 흐름 · 해외지수는 전 거래일 종가, 환율은 하나은행 고시 매매기준율`;
   BOARD={}; items.forEach(r=>{ BOARD[r[1]]={val:num(r[2]),rate:num(r[4])}; });
 }
 
 /* ---------- 지수 흐름 차트 ---------- */
 // 이력은 처음 눌렀을 때 한 번만 받는다. 상황판만 볼 사람에게 56KB 를 미리 물리지 않는다.
 let BOARD={}, HIST=null, HIST_P=null, IDX_CHART=null, IDX_NAME='', IDX_DAYS=250;
-const RANGES=[['1개월',22],['3개월',65],['6개월',130],['1년',400]];
+// 달력 개월이 아니라 거래일 수다. 한 해 약 250일로 잡았다.
+const RANGES=[['1개월',22],['3개월',65],['6개월',125],['1년',250],['3년',750],['5년',1300]];
 
 function loadHist(){
   if(HIST_P) return HIST_P;

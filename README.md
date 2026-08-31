@@ -19,7 +19,7 @@
 ```
 index.html                            포트폴리오 관리 도구 (단일 HTML)
 scripts/build_etf_prices.py           국내 ETF 시세 → etf_prices.csv
-scripts/build_index_history.py        지수·환율 1년치 일별 종가 → indices_history.csv
+scripts/build_index_history.py        지수·환율 5년치 일별 종가 → indices_history.csv
 scripts/build_us_symbols.py           미국 티커 → 네이버 코드 매핑 (증분)
 scripts/build_us_prices.py            미국 시세 + 환율 → us_prices.csv, fx.csv
 .github/workflows/update-prices.yml   장중 10분마다 시세 갱신
@@ -36,7 +36,7 @@ docs/시트_적용가이드.md                 기존 스프레드시트를 CSV�
 | `data/us_prices.csv` | 미국 주식·ETF 티커·종목명·거래소·USD 시세 | 12,299행 |
 | `data/fx.csv` | USD/KRW 고시환율 | 1행 |
 | `data/us_symbols.json` | 티커 → 네이버 reutersCode 매핑 캐시 | 13,141건 |
-| `data/indices_history.csv` | 지수·환율 1년치 일별 종가 (상황판 차트용) | 1,942행 |
+| `data/indices_history.csv` | 지수·환율 5년치 일별 종가 (상황판 차트용) | 8,823행 |
 
 출처
 

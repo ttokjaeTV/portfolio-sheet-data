@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-주요 지수 + 환율의 1년치 일별 종가 → data/indices_history.csv
+주요 지수 + 환율의 5년치 일별 종가 → data/indices_history.csv
 
 상황판 타일을 눌렀을 때 흐름을 보여주기 위한 자료다.
 브라우저에서 네이버를 직접 부르면 CORS 로 막히므로 여기서 받아 레포에 넣는다.
@@ -32,8 +32,8 @@ FOR_URL = ("https://api.stock.naver.com/chart/foreign/index/{}/day"
 FX_URL = "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?page={}&pageSize=60"
 
 OUT_PATH = os.environ.get("INDEX_HISTORY_PATH", "data/indices_history.csv")
-DAYS = 400          # 달력일. 휴장일이 빠져 영업일 약 260일이 남는다
-FX_PAGES = 5        # 60건씩 5페이지 = 약 1년
+DAYS = 1830         # 달력일. 휴장일이 빠져 영업일 약 1,230일(5년)이 남는다
+FX_PAGES = 22       # 60건씩 22페이지 = 약 5년
 
 DOMESTIC = [("KOSPI", "코스피"), ("KOSDAQ", "코스닥")]
 WORLD = [(".DJI", "다우"), (".IXIC", "나스닥"), (".INX", "S&P 500"), (".VIX", "VIX")]
@@ -120,7 +120,7 @@ def main():
     print(f"완료: {OUT_PATH} ({len(dedup)}행)", file=sys.stderr)
     for n in sorted(names):
         sub = [r for r in dedup if r[0] == n]
-        print(f"  {n:<8} {len(sub):>4}일  {sub[0][1]} ~ {sub[-1][1]}", file=sys.stderr)
+        print(f"  {n:<8} {len(sub):>5}일  {sub[0][1]} ~ {sub[-1][1]}", file=sys.stderr)
 
 
 if __name__ == "__main__":
