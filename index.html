@@ -1428,12 +1428,15 @@ function nums(line,hit){
   s=s.replace(/\d[\d,]*(?:\.\d+)?\s*%/g,' ');     // 수익률 제거
   // 글자에 붙은 숫자는 값이 아니다. "현대차2우B" 의 2, "2우6" 의 6 이 수량으로 잡히던 문제.
   // 앞뒤가 공백·문장 끝·통화기호일 때만 숫자로 인정한다.
+  // 마이너스가 붙은 평가손익도 가져온다. 부호 때문에 버리면
+  // 매입금액 = 평가금액 - 평가손익 검산을 아예 못 한다.
+  //   목레버리지 -3,463,518  511  15,118   ← 이 -3,463,518 이 있어야 15,118 을 확정한다
   const out=[];
-  const re=/(^|[\s(₩$])(\d[\d.,]*\d|\d)(?=$|[\s)원]|$)/g;
+  const re=/(^|[\s(₩$])([-−–])?(\d[\d.,]*\d|\d)(?=$|[\s)원]|$)/g;
   let m;
   while((m=re.exec(s))){
-    const v=parseFloat(fixThousands(m[2]));
-    if(isFinite(v)&&v>0) out.push(v);
+    const v=parseFloat(fixThousands(m[3]))*(m[2]?-1:1);
+    if(isFinite(v)&&v!==0) out.push(v);
   }
   return out;
 }
@@ -1493,7 +1496,9 @@ function inferQtyAvg(list,price,fxMul){
         if(a<=0||ai===qi||ai===c.i) continue;
         if(a<c.cur*0.05||a>c.cur*20) continue;      // 매입가는 현재가와 자릿수가 비슷하다
         // (가) 수량 × 매입가 = 매입금액 이 화면에 있는 경우
-        if(find((x,i)=>near(x,q*a,0.005),qi,ai,c.i)>=0)
+        // 평가금액으로 쓴 칸(vi)은 제외한다. 그러지 않으면 매입가 자리에 현재가를 넣고
+        // 수량 × 현재가 = 평가금액 이라는 같은 식을 다시 확인하는 꼴이 된다.
+        if(find((x,i)=>near(x,q*a,0.005),qi,ai,c.i,vi)>=0)
           return {qty:q,avg:a,sure:c.onScreen};
         // (나) 매입금액 열이 없는 화면. 매입금액 = 평가금액 - 평가손익 으로 유도한다.
         if(find((pl,i)=>near(a,(val-pl)/q,0.005),qi,ai,c.i,vi)>=0)
@@ -1533,7 +1538,8 @@ function pick(g,h,cols,k){
   if(g&&g.derived&&g[k]!=='' ) return g[k];
   if(!cols[k]) return '';            // 화면에도 없고 산수로도 못 구하면 비워 둔다
   if(g) return g[k];
-  return (k==='qty'?h.n[0]:h.n[1])??'';
+  const pos=h.n.filter(v=>v>0);      // 평가손익이 마이너스면 열에서 빼고 센다
+  return (k==='qty'?pos[0]:pos[1])??'';
 }
 
 /* 계좌 이름의 다음 번호를 만든다. 일반계좌 → 일반계좌2, 연금저축펀드1 → 연금저축펀드2 */
@@ -1686,7 +1692,11 @@ function parseShot(src,si){
     // 단, 찾은 이름의 조각이 이 줄에 실제로 있어야 한다.
     // (그러지 않으면 "종목코드 평가금액 현재가" 같은 헤더 줄이
     //  아랫줄 종목을 가로채 진짜 행을 지워 버린다)
-    const onThisLine=!a&&!!j&&lcsLen(letters(lines[i]),letters(j.m.name))>=3;
+    // 조각을 셀 때 숫자는 뺀다. 금액에 섞인 숫자까지 세면
+    // "현금 22.69% 135,200 33,800" 이 TIGER 200 IT 의 200 을 자기 조각으로 착각해
+    // 아랫줄의 진짜 TIGER 종목을 가로챈다.
+    const nodigit=t=>letters(t).replace(/[0-9]/g,'');
+    const onThisLine=!a&&!!j&&lcsLen(nodigit(lines[i]),nodigit(j.m.name))>=3;
     const better=needJoin&&(
       onThisLine
       || (a&&j.m.code!==a.m.code
