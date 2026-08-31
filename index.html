@@ -212,6 +212,13 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .shot{display:inline-flex;align-items:center;gap:6px;background:var(--bg-alt);border-radius:8px;
   padding:5px 10px;font-size:11.5px;font-weight:700;color:var(--ink-soft)}
 .shot.err{background:#F6D9D4;color:var(--red)}
+.shot-group td{background:var(--bg-alt) !important;padding:10px 12px !important;
+  border-bottom:1.5px solid var(--border)}
+.shot-group-in{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.shot-group-nm{font-size:12.5px;font-weight:800;color:var(--ink-soft)}
+.shot-group-set{font-size:12px;font-weight:700;color:var(--ink-mute);
+  display:inline-flex;align-items:center;gap:8px}
+.shot-group-set select{width:auto;min-width:150px;padding:6px 10px;font-size:12.5px}
 
 .insight-box{background:var(--dark-warm);color:var(--white);border-radius:20px;padding:36px;margin-bottom:24px}
 .insight-label{display:flex;align-items:center;gap:8px;margin-bottom:16px}
@@ -370,8 +377,9 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 
   <div class="review" id="review">
     <div class="warn-box">
-      ⚠️ 문자 인식은 완벽하지 않습니다. <b>종목·수량·매입가를 반드시 눈으로 확인</b>하고 고친 뒤 추가하세요.
-      특히 숫자 자릿수와 비슷한 이름의 종목을 주의 깊게 봐주세요.
+      ⚠️ 문자 인식은 완벽하지 않습니다. <b>종목·수량·매입가를 반드시 눈으로 확인</b>하고 고친 뒤 추가하세요.<br>
+      캡처에 <b>보유수량·평균단가 열이 보이지 않으면</b> 화면에 있는 다른 숫자(평가손익·평가금액)를
+      집어옵니다. 증권사 앱에서 그 두 열이 나오도록 좌우로 밀어 캡처하시면 정확도가 크게 올라갑니다.
     </div>
     <div class="review-bulk">
       <span>모두 이 계좌로 지정</span>
@@ -728,8 +736,18 @@ function renderRows(){
   }).join('');
 }
 /* ---------- 계좌 관리 ---------- */
+/* 계좌 드롭다운. 맨 끝에 '새 계좌 추가' 항목을 붙여 어디서든 바로 만들 수 있게 한다 */
 function acctOptions(sel){
-  return accts().map(a=>`<option ${a===(sel||accts()[0])?'selected':''}>${esc(a)}</option>`).join('');
+  return accts().map(a=>`<option ${a===(sel||accts()[0])?'selected':''}>${esc(a)}</option>`).join('')
+    +'<option value="__add__">+ 새 계좌 추가…</option>';
+}
+/* 드롭다운에서 '새 계좌 추가'를 고른 경우 처리.
+   만들었으면 새 이름을, 취소했으면 null 을 준다. */
+function handleAddOption(selectEl,fallback){
+  const name=addAccount();
+  if(name){ selectEl.value=name; return name; }
+  selectEl.value=fallback||accts()[0];
+  return null;
 }
 function renderAccts(){
   const box=document.getElementById('acct-chips');
@@ -743,11 +761,14 @@ function renderAccts(){
   }).join('');
 }
 function addAccount(){
-  const name=(prompt('추가할 계좌 이름을 입력하세요.\n예: 연금저축펀드3, IRP2, 일반계좌(해외)')||'').trim();
-  if(!name) return;
-  if(accts().includes(name)){ alert('이미 있는 계좌입니다.'); return; }
-  state.accounts=[...accts(),name];
+  const base=accts();
+  const suggest=/일반계좌/.test(base.join()) ? `일반계좌${base.filter(a=>/일반계좌/.test(a)).length+1}` : '일반계좌';
+  const name=(prompt('추가할 계좌 이름을 입력하세요.\n예: 연금저축펀드3, IRP2, 일반계좌2',suggest)||'').trim();
+  if(!name) return null;
+  if(base.includes(name)){ alert('이미 있는 계좌입니다.'); return null; }
+  state.accounts=[...base,name];
   save(); renderAccts(); renderCash(); render();
+  return name;
 }
 function editAccount(i){
   const list=accts(), old=list[i];
@@ -967,7 +988,13 @@ function refocusCash(a){
   if(el){ el.focus(); try{ el.setSelectionRange(el.value.length,el.value.length); }catch(e){} }
 }
 document.addEventListener('change',e=>{
-  if(e.target.dataset.k==='acct'){ state.holdings[+e.target.dataset.i].acct=e.target.value; save(); render(); }
+  const t=e.target;
+  if(t.dataset.k==='acct'){
+    const h=state.holdings[+t.dataset.i];
+    if(t.value==='__add__'){ const n=handleAddOption(t,h.acct); if(!n) return; h.acct=n; }
+    else h.acct=t.value;
+    save(); render();
+  }
 });
 document.addEventListener('click',e=>{
   const pick=e.target.closest('[data-pick]');
@@ -1124,7 +1151,7 @@ async function runOCR(files){
               prog(base+span*(0.3+m.progress*0.7),`글자를 읽고 있습니다 ${tag}… ${Math.round(m.progress*100)}%`);
           }
         });
-        texts.push(data.text||'');
+        texts.push({name:imgs[i].name, text:data.text||''});
         shots.children[i].textContent=`🖼 ${imgs[i].name} · 완료`;
       }catch(err){
         shots.children[i].className='shot err';
@@ -1135,7 +1162,7 @@ async function runOCR(files){
 
     prog(1,'인식 완료');
     setTimeout(()=>document.getElementById('ocr-prog').classList.remove('on'),700);
-    buildReview(texts.join('\n'));
+    buildReview(texts);
   }catch(e){
     document.getElementById('ocr-prog').classList.remove('on');
     alert('캡처를 읽지 못했습니다.\n\n'+e.message
@@ -1164,30 +1191,38 @@ function nums(line,hit){
   return (s.match(/\d[\d,]*(?:\.\d+)?/g)||[])
     .map(v=>parseFloat(v.replace(/,/g,''))).filter(n=>isFinite(n)&&n>0);
 }
-function buildReview(text){
-  ocrRaw=text||'';
-  const lines=ocrRaw.split('\n').map(s=>s.trim()).filter(s=>s.length>1);
+function buildReview(shots){
+  if(typeof shots==='string') shots=[{name:'캡처',text:shots}];
+  ocrRaw=shots.map(s=>s.text).join('\n');
+  ocrShots=shots.map(s=>s.name);
+  ocrRows=[];
+  shots.forEach((shot,si)=>parseShot(shot.text,si));
+  renderReview();
+}
+
+/* 캡처 한 장을 파싱해 ocrRows 에 담는다. si = 몇 번째 캡처인지 */
+function parseShot(text,si){
+  const lines=(text||'').split('\n').map(s=>s.trim()).filter(s=>s.length>1);
   const hits=[];
   lines.forEach(line=>{
     const r=matchStock(line);
     if(r) hits.push({line,m:r.m,via:r.via,lot:r.lot||'',n:nums(line,r.m)});
   });
 
-  ocrRows=[];
   const pipes=hits.filter(h=>h.via==='pipe');
 
   if(pipes.length){
     // "현금 | AMD", "소수점 | AMD" 처럼 구분선 줄이 곧 로트 하나다.
     // 정수주와 소수점주는 평균단가가 다르므로 절대 합치지 않는다.
     pipes.forEach(h=>{
-      ocrRows.push({line:h.line,code:h.m.code,name:h.m.name,lot:h.lot,acct:accts()[0],
+      ocrRows.push({src:si,line:h.line,code:h.m.code,name:h.m.name,lot:h.lot,acct:accts()[0],
         isUS:h.m.cur==='USD', qty:h.n[0]??'', avg:h.n[1]??'', use:true});
     });
     // 구분선 줄이 없는 종목(다른 레이아웃 혼재)은 따로 주워 담는다
     const have=new Set(pipes.map(h=>h.m.code));
     hits.filter(h=>h.via!=='pipe'&&!have.has(h.m.code)&&h.n.length>=2).forEach(h=>{
       have.add(h.m.code);
-      ocrRows.push({line:h.line,code:h.m.code,name:h.m.name,lot:'',acct:accts()[0],
+      ocrRows.push({src:si,line:h.line,code:h.m.code,name:h.m.name,lot:'',acct:accts()[0],
         isUS:h.m.cur==='USD', qty:h.n[0]??'', avg:h.n[1]??'', use:true});
     });
   }else{
@@ -1198,11 +1233,15 @@ function buildReview(text){
         const nx=hits[++i]; merged.push(nx.line);
         if(nx.n.length>h.n.length) h=nx;
       }
-      ocrRows.push({line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,lot:'',acct:accts()[0],
+      ocrRows.push({src:si,line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,lot:'',acct:accts()[0],
         isUS:h.m.cur==='USD', qty:h.n[0]??'', avg:h.n[1]??'', use:true});
     }
   }
 
+}
+
+let ocrShots=[];
+function renderReview(){
   const body=document.getElementById('review-body');
   if(!ocrRows.length){
     body.innerHTML='<tr><td colspan="6" style="text-align:left;color:#8B8276;padding:20px">'
@@ -1213,14 +1252,33 @@ function buildReview(text){
       +'white-space:pre-wrap;font-size:11px;max-height:220px;overflow:auto">'
       +esc(ocrRaw.slice(0,2000)||'(읽어낸 글자가 없습니다)')+'</pre></td></tr>';
   }else{
-    body.innerHTML=ocrRows.map((r,i)=>`<tr>
+    const rowHtml=(r,i)=>`<tr>
       <td class="tl" style="max-width:210px;white-space:normal;font-size:11px;color:#8B8276">${esc(r.line)}</td>
       <td class="tl">${esc(r.name)}<br><span style="font-size:11px;color:#8B8276">
         ${r.isUS?'<span class="flag us">미국</span>':''}${esc(r.code)}${r.lot?` · ${esc(r.lot)}`:''}</span></td>
       <td class="tl"><select data-ocr="${i}" data-f="acct">${acctOptions(r.acct)}</select></td>
       <td><input type="number" data-ocr="${i}" data-f="qty" value="${esc(r.qty)}" step="any"></td>
       <td><input type="number" data-ocr="${i}" data-f="avg" value="${esc(r.avg)}" step="any"></td>
-      <td><input type="checkbox" data-ocr="${i}" data-f="use" checked style="width:auto"></td></tr>`).join('');
+      <td><input type="checkbox" data-ocr="${i}" data-f="use" ${r.use?'checked':''} style="width:auto"></td></tr>`;
+
+    let html='';
+    // 캡처가 여러 장이면 장별로 묶고, 묶음마다 계좌를 한 번에 지정할 수 있게 한다
+    if(ocrShots.length>1){
+      ocrShots.forEach((nm,si)=>{
+        const idx=ocrRows.map((r,i)=>[r,i]).filter(([r])=>r.src===si);
+        if(!idx.length) return;
+        html+=`<tr class="shot-group"><td colspan="6">
+          <div class="shot-group-in">
+            <span class="shot-group-nm">🖼 ${esc(nm)} · ${idx.length}종목</span>
+            <span class="shot-group-set">이 캡처 전체를
+              <select data-shot="${si}">${acctOptions(ocrRows[idx[0][1]].acct)}</select> 로</span>
+          </div></td></tr>`;
+        html+=idx.map(([r,i])=>rowHtml(r,i)).join('');
+      });
+    }else{
+      html=ocrRows.map(rowHtml).join('');
+    }
+    body.innerHTML=html;
     document.getElementById('bulk-acct').innerHTML=acctOptions();
   }
   document.getElementById('review').classList.add('on');
@@ -1296,15 +1354,37 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('change',e=>{
   const t=e.target;
-  if(t.dataset.ocr===undefined) return;
-  const r=ocrRows[+t.dataset.ocr];
-  if(t.dataset.f==='use') r.use=t.checked;
-  else if(t.dataset.f==='acct') r.acct=t.value;
+
+  // 검수 행
+  if(t.dataset.ocr!==undefined){
+    const r=ocrRows[+t.dataset.ocr];
+    if(t.dataset.f==='use') r.use=t.checked;
+    else if(t.dataset.f==='acct'){
+      if(t.value==='__add__'){ const n=handleAddOption(t,r.acct); if(!n) return; r.acct=n; renderReview(); }
+      else r.acct=t.value;
+    }
+    return;
+  }
+
+  // 캡처 한 장 전체를 한 계좌로
+  if(t.dataset.shot!==undefined){
+    const si=+t.dataset.shot;
+    const cur=(ocrRows.find(r=>r.src===si)||{}).acct;
+    let v=t.value;
+    if(v==='__add__'){ const n=handleAddOption(t,cur); if(!n) return; v=n; }
+    ocrRows.forEach(r=>{ if(r.src===si) r.acct=v; });
+    renderReview();
+    return;
+  }
+
+  // 전체 일괄 지정 드롭다운에서 계좌를 새로 만든 경우
+  if(t.id==='bulk-acct'&&t.value==='__add__') handleAddOption(t,accts()[0]);
 });
 document.getElementById('btn-bulk-apply').onclick=()=>{
   const v=document.getElementById('bulk-acct').value;
+  if(v==='__add__'){ alert('먼저 계좌를 선택하세요.'); return; }
   ocrRows.forEach(r=>r.acct=v);
-  document.querySelectorAll('[data-ocr][data-f="acct"]').forEach(s=>s.value=v);
+  renderReview();
 };
 document.getElementById('btn-acct-add').onclick=addAccount;
 document.addEventListener('click',e=>{
