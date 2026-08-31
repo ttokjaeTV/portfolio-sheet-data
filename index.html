@@ -132,6 +132,8 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .prog-txt{font-size:12px;font-weight:700;color:var(--ink-mute);margin-top:8px}
 .review{margin-top:20px;display:none}
 .review.on{display:block}
+.col-warn{background:#FDF6E7;border:1px solid #EBD9A8;border-radius:12px;padding:14px 16px;
+  font-size:13px;font-weight:600;color:#7A5A1E;line-height:1.75;margin-bottom:16px}
 .warn-box{background:#FBEDE9;border:1px solid #EFC9BE;border-radius:12px;padding:14px 16px;
   font-size:13px;font-weight:600;color:#8C3A22;line-height:1.7;margin-bottom:16px}
 
@@ -430,6 +432,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
       캡처에 <b>보유수량·평균단가 열이 보이지 않으면</b> 화면에 있는 다른 숫자(평가손익·평가금액)를
       집어옵니다. 증권사 앱에서 그 두 열이 나오도록 좌우로 밀어 캡처하시면 정확도가 크게 올라갑니다.<br><b>행을 누르면</b> 그 종목을 캡처의 어디에서 읽었는지 네모로 표시합니다.
     </div>
+    <div class="col-warn" id="col-warn" style="display:none"></div>
     <div class="review-bulk">
       <span>모두 이 계좌로 지정</span>
       <select id="bulk-acct"></select>
@@ -1323,7 +1326,16 @@ function inferQtyAvg(list,price,fxMul){
   }
   return fallback;
 }
-let shotAcct=[];
+let shotAcct=[], shotCols=[];
+
+/* 값을 넣을지 결정한다.
+   검산으로 확인된 값은 그대로 쓰고, 추정값은 그 열이 화면에 있을 때만 넣는다. */
+function pick(g,h,cols,k){
+  if(g&&g.sure) return g[k];
+  if(!cols[k]) return '';            // 화면에 없는 열은 비워 둔다
+  if(g) return g[k];
+  return (k==='qty'?h.n[0]:h.n[1])??'';
+}
 
 /* 계좌 이름의 다음 번호를 만든다. 일반계좌 → 일반계좌2, 연금저축펀드1 → 연금저축펀드2 */
 function nextAcctName(base,taken){
@@ -1387,6 +1399,17 @@ function detectAcct(text){
   return null;
 }
 
+/* 캡처의 표 헤더를 읽어 어떤 열이 화면에 있는지 판단한다.
+   "종목명 평가손익 수익률 평가금액" 처럼 보유수량·매입단가 열이 아예 없는 화면에서
+   다른 숫자를 수량·매입가에 밀어 넣으면 안 된다. 없으면 비워두고 알려준다. */
+function detectCols(text){
+  const t=text||'';
+  return {
+    qty: /보유수량|매도가능|주문가능|수량|보유(?!잔고)/.test(t),
+    avg: /매입단가|평균단가|매수단가|매입가|평단/.test(t)
+  };
+}
+
 function parseShot(src,si){
   // src 가 문자열이면 줄로 쪼개고, {text,bbox} 배열이면 좌표를 함께 쓴다
   const rows = typeof src==='string'
@@ -1396,6 +1419,8 @@ function parseShot(src,si){
   const guess=detectAcct(whole)||accts()[0];
   shotAcct[si]=guess;
   const mkt=detectMarket(whole);
+  const cols=detectCols(whole);
+  shotCols[si]=cols;
   const lines=rows.map(r=>r.text);
   const boxes=rows.map(r=>r.bbox);
   const union=(a,b)=>!a?b:(!b?a:{x0:Math.min(a.x0,b.x0),y0:Math.min(a.y0,b.y0),
@@ -1480,7 +1505,7 @@ function parseShot(src,si){
     pipes.forEach(h=>{
       const g=inferQtyAvg(h.n,h.m.price,h.m.cur==='USD'?FX:0);
       ocrRows.push({src:si,box:h.box,line:h.line,code:h.m.code,name:h.m.name,lot:h.lot,acct:guess,nameSure:h.nameSure,
-        isUS:h.m.cur==='USD', qty:g?g.qty:(h.n[0]??''), avg:g?g.avg:(h.n[1]??''),
+        isUS:h.m.cur==='USD', qty:pick(g,h,cols,'qty'), avg:pick(g,h,cols,'avg'),
         sure:!!(g&&g.sure), use:true});
     });
     // 구분선 줄이 없는 종목(다른 레이아웃 혼재)은 따로 주워 담는다
@@ -1489,7 +1514,7 @@ function parseShot(src,si){
       have.add(h.m.code);
       const g=inferQtyAvg(h.n,h.m.price,h.m.cur==='USD'?FX:0);
       ocrRows.push({src:si,box:h.box,line:h.line,code:h.m.code,name:h.m.name,lot:'',acct:guess,nameSure:h.nameSure,
-        isUS:h.m.cur==='USD', qty:g?g.qty:(h.n[0]??''), avg:g?g.avg:(h.n[1]??''),
+        isUS:h.m.cur==='USD', qty:pick(g,h,cols,'qty'), avg:pick(g,h,cols,'avg'),
         sure:!!(g&&g.sure), use:true});
     });
   }else{
@@ -1514,7 +1539,7 @@ function parseShot(src,si){
       h={...h,n};
       const g=inferQtyAvg(h.n,h.m.price,h.m.cur==='USD'?FX:0);
       ocrRows.push({src:si,box:h.box,line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,lot:'',acct:guess,nameSure:h.nameSure,
-        isUS:h.m.cur==='USD', qty:g?g.qty:(h.n[0]??''), avg:g?g.avg:(h.n[1]??''),
+        isUS:h.m.cur==='USD', qty:pick(g,h,cols,'qty'), avg:pick(g,h,cols,'avg'),
         sure:!!(g&&g.sure), use:true});
     }
   }
@@ -1567,6 +1592,22 @@ function renderReview(){
     if(seenRow.has(k)) return false;
     seenRow.add(k); return true;
   });
+
+  // 화면에 없는 열이 있으면 알려준다
+  const miss=[];
+  shotCols.forEach((c,si)=>{ if(!c) return;
+    const nm=(ocrShots[si]||{}).name||('캡처'+(si+1));
+    const m=[]; if(!c.qty) m.push('보유수량'); if(!c.avg) m.push('매입단가');
+    if(m.length&&ocrRows.some(r=>r.src===si)) miss.push(`${nm} — ${m.join('·')} 열이 없습니다`);
+  });
+  const missBox=document.getElementById('col-warn');
+  if(missBox){
+    missBox.innerHTML = miss.length
+      ? `📋 <b>캡처에 없는 열은 비워 두었습니다.</b><br>${miss.map(esc).join('<br>')}<br>
+         증권사 앱에서 표를 좌우로 밀어 그 열이 보이게 다시 캡처하시거나, 직접 입력해 주세요.`
+      : '';
+    missBox.style.display = miss.length ? 'block' : 'none';
+  }
 
   const body=document.getElementById('review-body');
   if(!ocrRows.length){
