@@ -1451,50 +1451,69 @@ function nums(line,hit){
 function inferQtyAvg(list,price,fxMul){
   if(list.length<3) return null;
   const near=(a,b,t)=>Math.abs(a-b)<=Math.max(Math.abs(b)*(t||0.005),0.51);
+  // 값이 아니라 자리(index)로 구분한다.
+  // 1주만 보유하면 평가금액과 현재가가 같은 숫자가 되는데,
+  // 값으로 비교하면 둘 다 걸러져 검산이 통째로 실패한다.
+  const N=list.length;
+  const find=(pred,...skip)=>{
+    for(let i=0;i<N;i++){ if(skip.includes(i)) continue; if(pred(list[i],i)) return i; }
+    return -1;
+  };
 
-  // 1) 화면에서 현재가로 보이는 숫자 찾기 (우리 시세와 ±25% 이내면 후보)
-  const anchors=[];
-  if(price>0){
-    list.forEach(x=>{ if(x>0&&Math.abs(x-price)<=price*0.25) anchors.push({v:x,gap:Math.abs(x-price)}); });
-    anchors.sort((a,b)=>a.gap-b.gap);
-  }
   let fallback=null;
-  const cands=anchors.map(a=>({cur:a.v,onScreen:true}));
-  if(price>0) cands.push({cur:price,onScreen:false});   // 현재가 열이 안 잡힌 경우 대비
+  const cands=[];
+  if(price>0){
+    list.forEach((v,i)=>{ if(v>0&&Math.abs(v-price)<=price*0.25)
+      cands.push({i,cur:v,onScreen:true,gap:Math.abs(v-price)}); });
+    cands.sort((a,b)=>a.gap-b.gap);
+    cands.push({i:-1,cur:price,onScreen:false});   // 현재가 열이 안 잡힌 경우 대비
+  }
 
   for(const c of cands){
-    for(const q of list){
-      if(q<=0||q===c.cur) continue;
-      // 수량 × 현재가 = 평가금액 이 화면에 있어야 한다
-      // 미국 종목인데 평가금액만 원화로 찍는 증권사가 있다. 환율을 곱해서도 맞춰본다.
+    for(let qi=0;qi<N;qi++){
+      const q=list[qi];
+      if(q<=0||qi===c.i) continue;
+
+      // 수량 × 현재가 = 평가금액 이 화면에 있어야 한다.
+      // 미국 종목인데 평가금액만 원화로 찍는 증권사가 있어 환율도 곱해 본다.
       const tol=c.onScreen?0.005:0.05;
-      const val=list.find(x=>x!==q&&x!==c.cur&&near(x,q*c.cur,tol))
-             ?? (fxMul?list.find(x=>x!==q&&x!==c.cur&&near(x,q*c.cur*fxMul,0.03)):undefined);
-      if(val===undefined) continue;
-      for(const a of list){
-        if(a<=0||a===q||a===c.cur) continue;
-        if(a<c.cur*0.05||a>c.cur*20) continue;         // 매입가는 현재가와 자릿수가 비슷하다
+      let vi=find((x,i)=>near(x,q*c.cur,tol),qi,c.i);
+      if(vi<0&&fxMul) vi=find((x,i)=>near(x,q*c.cur*fxMul,0.03),qi,c.i);
+      if(vi<0) continue;
+      const val=list[vi];
+
+      // 표에서 매입단가는 수량 뒤 칸에 온다. 뒤쪽을 먼저 보고 없으면 앞쪽을 본다.
+      // 1주만 보유하면 (평가금액 - 평가손익) ÷ 1 = 매입단가 가 양방향으로 성립해
+      // 평가손익을 매입단가로 잘못 집는 일이 있다. 칸 순서로 가른다.
+      const order=[];
+      for(let i=qi+1;i<N;i++) order.push(i);
+      for(let i=0;i<qi;i++) order.push(i);
+      for(const ai of order){
+        const a=list[ai];
+        if(a<=0||ai===qi||ai===c.i) continue;
+        if(a<c.cur*0.05||a>c.cur*20) continue;      // 매입가는 현재가와 자릿수가 비슷하다
         // (가) 수량 × 매입가 = 매입금액 이 화면에 있는 경우
-        if(list.some(x=>x!==q&&x!==a&&x!==c.cur&&near(x,q*a,0.005)))
+        if(find((x,i)=>near(x,q*a,0.005),qi,ai,c.i)>=0)
           return {qty:q,avg:a,sure:c.onScreen};
-        // (나) 매입금액 열이 없는 화면. 평가손익으로 유도한다.
-        //     매입금액 = 평가금액 - 평가손익  →  매입단가 = 그 값 / 수량
-        if(list.some(pl=>pl!==q&&pl!==a&&pl!==c.cur&&pl!==val
-              &&near(a,(val-pl)/q,0.005)))
+        // (나) 매입금액 열이 없는 화면. 매입금액 = 평가금액 - 평가손익 으로 유도한다.
+        if(find((pl,i)=>near(a,(val-pl)/q,0.005),qi,ai,c.i,vi)>=0)
           return {qty:q,avg:a,sure:c.onScreen};
       }
+
       // (다) 매입가를 확인할 값이 화면에 없는 경우.
       //   먼저 수량 바로 뒤에 오는 숫자를 본다. 대개 그 자리가 매입단가다.
       if(!fallback){
-        const at=list.indexOf(q);
-        const a2=list.slice(at+1).find(x=>x>0&&x!==c.cur&&x>=c.cur*0.05&&x<=c.cur*20);
-        if(a2!==undefined) fallback={qty:q,avg:a2,sure:false,guess:true};
+        for(let i=qi+1;i<N;i++){
+          const x=list[i];
+          if(i===c.i) continue;
+          if(x>0&&x>=c.cur*0.05&&x<=c.cur*20){ fallback={qty:q,avg:x,sure:false,guess:true}; break; }
+        }
       }
       //   그것도 없으면 매수단가 열 없이 매수금액만 찍는 화면이다. 나눠서 만든다.
       if(!fallback){
-        for(const buy of list){
-          if(buy<=0||buy===q||buy===c.cur||buy===val) continue;
-          const a3=buy/q;
+        for(let i=0;i<N;i++){
+          if(i===qi||i===c.i||i===vi) continue;
+          const a3=list[i]/q;
           if(a3>=c.cur*0.05&&a3<=c.cur*20){ fallback={qty:q,avg:+a3.toFixed(4),sure:false,derived:true}; break; }
         }
       }
@@ -1605,6 +1624,7 @@ function parseShot(src,si){
   const mkt=detectMarket(whole);
   const cols=detectCols(whole);
   shotCols[si]=cols;
+  krStyleNums = mkt!=='US';
   const lines=rows.map(r=>r.text);
   const boxes=rows.map(r=>r.bbox);
   const union=(a,b)=>!a?b:(!b?a:{x0:Math.min(a.x0,b.x0),y0:Math.min(a.y0,b.y0),
@@ -1973,8 +1993,12 @@ function fuzzyKR(line,nums){
      2.924,295  ← 실제로는 2,924,295
    구분자가 둘 이상이고 각 묶음이 정확히 3자리면 천단위로 본다.
    구분자가 하나뿐인 39.025 같은 값은 소수점일 수 있으므로 건드리지 않는다. */
+let krStyleNums=false;   // 국내 화면이면 소수점이 거의 없다
 function fixThousands(tok){
   if(/^\d{1,3}(?:[.,]\d{3}){2,}$/.test(tok)) return tok.replace(/[.,]/g,'');
+  // 국내 잔고 화면의 금액은 정수라 27.550 은 27,550 의 오인식이다.
+  // 미국 종목 화면은 596.2445 처럼 소수 넷째 자리까지 쓰므로 건드리지 않는다.
+  if(krStyleNums&&/^\d{1,3}\.\d{3}$/.test(tok)) return tok.replace('.','');
   return tok.replace(/,/g,'');
 }
 function pickNums(str){
