@@ -1476,7 +1476,11 @@ function parseShot(src,si){
   for(let i=0;i<lines.length-1;i++){
     if(skip.has(i)||skip.has(i+1)||joined.has(i)) continue;
     const a=matched[i];
-    if(!a||a.nameSure) continue;                 // 코드·티커로 확정된 건 건드리지 않는다
+    if(a&&a.nameSure) continue;                  // 코드·티커로 확정된 건 건드리지 않는다
+    // a 가 없어도(그 줄만으로는 못 찾은 경우) 다음 줄과 붙여 다시 찾아본다.
+    //   ACE OI=3S&P500            ← 미국 이 OI=3 으로 깨져 이름을 못 찾는다
+    //   CEDI= 40.26% 8,741,710 26,410  ← 현재가는 여기 있다
+    // 둘을 붙이면 브랜드 ACE + 현재가 26,410 + 조각 SP500 으로 찾아낼 수 있다
     const j=matchStock(lines[i]+' '+lines[i+1],mkt);
     // 합친 줄에서 이름이 정확히 일치하면 그게 정답이다.
     // (KODEX 미국나 + 스닥100 → KODEX 미국나스닥100. 조각 매칭은 선물(H) 로 샜다)
@@ -1489,8 +1493,10 @@ function parseShot(src,si){
     //                                ← 아랫줄은 이름 조각일 뿐(추정 매칭). 합쳐야 한다
     const alone=matched[i+1];
     const needJoin=j&&(!alone||!alone.nameSure||alone.m.code!==j.m.code);
-    const better=needJoin&&j.m.code!==a.m.code
-      &&((j.nameSure&&!a.nameSure)||j.m.name.length>a.m.name.length);
+    const better=needJoin&&(
+      !a                                          // 혼자서는 못 찾았는데 붙이니 찾은 경우
+      || (j.m.code!==a.m.code
+          && ((j.nameSure&&!a.nameSure)||j.m.name.length>a.m.name.length)));
     if(better){
       matched[i]=j; skip.add(i+1); joined.add(i); // 숫자도 아랫줄 것을 같이 쓴다
     }
@@ -1547,6 +1553,10 @@ function parseShot(src,si){
     //   SPYM                    10,335,009  90.4600   ← 티커
     const byName=v=>v==='name'||v==='fuzzy'||v==='alias'||v==='usname';
     const pairUp=(a,b)=>byName(a.via)!==byName(b.via);
+    // OCR 이 이름을 자기 숫자들보다 뒤에 놓는 경우가 있다.
+    //   2,509,041 331 / 18,830 / ACE OI=3S&P500 / … 8,741,710 26,410
+    // 앞 종목이 쓰고 남긴 숫자를 다음 종목이 이어받아 다시 계산해 본다.
+    let leftover=[];
     for(let i=0;i<hits.length;i++){
       let h=hits[i], merged=[h.line], n=h.n.slice();
       while(i+1<hits.length&&hits[i+1].m.code===h.m.code
@@ -1556,7 +1566,15 @@ function parseShot(src,si){
         if(nx.n.length>h.n.length) h={...nx,n};
       }
       h={...h,n};
-      const g=inferQtyAvg(h.n,h.m.price,h.m.cur==='USD'?FX:0);
+      const fx=h.m.cur==='USD'?FX:0;
+      let g=inferQtyAvg(h.n,h.m.price,fx);
+      if(!g&&leftover.length){
+        const wide=leftover.concat(h.n);
+        const g2=inferQtyAvg(wide,h.m.price,fx);
+        if(g2){ g=g2; h={...h,n:wide}; }
+      }
+      // 이번에 쓰지 않은 숫자는 다음 종목 몫일 수 있다
+      leftover = g ? h.n.filter(x=>x!==g.qty&&x!==g.avg) : [];
       ocrRows.push({src:si,box:h.box,line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,lot:'',acct:guess,nameSure:h.nameSure,
         isUS:h.m.cur==='USD', qty:pick(g,h,cols,'qty'), avg:pick(g,h,cols,'avg'),
         sure:!!(g&&g.sure), use:true});
