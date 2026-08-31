@@ -372,7 +372,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <div class="drop-multi">여러 장 한 번에 선택 가능 · 계좌별로 캡처해 함께 넣으세요</div>
     <div class="drop-s">
       글자가 클수록 정확합니다. 화면을 확대해 캡처하면 인식률이 올라갑니다.<br>
-      <b>보유수량·평균단가 열이 보이도록</b> 좌우로 밀어 캡처하면 훨씬 정확합니다.<br>
+      <b>보유수량·평균단가 열이 보이도록</b> 좌우로 밀어 캡처하면 훨씬 정확합니다.<br><b>보유 목록만 잘라서</b> 캡처하세요. 관심종목 같은 옆 화면이 같이 들어가면 섞여 읽힙니다.<br>
       최초 1회 인식 데이터 약 22MB를 내려받습니다. 와이파이 환경을 권합니다.
     </div>
     <input type="file" id="file-img" accept="image/*" multiple hidden>
@@ -1219,7 +1219,7 @@ function nums(line,hit){
    우리가 아는 현재가는 "화면의 어떤 숫자가 현재가인가"를 짚는 데만 쓴다.
    그래서 장중에 시세가 몇 분 차이 나도 결과가 흔들리지 않는다.
    현재가 열이 캡처에 없으면 우리 시세로 대신 계산하되 확신도를 낮춘다. */
-function inferQtyAvg(list,price){
+function inferQtyAvg(list,price,fxMul){
   if(list.length<3) return null;
   const near=(a,b,t)=>Math.abs(a-b)<=Math.max(Math.abs(b)*(t||0.005),0.51);
 
@@ -1229,6 +1229,7 @@ function inferQtyAvg(list,price){
     list.forEach(x=>{ if(x>0&&Math.abs(x-price)<=price*0.25) anchors.push({v:x,gap:Math.abs(x-price)}); });
     anchors.sort((a,b)=>a.gap-b.gap);
   }
+  let fallback=null;
   const cands=anchors.map(a=>({cur:a.v,onScreen:true}));
   if(price>0) cands.push({cur:price,onScreen:false});   // 현재가 열이 안 잡힌 경우 대비
 
@@ -1236,8 +1237,11 @@ function inferQtyAvg(list,price){
     for(const q of list){
       if(q<=0||q===c.cur) continue;
       // 수량 × 현재가 = 평가금액 이 화면에 있어야 한다
-      if(!list.some(x=>x!==q&&x!==c.cur&&near(x,q*c.cur,c.onScreen?0.005:0.05))) continue;
-      const val=list.find(x=>x!==q&&x!==c.cur&&near(x,q*c.cur,c.onScreen?0.005:0.05));
+      // 미국 종목인데 평가금액만 원화로 찍는 증권사가 있다. 환율을 곱해서도 맞춰본다.
+      const tol=c.onScreen?0.005:0.05;
+      const val=list.find(x=>x!==q&&x!==c.cur&&near(x,q*c.cur,tol))
+             ?? (fxMul?list.find(x=>x!==q&&x!==c.cur&&near(x,q*c.cur*fxMul,0.03)):undefined);
+      if(val===undefined) continue;
       for(const a of list){
         if(a<=0||a===q||a===c.cur) continue;
         if(a<c.cur*0.05||a>c.cur*20) continue;         // 매입가는 현재가와 자릿수가 비슷하다
@@ -1246,13 +1250,20 @@ function inferQtyAvg(list,price){
           return {qty:q,avg:a,sure:c.onScreen};
         // (나) 매입금액 열이 없는 화면. 평가손익으로 유도한다.
         //     매입금액 = 평가금액 - 평가손익  →  매입단가 = 그 값 / 수량
-        if(val!==undefined&&list.some(pl=>pl!==q&&pl!==a&&pl!==c.cur&&pl!==val
+        if(list.some(pl=>pl!==q&&pl!==a&&pl!==c.cur&&pl!==val
               &&near(a,(val-pl)/q,0.005)))
           return {qty:q,avg:a,sure:c.onScreen};
       }
+      // 수량은 검산됐는데 매입가를 확인할 값이 화면에 없는 경우.
+      // 수량 바로 뒤에 오는 숫자를 매입가로 보되 '추정'으로 남긴다.
+      if(!fallback){
+        const at=list.indexOf(q);
+        const a2=list.slice(at+1).find(x=>x>0&&x!==c.cur&&x>=c.cur*0.05&&x<=c.cur*20);
+        if(a2!==undefined) fallback={qty:q,avg:a2,sure:false};
+      }
     }
   }
-  return null;
+  return fallback;
 }
 function buildReview(shots){
   if(typeof shots==='string') shots=[{name:'캡처',text:shots}];
@@ -1291,7 +1302,27 @@ function parseShot(text,si){
   // 이러면 각 줄이 따로 엉뚱한 종목에 걸린다. 다음 줄까지 붙여 다시 찾아보고
   // 더 긴 이름이 나오면 그쪽을 쓴다.
   const skip=new Set(), joined=new Set();
+  const byNameVia=v=>v==='name'||v==='fuzzy'||v==='alias'||v==='usname';
+
+  // (가) 윗줄에 종목명, 아랫줄에 종목코드를 찍는 화면.
+  //   State Street SPDR S&P 500 ETF        83   80.0700
+  //   SPYM                         10,335,009   90.4600
+  // 이름은 비슷한 종목이 많아 헷갈리지만(SPY vs SPYM) 티커는 정확하다.
+  // 그래서 아랫줄 티커를 정답으로 삼고 두 줄을 한 건으로 묶는다.
   for(let i=0;i<lines.length-1;i++){
+    const b=matched[i+1];
+    // 아랫줄이 코드·티커로 잡힌 경우만. 구분선(현금|AMD) 줄은 그 자체가 로트라 제외한다.
+    if(!b||byNameVia(b.via)||b.via==='pipe') continue;
+    const a=matched[i];
+    if(a&&!byNameVia(a.via)&&a.m.code!==b.m.code) continue;  // 윗줄도 별개 티커면 손대지 않는다
+    if(!nums(lines[i],a?a.m:b.m).length) continue;           // 윗줄에 숫자가 있어야 보유 행이다
+    matched[i]={m:b.m,via:b.via,nameSure:true};
+    skip.add(i+1); joined.add(i);
+  }
+
+  // (나) 종목명이 두 줄로 잘린 화면 (TIME 미국나스닥100 / 채권혼합50액티브)
+  for(let i=0;i<lines.length-1;i++){
+    if(skip.has(i)||skip.has(i+1)||joined.has(i)) continue;
     const a=matched[i];
     if(!a||a.nameSure) continue;                 // 코드·티커로 확정된 건 건드리지 않는다
     const j=matchStock(lines[i]+' '+lines[i+1]);
@@ -1323,7 +1354,7 @@ function parseShot(text,si){
     // "현금 | AMD", "소수점 | AMD" 처럼 구분선 줄이 곧 로트 하나다.
     // 정수주와 소수점주는 평균단가가 다르므로 절대 합치지 않는다.
     pipes.forEach(h=>{
-      const g=inferQtyAvg(h.n,h.m.price);
+      const g=inferQtyAvg(h.n,h.m.price,h.m.cur==='USD'?FX:0);
       ocrRows.push({src:si,line:h.line,code:h.m.code,name:h.m.name,lot:h.lot,acct:guess,nameSure:h.nameSure,
         isUS:h.m.cur==='USD', qty:g?g.qty:(h.n[0]??''), avg:g?g.avg:(h.n[1]??''),
         sure:!!(g&&g.sure), use:true});
@@ -1332,7 +1363,7 @@ function parseShot(text,si){
     const have=new Set(pipes.map(h=>h.m.code));
     hits.filter(h=>h.via!=='pipe'&&!have.has(h.m.code)&&h.n.length>=2).forEach(h=>{
       have.add(h.m.code);
-      const g=inferQtyAvg(h.n,h.m.price);
+      const g=inferQtyAvg(h.n,h.m.price,h.m.cur==='USD'?FX:0);
       ocrRows.push({src:si,line:h.line,code:h.m.code,name:h.m.name,lot:'',acct:guess,nameSure:h.nameSure,
         isUS:h.m.cur==='USD', qty:g?g.qty:(h.n[0]??''), avg:g?g.avg:(h.n[1]??''),
         sure:!!(g&&g.sure), use:true});
@@ -1343,13 +1374,21 @@ function parseShot(text,si){
     // 겹치는 숫자가 없으면 서로 다른 보유 건이므로 합치지 않는다
     // (OCR 이 현대차2우B 를 현대차로 잘못 읽어 진짜 현대차와 뭉치던 문제).
     const shares=(a,b)=>a.n.some(x=>b.n.includes(x));
+    // 이름으로 찾은 줄과 코드·티커로 찾은 줄이 같은 종목이면 한 보유 건이다.
+    //   State Street SPDR S&P 500 ETF  83   80.0700   ← 이름
+    //   SPYM                    10,335,009  90.4600   ← 티커
+    const byName=v=>v==='name'||v==='fuzzy'||v==='alias'||v==='usname';
+    const pairUp=(a,b)=>byName(a.via)!==byName(b.via);
     for(let i=0;i<hits.length;i++){
-      let h=hits[i], merged=[h.line];
-      while(i+1<hits.length&&hits[i+1].m.code===h.m.code&&shares(h,hits[i+1])){
+      let h=hits[i], merged=[h.line], n=h.n.slice();
+      while(i+1<hits.length&&hits[i+1].m.code===h.m.code
+            &&(shares(h,hits[i+1])||pairUp(h,hits[i+1]))){
         const nx=hits[++i]; merged.push(nx.line);
-        if(nx.n.length>h.n.length) h=nx;
+        n=n.concat(nx.n);
+        if(nx.n.length>h.n.length) h={...nx,n};
       }
-      const g=inferQtyAvg(h.n,h.m.price);
+      h={...h,n};
+      const g=inferQtyAvg(h.n,h.m.price,h.m.cur==='USD'?FX:0);
       ocrRows.push({src:si,line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,lot:'',acct:guess,nameSure:h.nameSure,
         isUS:h.m.cur==='USD', qty:g?g.qty:(h.n[0]??''), avg:g?g.avg:(h.n[1]??''),
         sure:!!(g&&g.sure), use:true});
@@ -1360,6 +1399,14 @@ function parseShot(text,si){
 
 let ocrShots=[];
 function renderReview(){
+  // 관심종목 패널 등이 같이 캡처되면 같은 행이 여러 번 잡힌다. 중복 제거.
+  const seenRow=new Set();
+  ocrRows=ocrRows.filter(r=>{
+    const k=r.src+'|'+r.code+'|'+r.qty+'|'+r.avg;
+    if(seenRow.has(k)) return false;
+    seenRow.add(k); return true;
+  });
+
   const body=document.getElementById('review-body');
   if(!ocrRows.length){
     body.innerHTML='<tr><td colspan="6" style="text-align:left;color:#8B8276;padding:20px">'
