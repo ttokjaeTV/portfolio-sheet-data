@@ -1321,10 +1321,10 @@ function nums(line,hit){
   // 글자에 붙은 숫자는 값이 아니다. "현대차2우B" 의 2, "2우6" 의 6 이 수량으로 잡히던 문제.
   // 앞뒤가 공백·문장 끝·통화기호일 때만 숫자로 인정한다.
   const out=[];
-  const re=/(^|[\s(₩$])(\d[\d,]*(?:\.\d+)?)(?=$|[\s)원,.]|$)/g;
+  const re=/(^|[\s(₩$])(\d[\d.,]*\d|\d)(?=$|[\s)원]|$)/g;
   let m;
   while((m=re.exec(s))){
-    const v=parseFloat(m[2].replace(/,/g,''));
+    const v=parseFloat(fixThousands(m[2]));
     if(isFinite(v)&&v>0) out.push(v);
   }
   return out;
@@ -1855,11 +1855,21 @@ function fuzzyKR(line,nums){
   // 후보로 주되 '추정'으로 표시해 이용자가 확인하게 한다.
   return {m:KR[b1],ambiguous:s1<s2*1.05};
 }
-/* 줄에 있는 숫자만 뽑는다 (종목 후보를 현재가로 가릴 때 쓴다) */
-function rawNums(line){
-  return (String(line).match(/\d[\d,]*(?:\.\d+)?/g)||[])
-    .map(v=>parseFloat(v.replace(/,/g,''))).filter(n=>isFinite(n)&&n>0);
+/* OCR 이 천단위 쉼표를 마침표로 읽는 경우가 있다.
+     2.924,295  ← 실제로는 2,924,295
+   구분자가 둘 이상이고 각 묶음이 정확히 3자리면 천단위로 본다.
+   구분자가 하나뿐인 39.025 같은 값은 소수점일 수 있으므로 건드리지 않는다. */
+function fixThousands(tok){
+  if(/^\d{1,3}(?:[.,]\d{3}){2,}$/.test(tok)) return tok.replace(/[.,]/g,'');
+  return tok.replace(/,/g,'');
 }
+function pickNums(str){
+  return (String(str).match(/\d[\d.,]*\d|\d/g)||[])
+    .map(t=>parseFloat(fixThousands(t))).filter(n=>isFinite(n)&&n>0);
+}
+
+/* 줄에 있는 숫자만 뽑는다 (종목 후보를 현재가로 가릴 때 쓴다) */
+function rawNums(line){ return pickNums(line); }
 
 /* 두 글자열이 공유하는 가장 긴 연속 조각의 길이 */
 function lcsLen(a,b){
@@ -1891,8 +1901,20 @@ function brandPriceMatch(line,nums){
   for(const k in KR){
     const m=KR[k];
     if(!m.price||!krFlat[k].startsWith(brand)) continue;
+    // (가) 화면에 현재가가 찍혀 있는 경우
     let near=false;
     for(const v of nums) if(Math.abs(v-m.price)/m.price<0.015){ near=true; break; }
+    // (나) 현재가 열이 없어도 산수로 확인할 수 있다.
+    //     수량 × 현재가 = 평가금액 이 원 단위까지 맞으면 그 종목이 맞다.
+    //     735 × 23,755 = 17,459,925  ← KODEX 미국S&P500
+    if(!near){
+      outer:
+      for(const q of nums){
+        if(q<=0||q>1e7) continue;
+        const v=q*m.price;
+        for(const x of nums) if(x!==q&&Math.abs(x-v)/v<0.005){ near=true; break outer; }
+      }
+    }
     if(!near) continue;
     // 브랜드를 뗀 이름과 줄이 3글자 이상 겹쳐야 한다
     const rest=krFlat[k].slice(brand.length);
