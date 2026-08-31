@@ -984,23 +984,37 @@ function buildReview(text){
   const hits=[];
   lines.forEach(line=>{
     const r=matchStock(line);
-    if(r) hits.push({line,m:r.m,via:r.via,n:nums(line,r.m)});
+    if(r) hits.push({line,m:r.m,via:r.via,lot:r.lot||'',n:nums(line,r.m)});
   });
 
-  // 연속된 같은 종목 병합.
-  // "현금 | AMD 40 221.2327" 처럼 구분선 뒤에 티커가 오는 줄에 평균단가가 있다.
-  // 그래서 via==='pipe' 인 줄을 최우선으로 삼고, 없으면 숫자가 많은 줄을 쓴다.
-  const score=h=>(h.via==='pipe'?100:0)+h.n.length;
   ocrRows=[];
-  for(let i=0;i<hits.length;i++){
-    let h=hits[i], merged=[h.line];
-    while(i+1<hits.length&&hits[i+1].m.code===h.m.code){
-      const nx=hits[++i]; merged.push(nx.line);
-      if(score(nx)>score(h)) h=nx;
+  const pipes=hits.filter(h=>h.via==='pipe');
+
+  if(pipes.length){
+    // "현금 | AMD", "소수점 | AMD" 처럼 구분선 줄이 곧 로트 하나다.
+    // 정수주와 소수점주는 평균단가가 다르므로 절대 합치지 않는다.
+    pipes.forEach(h=>{
+      ocrRows.push({line:h.line,code:h.m.code,name:h.m.name,lot:h.lot,
+        isUS:h.m.cur==='USD', qty:h.n[0]??'', avg:h.n[1]??'', use:true});
+    });
+    // 구분선 줄이 없는 종목(다른 레이아웃 혼재)은 따로 주워 담는다
+    const have=new Set(pipes.map(h=>h.m.code));
+    hits.filter(h=>h.via!=='pipe'&&!have.has(h.m.code)&&h.n.length>=2).forEach(h=>{
+      have.add(h.m.code);
+      ocrRows.push({line:h.line,code:h.m.code,name:h.m.name,lot:'',
+        isUS:h.m.cur==='USD', qty:h.n[0]??'', avg:h.n[1]??'', use:true});
+    });
+  }else{
+    // 구분선 레이아웃이 아닌 증권사 — 연속된 같은 종목을 합치고 숫자가 많은 줄을 쓴다
+    for(let i=0;i<hits.length;i++){
+      let h=hits[i], merged=[h.line];
+      while(i+1<hits.length&&hits[i+1].m.code===h.m.code){
+        const nx=hits[++i]; merged.push(nx.line);
+        if(nx.n.length>h.n.length) h=nx;
+      }
+      ocrRows.push({line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,lot:'',
+        isUS:h.m.cur==='USD', qty:h.n[0]??'', avg:h.n[1]??'', use:true});
     }
-    const n=h.n;   // 보통 "티커 수량 평균단가" 순서
-    ocrRows.push({line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,
-      isUS:h.m.cur==='USD', qty:n[0]??'', avg:n[1]??'', use:true});
   }
 
   const body=document.getElementById('review-body');
@@ -1014,9 +1028,10 @@ function buildReview(text){
       +esc(ocrRaw.slice(0,2000)||'(읽어낸 글자가 없습니다)')+'</pre></td></tr>';
   }else{
     body.innerHTML=ocrRows.map((r,i)=>`<tr>
-      <td class="tl" style="max-width:230px;white-space:normal;font-size:11px;color:#8B8276">${esc(r.line)}</td>
+      <td class="tl" style="max-width:230px;white-space:normal;font-size:11px;color:#8B8276;
+        max-height:80px;overflow:auto;display:block">${esc(r.line)}</td>
       <td class="tl">${esc(r.name)}<br><span style="font-size:11px;color:#8B8276">
-        ${r.isUS?'<span class="flag us">미국</span>':''}${esc(r.code)}</span></td>
+        ${r.isUS?'<span class="flag us">미국</span>':''}${esc(r.code)}${r.lot?` · ${esc(r.lot)}`:''}</span></td>
       <td><input type="number" data-ocr="${i}" data-f="qty" value="${esc(r.qty)}" step="any"></td>
       <td><input type="number" data-ocr="${i}" data-f="avg" value="${esc(r.avg)}" step="any"></td>
       <td><input type="checkbox" data-ocr="${i}" data-f="use" checked style="width:auto"></td></tr>`).join('');
@@ -1029,19 +1044,29 @@ function buildReview(text){
 const NAME_NOISE=/\bETF\b|\bTRUST\b|\bSERIES\b|\bINDEX\b|\bFUND\b|\bINC\b|\bCORP\b|\bCO\b|[.,()]/g;
 function normName(s){ return s.toUpperCase().replace(NAME_NOISE,' ').replace(/\s+/g,' ').trim(); }
 
+/* 계좌번호·헤더 등 종목이 있을 리 없는 줄 */
+const SKIP_LINE=/\d{3,4}-\d{3,4}-\d{2,3}|계좌|잔고|합계|총액|예수금|출금가능|증거금/;
+
 function matchStock(line){
   const up=line.toUpperCase();
+  if(SKIP_LINE.test(line)) return null;
 
   // 1) 국내 종목코드 (문자 섞인 신형 코드 포함)
   for(const x of up.match(/\b[0-9][0-9A-Z]{5}\b/g)||[]) if(KR[x]) return {m:KR[x],via:'code'};
 
   // 2) "현금 | AMD" 처럼 구분선 뒤에 오는 티커. 이 줄에 평균단가가 함께 있다.
-  const after=up.split(/[|｜/]/).slice(1).join(' ');
-  for(const t of after.match(/\b[A-Z][A-Z.-]{0,5}\b/g)||[]) if(US[t]) return {m:US[t],via:'pipe'};
+  //    구분(현금/소수점)도 같이 들고 와 로트를 구분한다.
+  const parts=line.split(/[|｜]/);
+  if(parts.length>1){
+    const after=parts.slice(1).join(' ');
+    for(const t of after.match(/\b[A-Z][A-Z.-]{0,5}\b/g)||[])   // 원문 기준 = 대문자만
+      if(US[t]) return {m:US[t],via:'pipe',lot:parts[0].trim().slice(0,6)};
+  }
 
-  // 3) 줄 어디든 있는 미국 티커 (흔한 오검출 단어 제외)
+  // 3) 줄 어디든 있는 미국 티커.
+  //    반드시 원문에서 대문자여야 한다. OCR 이 "Vv" 같은 글자를 티커로 오인하는 걸 막는다.
   const STOP=new Set(['USD','KRW','ETF','ALL','NEW','TOP','AND','THE','FOR','INC','CORP','CO','S&P']);
-  for(const t of up.match(/\b[A-Z][A-Z.-]{1,5}\b/g)||[])
+  for(const t of line.match(/\b[A-Z][A-Z.-]{1,5}\b/g)||[])
     if(!STOP.has(t)&&US[t]) return {m:US[t],via:'ticker'};
 
   // 4) 종목명 부분 일치 — 국내(긴 이름 우선)
