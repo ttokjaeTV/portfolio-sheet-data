@@ -173,6 +173,22 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .data-table input,.data-table select{padding:7px 9px;font-size:13px}
 .chip{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;
   background:var(--bg-alt);color:var(--ink-soft)}
+.chip.lot{background:var(--accent-soft);color:var(--accent)}
+
+/* 합쳐 보기 토글 */
+.detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;
+  flex-wrap:wrap;margin-bottom:6px}
+.merge-toggle{display:inline-flex;align-items:center;gap:10px;cursor:pointer;flex-shrink:0}
+.merge-label{font-size:12.5px;font-weight:700;color:var(--ink-soft);white-space:nowrap}
+.toggle-switch{position:relative;display:inline-block;width:50px;height:27px;flex-shrink:0}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;
+  background:#C4B8A3;transition:.25s;border-radius:30px}
+.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:4px;bottom:3.5px;
+  background:var(--white);transition:.25s;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle-switch input:checked+.toggle-slider{background:var(--accent)}
+.toggle-switch input:checked+.toggle-slider:before{transform:translateX(23px)}
+.merge-note{font-size:12px;color:var(--ink-mute);font-weight:600;line-height:1.7;margin-bottom:2px}
 
 .insight-box{background:var(--dark-warm);color:var(--white);border-radius:20px;padding:36px;margin-bottom:24px}
 .insight-label{display:flex;align-items:center;gap:8px;margin-bottom:16px}
@@ -387,7 +403,19 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 
 <div class="card">
   <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 06 / 보유 종목 상세</span></div>
-  <div class="card-desc">국내 시세는 장중 약 10분 주기, 미국 시세는 전 거래일 종가 기준으로 갱신됩니다.</div>
+  <div class="detail-head">
+    <div class="card-desc" style="margin-bottom:0">
+      국내 시세는 장중 약 10분 주기, 미국 시세는 전 거래일 종가 기준으로 갱신됩니다.
+    </div>
+    <label class="merge-toggle">
+      <span class="merge-label">같은 종목 합쳐 보기</span>
+      <span class="toggle-switch">
+        <input type="checkbox" id="chk-merge">
+        <span class="toggle-slider"></span>
+      </span>
+    </label>
+  </div>
+  <div class="merge-note" id="merge-note"></div>
   <div class="table-wrap">
     <table class="data-table">
       <thead><tr>
@@ -742,10 +770,43 @@ function renderGauge(valid,cash){
     </div>`;
 }
 
+/* 같은 계좌·같은 종목의 로트를 하나로 합친다.
+   평균매입가는 가중평균 = Σ(수량×단가) ÷ Σ수량.
+   계좌가 다르면 과세·한도가 달라 합치지 않는다. */
+function mergeLots(rows){
+  const map=new Map();
+  rows.forEach(r=>{
+    const k=r.acct+' '+r.code;
+    const g=map.get(k);
+    if(!g){ map.set(k,{...r,lots:1}); return; }
+    g.qty+=r.qty; g.buyC+=r.buyC; g.valC+=r.valC;
+    g.buy+=r.buy; g.val+=r.val; g.lots++;
+  });
+  return [...map.values()].map(g=>{
+    g.avg = g.qty>0 ? g.buyC/g.qty : 0;      // 가중평균 매입단가
+    g.plC = g.valC-g.buyC;
+    g.pl  = g.val-g.buy;
+    g.ror = g.buy>0 ? (g.pl/g.buy*100) : 0;
+    return g;
+  });
+}
+
 function renderDetail(valid,total){
   const body=document.getElementById('detail-body');
-  if(!valid.length){ body.innerHTML='<tr><td colspan="12" style="text-align:center;color:#8B8276;padding:24px">데이터가 없습니다</td></tr>'; return; }
-  body.innerHTML=valid.slice().sort((a,b)=>b.val-a.val).map(r=>{
+  const note=document.getElementById('merge-note');
+  if(!valid.length){
+    body.innerHTML='<tr><td colspan="12" style="text-align:center;color:#8B8276;padding:24px">데이터가 없습니다</td></tr>';
+    note.textContent=''; return;
+  }
+
+  const rows = state.merge ? mergeLots(valid) : valid;
+  const multi = state.merge ? rows.filter(r=>r.lots>1).length : 0;
+  note.innerHTML = state.merge
+    ? (multi ? `같은 계좌 안에서 같은 종목 <b>${multi}건</b>을 합쳤습니다. 매입단가는 수량 가중평균입니다.`
+             : '합칠 종목이 없습니다. 모두 한 건씩만 보유 중입니다.')
+    : '정수주와 소수점주처럼 매입단가가 다른 로트를 따로 보여줍니다.';
+
+  body.innerHTML=rows.slice().sort((a,b)=>b.val-a.val).map(r=>{
     const price=r.isUS?usd(r.price):won(r.price);
     const avg=r.isUS?usd(r.avg):won(r.avg);
     const chg=r.isUS?(r.change>=0?'+':'')+r.change.toFixed(2)
@@ -753,9 +814,10 @@ function renderDetail(valid,total){
     return `<tr>
       <td class="tl"><span class="chip">${r.acct}</span></td>
       <td class="tl">${esc(r.name)}<br><span style="font-size:11px;color:#8B8276">
-        ${r.isUS?'<span class="flag us">미국</span>':''}${esc(r.code)}</span></td>
+        ${r.isUS?'<span class="flag us">미국</span>':''}${esc(r.code)}
+        ${r.lots>1?`<span class="chip lot">${r.lots}건 합산</span>`:''}</span></td>
       <td class="tl"><span class="chip">${esc(r.assetClass)}${r.safe?' · 안전':''}</span></td>
-      <td>${r.qty.toLocaleString('ko-KR')}</td><td>${avg}</td><td>${price}</td>
+      <td>${r.qty.toLocaleString('ko-KR',{maximumFractionDigits:6})}</td><td>${avg}</td><td>${price}</td>
       <td class="${cls(r.change)}">${chg}</td>
       <td>${money(r,r.buyC,r.buy,false)}</td>
       <td>${money(r,r.valC,r.val,false)}</td>
@@ -822,10 +884,13 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape') closeMenus();
 });
 
+document.getElementById('chk-merge').onchange=e=>{
+  state.merge=e.target.checked; save(); render();
+};
 document.getElementById('btn-add').onclick=()=>{ state.holdings.push({acct:ACCOUNTS[0],code:'',qty:'',avg:''}); save(); render(); };
 document.getElementById('btn-clear').onclick=()=>{
   if(!confirm('입력한 내용을 모두 지웁니다. 계속할까요?')) return;
-  state={holdings:[],cash:{}}; save(); renderCash(); render();
+  state={holdings:[],cash:{},merge:state.merge}; save(); renderCash(); render();
 };
 document.getElementById('btn-sample').onclick=()=>{
   state={holdings:[
@@ -860,7 +925,8 @@ document.getElementById('file-json').onchange=e=>{
       const d=j.data||j;
       if(!d||!Array.isArray(d.holdings)) throw new Error('형식이 맞지 않습니다');
       if(!confirm('현재 입력 내용을 파일 내용으로 바꿉니다. 계속할까요?')) return;
-      state={holdings:d.holdings,cash:d.cash||{}};
+      state={holdings:d.holdings,cash:d.cash||{},merge:!!d.merge};
+      document.getElementById('chk-merge').checked=!!state.merge;
       save(); renderCash(); render();
       alert(`불러왔습니다. 종목 ${state.holdings.length}건`);
     }catch(err){ alert('불러오지 못했습니다: '+err.message); }
@@ -1116,6 +1182,7 @@ document.getElementById('btn-review-cancel').onclick=()=>{
 /* ---------- 시작 ---------- */
 load();
 if(!state.holdings.length) state.holdings.push({acct:ACCOUNTS[0],code:'',qty:'',avg:''});
+document.getElementById('chk-merge').checked=!!state.merge;
 renderCash();
 render();
 loadAll();
