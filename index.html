@@ -1192,8 +1192,16 @@ function nums(line,hit){
     }
   }
   s=s.replace(/\d[\d,]*(?:\.\d+)?\s*%/g,' ');     // 수익률 제거
-  return (s.match(/\d[\d,]*(?:\.\d+)?/g)||[])
-    .map(v=>parseFloat(v.replace(/,/g,''))).filter(n=>isFinite(n)&&n>0);
+  // 글자에 붙은 숫자는 값이 아니다. "현대차2우B" 의 2, "2우6" 의 6 이 수량으로 잡히던 문제.
+  // 앞뒤가 공백·문장 끝·통화기호일 때만 숫자로 인정한다.
+  const out=[];
+  const re=/(^|[\s(₩$])(\d[\d,]*(?:\.\d+)?)(?=$|[\s)원,.]|$)/g;
+  let m;
+  while((m=re.exec(s))){
+    const v=parseFloat(m[2].replace(/,/g,''));
+    if(isFinite(v)&&v>0) out.push(v);
+  }
+  return out;
 }
 function buildReview(shots){
   if(typeof shots==='string') shots=[{name:'캡처',text:shots}];
@@ -1230,10 +1238,14 @@ function parseShot(text,si){
         isUS:h.m.cur==='USD', qty:h.n[0]??'', avg:h.n[1]??'', use:true});
     });
   }else{
-    // 구분선 레이아웃이 아닌 증권사 — 연속된 같은 종목을 합치고 숫자가 많은 줄을 쓴다
+    // 구분선 레이아웃이 아닌 증권사 — 한 종목이 두 줄로 쪼개진 경우만 합친다.
+    // 두 줄이 같은 종목의 앞뒤 조각이라면 수량 같은 숫자가 겹친다.
+    // 겹치는 숫자가 없으면 서로 다른 보유 건이므로 합치지 않는다
+    // (OCR 이 현대차2우B 를 현대차로 잘못 읽어 진짜 현대차와 뭉치던 문제).
+    const shares=(a,b)=>a.n.some(x=>b.n.includes(x));
     for(let i=0;i<hits.length;i++){
       let h=hits[i], merged=[h.line];
-      while(i+1<hits.length&&hits[i+1].m.code===h.m.code){
+      while(i+1<hits.length&&hits[i+1].m.code===h.m.code&&shares(h,hits[i+1])){
         const nx=hits[++i]; merged.push(nx.line);
         if(nx.n.length>h.n.length) h=nx;
       }
@@ -1296,11 +1308,31 @@ function normName(s){ return s.toUpperCase().replace(NAME_NOISE,' ').replace(/\s
 /* 계좌번호·헤더 등 종목이 있을 리 없는 줄 */
 const SKIP_LINE=/\d{3,4}-\d{3,4}-\d{2,3}|계좌|잔고|합계|총액|예수금|출금가능|증거금|평가손익|수익률순|매매구분/;
 
-/* 국내 종목명을 공백 없는 대문자로 미리 만들어 둔다 (매 줄마다 만들면 느리다) */
-let krFlat={};
+/* 국내 종목명을 공백 없는 대문자로 미리 만들어 둔다 (매 줄마다 만들면 느리다)
+   krAlias: 앞머리 영문 브랜드를 뗀 별칭. OCR 이 "SK하이닉스"에서 SK 를 놓쳐도 잡힌다.
+            한글 3자 이상일 때만 만든다 (LG화학 → "화학" 같은 위험한 별칭 방지) */
+let krFlat={}, krAlias={};
+const HANGUL=/[가-힣]/;
 function buildNameIndex(){
-  krFlat={};
-  for(const k in KR) krFlat[k]=KR[k].name.toUpperCase().replace(/\s+/g,'');
+  krFlat={}; krAlias={};
+  for(const k in KR){
+    const f=KR[k].name.toUpperCase().replace(/\s+/g,'');
+    krFlat[k]=f;
+    const a=f.replace(/^[A-Z0-9&.\-]+/,'');
+    if(a!==f&&a.length>=3&&HANGUL.test(a[0])) krAlias[k]=a;
+  }
+}
+/* 부분 문자열이 더 긴 단어를 잘라 들어간 것인지 확인.
+   "하이닉스" 안의 "이닉스" 처럼 앞뒤가 한글로 이어지면 다른 종목이다. */
+function wordish(flat,name){
+  let i=flat.indexOf(name);
+  while(i>=0){
+    const before=i>0?flat[i-1]:'';
+    const after=flat[i+name.length]||'';
+    if(!HANGUL.test(before)&&!HANGUL.test(after)) return true;
+    i=flat.indexOf(name,i+1);
+  }
+  return false;
 }
 
 function matchStock(line){
@@ -1326,9 +1358,15 @@ function matchStock(line){
   let best=null,bl=0;
   for(const k in KR){
     const n=krFlat[k];
-    if(n.length>=2&&n.length>bl&&flat.includes(n)){ best=KR[k]; bl=n.length; }
+    if(n.length>=2&&n.length>bl&&flat.includes(n)&&wordish(flat,n)){ best=KR[k]; bl=n.length; }
   }
   if(best) return {m:best,via:'name'};
+  // 정식 이름으로 못 찾으면 브랜드 뗀 별칭으로 한 번 더 (SK하이닉스 → 하이닉스)
+  for(const k in krAlias){
+    const n=krAlias[k];
+    if(n.length>bl&&flat.includes(n)&&wordish(flat,n)){ best=KR[k]; bl=n.length; }
+  }
+  if(best) return {m:best,via:'alias'};
 
   // 4) 줄 어디든 있는 미국 티커.
   //    반드시 원문에서 대문자여야 한다. OCR 이 "Vv" 같은 글자를 티커로 오인하는 걸 막는다.
