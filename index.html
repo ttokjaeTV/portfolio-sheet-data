@@ -289,6 +289,8 @@ input::placeholder{color:#BFB6A6;font-weight:500}
   font-weight:700;cursor:pointer;transition:all .15s ease;color:var(--ink-soft)}
 .fchip:hover{border-color:var(--accent);color:var(--accent)}
 .fchip.on{background:var(--dark-warm);border-color:var(--dark-warm);color:var(--white)}
+.fchip .fname{display:flex;flex-direction:column;line-height:1.25;text-align:left}
+.fchip .fnote{font-size:10px;font-weight:700;opacity:.7;margin-top:1px}
 .fchip .fcnt{font-size:11px;font-weight:700;opacity:.75}
 .fchip .fval{font-size:11px;font-weight:700;opacity:.75}
 #acct-body tr{cursor:pointer}
@@ -1257,8 +1259,14 @@ function renderDetail(all,total){
   if(fbox){
     if(used.length>1){
       if(detailFilter&&!used.includes(detailFilter)) detailFilter='';
-      const chip=(key,label,cnt,val)=>`<span class="fchip ${detailFilter===key?'on':''}" data-f="${esc(key)}">
-        ${esc(label)}<span class="fcnt">${cnt}종목</span><span class="fval">${wonShort(val)}원</span></span>`;
+      // STEP 03 에 적어 둔 증권사·계좌번호를 여기서도 같이 보여준다.
+      // 연금저축펀드1·2 처럼 이름만으로는 어느 증권사인지 알 수 없기 때문이다.
+      const chip=(key,label,cnt,val)=>{
+        const nt=(state.notes||{})[key];
+        return `<span class="fchip ${detailFilter===key?'on':''}" data-f="${esc(key)}">
+        <span class="fname">${esc(label)}${nt?`<span class="fnote">${esc(nt)}</span>`:''}</span>
+        <span class="fcnt">${cnt}종목</span><span class="fval">${wonShort(val)}원</span></span>`;
+      };
       fbox.innerHTML=chip('','전체',all.length,all.reduce((s,r)=>s+r.val,0))
         +used.map(a=>chip(a,a,all.filter(r=>r.acct===a).length,
                           all.filter(r=>r.acct===a).reduce((s,r)=>s+r.val,0))).join('');
@@ -1273,7 +1281,9 @@ function renderDetail(all,total){
 
   const rows = state.merge ? mergeLots(valid) : valid;
   const multi = state.merge ? rows.filter(r=>r.lots>1).length : 0;
-  const fnote = detailFilter ? `<b>${esc(detailFilter)}</b> 계좌만 보고 있습니다. ` : '';
+  const dnote = detailFilter ? (state.notes||{})[detailFilter] : '';
+  const fnote = detailFilter
+    ? `<b>${esc(detailFilter)}</b>${dnote?` (${esc(dnote)})`:''} 계좌만 보고 있습니다. ` : '';
   note.innerHTML = fnote + (state.merge
     ? (multi ? `같은 계좌 안에서 같은 종목 <b>${multi}건</b>을 합쳤습니다. 매입단가는 수량 가중평균입니다.`
              : '합칠 종목이 없습니다. 모두 한 건씩만 보유 중입니다.')
@@ -1285,7 +1295,8 @@ function renderDetail(all,total){
     const chg=r.isUS?(r.change>=0?'+':'')+r.change.toFixed(2)
                     :(r.change>=0?'+':'')+Math.round(r.change).toLocaleString('ko-KR');
     return `<tr>
-      <td class="tl"><span class="chip">${r.acct}</span></td>
+      <td class="tl"><span class="chip">${r.acct}</span>${
+        (state.notes||{})[r.acct]?`<span class="acct-note">${esc(state.notes[r.acct])}</span>`:''}</td>
       <td class="tl">${esc(r.name)}<br><span style="font-size:11px;color:#8B8276">
         ${r.isUS?'<span class="flag us">미국</span>':''}${esc(r.code)}
         ${r.lots>1?`<span class="chip lot">${r.lots}건 합산</span>`:''}</span></td>
