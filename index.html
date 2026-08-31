@@ -559,7 +559,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 02 / 캡처로 불러오기 (선택)</span></div>
   <div class="card-desc">
     증권사 앱 잔고 화면을 캡처해 올리면 종목과 수량을 자동으로 읽어옵니다.
-    <b>캡처를 여러 장 한 번에 올릴 수 있고</b>, 캡처마다 계좌가 자동으로 나뉩니다. 같은 종류 계좌가 겹치면 일반계좌2·연금저축펀드2 처럼 번호를 붙여 만들어 드립니다.
+    <b>캡처를 여러 장 한 번에 올릴 수 있고</b>, 캡처마다 계좌가 자동으로 나뉩니다. 같은 종류 계좌가 겹치면 일반계좌2·연금저축펀드2 처럼 번호를 붙여 만들어 드립니다.<br>
+    표가 옆으로 잘려 <b>수량과 매입가가 한 화면에 안 나오면</b> 좌우로 나눠 두 장을 올리세요. 같은 계좌·같은 종목이면 빈칸끼리 채워 한 건으로 합칩니다.
     읽은 결과는 바로 반영하지 않고 <b>검수 화면에서 확인한 뒤</b> 추가합니다.<br>캡처에 <span class="need">보유수량</span>·<span class="need">매입단가</span> 열이 함께 나오게 찍으시면 수량과 단가까지 자동으로 채워집니다.
   </div>
 
@@ -1929,7 +1930,9 @@ function nums(line,hit){
    현재가 열이 캡처에 없으면 우리 시세로 대신 계산하되 확신도를 낮춘다. */
 function inferQtyAvg(list,price,fxMul){
   if(list.length<3) return null;
-  const near=(a,b,t)=>Math.abs(a-b)<=Math.max(Math.abs(b)*(t||0.005),0.51);
+  // 0.51 은 원 단위 반올림을 견디려는 여유다. 달러 소수(0.06 대 0.12)에서는
+  // 이 여유가 너무 커서 아무 값이나 통과하므로 금액이 클 때만 준다.
+  const near=(a,b,t)=>Math.abs(a-b)<=Math.max(Math.abs(b)*(t||0.005),Math.abs(b)>=1000?0.51:0);
   // 값이 아니라 자리(index)로 구분한다.
   // 1주만 보유하면 평가금액과 현재가가 같은 숫자가 되는데,
   // 값으로 비교하면 둘 다 걸러져 검산이 통째로 실패한다.
@@ -2017,7 +2020,9 @@ function inferQtyAvg(list,price,fxMul){
         for(let i=0;i<N;i++){
           if(i===qi||i===c.i||i===vi) continue;
           const a3=list[i]/q;
-          if(a3>=c.cur*0.05&&a3<=c.cur*20){ fallback={qty:q,avg:+a3.toFixed(4),sure:false,derived:true}; break; }
+          // 나눈 값이 현재가와 자릿수가 비슷해야 매입가다.
+          // 넓게 두면 평가손익 ÷ 수량 (57.81 ÷ 1.44 = 40.1) 이 매입가로 들어간다.
+          if(a3>=c.cur*0.3&&a3<=c.cur*2){ fallback={qty:q,avg:+a3.toFixed(4),sure:false,derived:true}; break; }
         }
       }
       // 매입가는 끝내 못 찾았어도 수량은 확실하다
@@ -2030,6 +2035,21 @@ let shotAcct=[], shotCols=[];
 
 /* 값을 넣을지 결정한다.
    검산으로 확인된 값은 그대로 쓰고, 추정값은 그 열이 화면에 있을 때만 넣는다. */
+// 수량 열이 아예 없는 화면(종목코드·현재가·손익단가·평가손익만 주는 잔고)에서
+// 매입가만 골라낸다. 현재가와 자릿수가 비슷한 소수 값이 딱 하나면 그게 매입가다.
+//   AAPL  318.3100  0.0600 / 애플 50 290.3393 9.77%
+//   → 현재가 318.31 의 0.3~3배이면서 정수가 아닌 값은 290.3393 하나뿐이다
+//   (50 은 USD 오인식, 0.06 은 평가손익, 57.41 같은 손익도 범위 밖으로 빠진다)
+function avgOnly(list,price){
+  if(!(price>0)||!list||list.length<3) return null;
+  const cur=list.reduce((b,v)=>(v>0&&Math.abs(v-price)<Math.abs(b-price))?v:b,Infinity);
+  if(!isFinite(cur)||Math.abs(cur-price)>price*0.1) return null;   // 현재가가 화면에 있어야 한다
+  // 매입가는 현재가의 0.5~2배 안에 있다(손실 -50% ~ 이익 +100%).
+  // 넓히면 평가손익(SPYM 42.27) 이 매입가 후보로 끼어든다.
+  const hit=list.filter(v=>v!==cur&&v>=cur*0.5&&v<=cur*2&&!Number.isInteger(v));
+  return hit.length===1 ? hit[0] : null;
+}
+
 function pick(g,h,cols,k){
   if(g&&g.sure) return g[k];
   // 산수로 구한 값은 화면에 그 열이 없어도 쓴다.
@@ -2131,7 +2151,7 @@ function detectAcct(text){
    다른 숫자를 수량·매입가에 밀어 넣으면 안 된다. 없으면 비워두고 알려준다. */
 function detectCols(text){
   const t=text||'';
-  const AVG=/매입단가|평균단가|매수단가|매입가|매매단가|평단/;
+  const AVG=/매입단가|평균단가|매수단가|매입가|매매단가|손익단가|평단/;
   const QTY=/보유수량|매도가능|주문가능|수량/;
   // 다른 열 이름과 같은 줄에 있을 때만 헤더로 본다.
   // "보유 | 매매손익 | 체결" 같은 탭 이름을 열 이름으로 오인하지 않기 위해서다.
@@ -2169,7 +2189,10 @@ function parseShot(src,si){
   // 이러면 각 줄이 따로 엉뚱한 종목에 걸린다. 다음 줄까지 붙여 다시 찾아보고
   // 더 긴 이름이 나오면 그쪽을 쓴다.
   const skip=new Set(), joinN=new Map();   // 줄 → 아래로 몇 줄을 더 붙였나
-  const byNameVia=v=>v==='name'||v==='fuzzy'||v==='alias'||v==='usname';
+  // 티커 줄과 이름 줄이 위아래로 나뉜 화면을 한 건으로 묶기 위한 구분.
+  //   AAPL   미국  318.3100  0.0600   ← 티커 줄
+  //   애플    50   290.3393   9.77%   ← 이름 줄
+  const byNameVia=v=>v==='name'||v==='fuzzy'||v==='alias'||v==='usname'||v==='usko';
   // 아래 (가) 에서 쓰는 '티커 줄' 판정. 산수로 찾은 줄(brandprice·arith)은
   // 티커 줄이 아니다. 티커로 치면 "718 718 37.51 …" 이 아랫줄 TIGER 를
   // 티커처럼 끌어와 진짜 행을 지운다.
@@ -2186,8 +2209,19 @@ function parseShot(src,si){
     if(!b||!isCodeLike(b.via)) continue;
     const a=matched[i];
     if(a&&a.via==='pipe') continue;                          // 윗줄이 로트 줄이면 그대로 둔다
-    if(a&&!byNameVia(a.via)&&a.m.code!==b.m.code) continue;  // 윗줄도 별개 티커면 손대지 않는다
+    // 윗줄 이름이 흐릿하게 잡힌 경우엔 아랫줄 티커를 믿는다.
+    //   State Street SPDR S&P 500 ETF 83 80.07 / SPYM 10,335,009 90.46
+    //   ← 윗줄은 SPY 로도 보이지만 티커가 정확하다. 묶는다
+    // 반대로 윗줄이 이름 완전 일치로 확정됐는데 코드가 다르면 다음 종목이다.
+    //   애플 50 290.3393 9.77% / AVGO 미국 367.3200   ← 묶으면 한 건이 어긋난다
+    if(a&&a.nameSure&&a.m.code!==b.m.code) continue;
     if(!nums(lines[i],a?a.m:b.m).length) continue;           // 윗줄에 숫자가 있어야 보유 행이다
+    // 윗줄이 아무것도 못 찾았는데 그 앞줄이 이미 종목이라면,
+    // 윗줄은 앞 종목의 이어지는 줄이지 아랫줄 티커의 이름 줄이 아니다.
+    //   QQQMm 미국 294.3500 57.8100          ← 종목
+    //   인베스코 나스닥 100 ETF 254.2206       ← 위 종목의 이름 줄
+    //   SPYM 미국 90.1800 42.2300            ← 다음 종목. 위와 묶으면 안 된다
+    if(!a&&matched[i-1]) continue;
     // 아랫줄은 '티커 + 숫자' 뿐이어야 한다. 글자(숫자 제외)가 길면 OCR 이 깨진 줄이다.
     //   SPYM 10,335,009 90.4600      → 글자 SPYM (4)   ○
     //   TIME OI=ZLIAE100 626,272 585 → 글자 TIMEOIZLIAE (11) ×
@@ -2233,7 +2267,10 @@ function parseShot(src,si){
     // 조각을 셀 때 숫자는 뺀다. 금액에 섞인 숫자까지 세면
     // "현금 22.69% 135,200 33,800" 이 TIGER 200 IT 의 200 을 자기 조각으로 착각해
     // 아랫줄의 진짜 TIGER 종목을 가로챈다.
-    const nodigit=t=>letters(t).replace(/[0-9]/g,'');
+    // 조각을 셀 때 숫자와 ETF·ETN 같은 꼬리말은 뺀다.
+    // 어느 상품에나 붙는 글자라 "인베스코 나스닥 100 ETF" 가
+    // "SPDR Portfolio S&P 500 ETF" 의 조각으로 통과해 아랫줄을 가로챈다.
+    const nodigit=t=>letters(t).replace(/[0-9]/g,'').replace(/ETF|ETN/g,'');
     const onThisLine=!a&&!!j&&lcsLen(nodigit(lines[i]),nodigit(j.m.name))>=3;
     // 산수가 원 단위로 맞아떨어진 경우는 이름 조각보다 강한 증거다.
     // 이름이 통째로 깨져(^66ㄷ미국5&0500) 조각으로는 3글자를 못 채운다.
@@ -2321,7 +2358,7 @@ function parseShot(src,si){
     // 이름으로 찾은 줄과 코드·티커로 찾은 줄이 같은 종목이면 한 보유 건이다.
     //   State Street SPDR S&P 500 ETF  83   80.0700   ← 이름
     //   SPYM                    10,335,009  90.4600   ← 티커
-    const byName=v=>v==='name'||v==='fuzzy'||v==='alias'||v==='usname';
+    const byName=v=>byNameVia(v);
     const pairUp=(a,b)=>byName(a.via)!==byName(b.via);
     // OCR 이 이름을 자기 숫자들보다 뒤에 놓는 경우가 있다.
     //   2,509,041 331 / 18,830 / ACE OI=3S&P500 / … 8,741,710 26,410
@@ -2345,8 +2382,14 @@ function parseShot(src,si){
         const g2=inferQtyAvg(wide,h.m.price,fx);
         if(g2){ g=g2; h={...h,n:wide}; }
       }
+      if(!g){
+        const a=avgOnly(h.n,h.m.price);
+        if(a) g={qty:'',avg:a,sure:false,guess:true,partial:true};
+      }
       // 이번에 쓰지 않은 숫자는 다음 종목 몫일 수 있다
-      leftover = g ? h.n.filter(x=>x!==g.qty&&x!==g.avg) : [];
+      // 매입가만 골라낸 경우는 남은 숫자를 다음 종목으로 넘기지 않는다.
+      // 각 행이 자기 숫자를 다 갖고 있는 화면이라, 넘기면 다음 행이 오염된다.
+      leftover = (g&&!g.partial) ? h.n.filter(x=>x!==g.qty&&x!==g.avg) : [];
       ocrRows.push({src:si,box:h.box,line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,lot:'',acct:guess,nameSure:h.nameSure,
         isUS:h.m.cur==='USD', qty:pick(g,h,cols,'qty'), avg:pick(g,h,cols,'avg'),
         sure:!!(g&&g.sure), derived:!!(g&&g.derived), use:true});
@@ -2770,7 +2813,10 @@ function matchStock(line,mkt){
   const okKR=mkt!=='US', okUS=mkt!=='KR';
 
   // 1) 국내 종목코드 (문자 섞인 신형 코드 포함)
-  if(okKR) for(const x of up.match(/\b[0-9][0-9A-Z]{5}\b/g)||[]) if(KR[x]) return {m:KR[x],via:'code',nameSure:true};
+  // 앞뒤가 숫자·소수점이면 코드가 아니다.
+  // 잔고수량 0.002410 의 뒤 여섯 자리가 종목코드 002410(범양건영) 으로 잡히던 문제.
+  if(okKR) for(const x of up.match(/(?<![\d.])[0-9][0-9A-Z]{5}(?![\d.])/g)||[])
+    if(KR[x]) return {m:KR[x],via:'code',nameSure:true};
 
   // 2) "현금 | AMD" 처럼 구분선 뒤에 오는 티커. 이 줄에 평균단가가 함께 있다.
   //    구분(현금/소수점)도 같이 들고 와 로트를 구분한다.
@@ -2837,7 +2883,17 @@ function matchStock(line,mkt){
   //    "TIME OI=ZLIAE100" 이 Clockwise(TIME), "x{HE|E (H" 가 하와이안(HE) 이 된다.
   //    티커 줄은 보통 티커 하나에 숫자뿐이므로 대문자 토막이 하나일 때만 인정한다.
   const STOP=new Set(['USD','KRW','ETF','ALL','NEW','TOP','AND','THE','FOR','INC','CORP','CO','S&P']);
-  const caps=[...new Set((line.match(/\b[A-Z][A-Z.-]{1,5}\b/g)||[]).filter(t=>!STOP.has(t)))];
+  // 소문자가 뒤에 붙어도 대문자 부분만 티커로 본다. QQQMm → QQQM
+  const caps=[...new Set((line.match(/\b[A-Z][A-Z.-]{1,5}(?=[a-z]|\b)/g)||[]).filter(t=>!STOP.has(t)))];
+  // 종목코드 열이 맨 앞에 오는 화면은 줄 첫 토막이 곧 티커다.
+  //   AAPL   미국  oN  318.3100  0.0600
+  //   QQQMm  미국  AA  294.0700 57.4100   ← 뒤쪽 AA(알코아) 가 아니라 앞의 QQQM 이다
+  // 다만 미국 표기가 있는 줄로 제한한다. 그러지 않으면 국내 화면의
+  // "TIME OI=ZLIAE100 …" 이 Clockwise(TIME) 로 샌다.
+  if(okUS&&caps.length>1&&/미국|USD|NASDAQ|NYSE|AMEX/i.test(line)){
+    const head=(line.match(/^\s*([A-Z][A-Z.-]{1,5})(?=[a-z]|\b)/)||[])[1];
+    if(head&&!STOP.has(head)&&US[head]) return {m:US[head],via:'ticker',nameSure:true};
+  }
   if(okUS&&caps.length===1&&US[caps[0]]) return {m:US[caps[0]],via:'ticker',nameSure:true};
 
   // 5) 종목명 부분 일치 — 미국 ("INVESCO NASDAQ 100" → QQQM)
@@ -2901,13 +2957,40 @@ document.addEventListener('click',e=>{
   if(c) editAccount(+c.dataset.acct);
 });
 document.getElementById('btn-apply').onclick=()=>{
-  const add=ocrRows.filter(r=>r.use&&num(r.qty)>0);
-  if(!add.length){ alert('추가할 항목이 없습니다. 수량을 확인해 주세요.'); return; }
+  const use=ocrRows.filter(r=>r.use);
+  // 표가 가로로 잘려 한 캡처에 수량과 매입가가 같이 안 나오는 증권사가 있다.
+  //   왼쪽 캡처 : 종목코드 · 현재가 · 손익단가      → 매입가만
+  //   오른쪽 캡처: 종목코드 · 평가금액 · 잔고수량    → 수량만
+  // 한쪽만 읽힌 행은 같은 계좌·같은 종목의 빈칸을 채우는 쪽으로 쓴다.
+  const fill=[], add=[];
+  use.forEach(r=>{
+    const q=num(r.qty)>0, a=num(r.avg)>0;
+    if(q&&a) add.push(r);
+    else if(q||a) fill.push(r);
+  });
+  let filled=0;
+  fill.forEach(r=>{
+    const acct=r.acct||accts()[0];
+    const t=state.holdings.find(h=>(h.acct||accts()[0])===acct&&h.code===r.code
+      &&((num(r.qty)>0&&!(num(h.qty)>0))||(num(r.avg)>0&&!(num(h.avg)>0))));
+    if(t){
+      if(num(r.qty)>0&&!(num(t.qty)>0)) t.qty=r.qty;
+      if(num(r.avg)>0&&!(num(t.avg)>0)) t.avg=r.avg;
+      filled++;
+    }else if(num(r.qty)>0){
+      add.push(r);                       // 수량만 있으면 그대로 넣는다. 매입가는 나중에 채운다
+    }
+  });
+  if(!add.length&&!filled){
+    alert('추가할 항목이 없습니다.\n수량이 비어 있으면 넣을 수 없습니다.'); return;
+  }
   add.forEach(r=>state.holdings.push({acct:r.acct||accts()[0],code:r.code,qty:r.qty,avg:r.avg}));
   save(); render();
   document.getElementById('review').classList.remove('on');
   freeShots();
-  alert(`${add.length}건을 추가했습니다.\n계좌 구분과 매입가를 확인해 주세요.`);
+  alert([add.length?`${add.length}건을 추가했습니다.`:'',
+         filled?`${filled}건은 이미 있는 종목의 빈칸을 채웠습니다.`:'',
+         '계좌 구분과 매입가를 확인해 주세요.'].filter(Boolean).join('\n'));
 };
 function freeShots(){
   ocrShots.forEach(sh=>{ if(sh&&sh.url) try{ URL.revokeObjectURL(sh.url); }catch(e){} });
