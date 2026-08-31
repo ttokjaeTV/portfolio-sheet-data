@@ -190,6 +190,29 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .toggle-switch input:checked+.toggle-slider:before{transform:translateX(23px)}
 .merge-note{font-size:12px;color:var(--ink-mute);font-weight:600;line-height:1.7;margin-bottom:2px}
 
+/* 계좌 관리 */
+.acct-mgr{margin-top:26px;padding-top:20px;border-top:1px dashed var(--border)}
+.acct-mgr-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.acct-chips{display:flex;flex-wrap:wrap;gap:8px}
+.acct-chip{display:inline-flex;align-items:center;gap:7px;background:var(--bg-alt);
+  border:1.5px solid var(--border);border-radius:999px;padding:7px 14px;font-size:13px;
+  font-weight:700;cursor:pointer;transition:all .15s ease}
+.acct-chip:hover{border-color:var(--accent);color:var(--accent)}
+.acct-chip .cnt{font-size:11px;font-weight:700;color:var(--ink-mute)}
+.acct-chip .tagline{font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;
+  background:var(--accent-soft);color:var(--accent)}
+.acct-hint{font-size:11.5px;color:var(--ink-mute);font-weight:600;line-height:1.7;margin-top:12px}
+
+/* 검수 화면 계좌 일괄 지정 */
+.review-bulk{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;
+  background:var(--bg-alt);border-radius:12px;padding:12px 16px}
+.review-bulk span{font-size:12.5px;font-weight:700;color:var(--ink-soft)}
+.review-bulk select{width:auto;min-width:180px;padding:8px 12px;font-size:13px}
+.shot-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.shot{display:inline-flex;align-items:center;gap:6px;background:var(--bg-alt);border-radius:8px;
+  padding:5px 10px;font-size:11.5px;font-weight:700;color:var(--ink-soft)}
+.shot.err{background:#F6D9D4;color:var(--red)}
+
 .insight-box{background:var(--dark-warm);color:var(--white);border-radius:20px;padding:36px;margin-bottom:24px}
 .insight-label{display:flex;align-items:center;gap:8px;margin-bottom:16px}
 .insight-label-text{font-size:12px;font-weight:800;letter-spacing:1.5px;color:var(--accent-soft)}
@@ -307,6 +330,18 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <button class="btn ghost" id="btn-sample">예시 채우기</button>
     <button class="btn ghost" id="btn-clear">전체 지우기</button>
   </div>
+
+  <div class="acct-mgr">
+    <div class="acct-mgr-head">
+      <span class="label" style="margin:0">내 계좌</span>
+      <button class="btn ghost" id="btn-acct-add" style="padding:7px 12px;font-size:12px">+ 계좌 추가</button>
+    </div>
+    <div class="acct-chips" id="acct-chips"></div>
+    <div class="acct-hint">
+      계좌를 클릭하면 이름을 바꾸거나 지울 수 있습니다.
+      이름에 <b>IRP</b>가 들어가면 위험자산 70% 한도를, <b>연금·ISA</b>가 들어가면 절세계좌로 계산합니다.
+    </div>
+  </div>
 </div>
 
 <!-- STEP 02 : 캡처 인식 -->
@@ -320,11 +355,13 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="drop" id="drop">
     <div class="drop-t">📷 캡처 이미지를 여기에 끌어다 놓거나 클릭해 선택</div>
     <div class="drop-s">
+      <b>여러 장을 한 번에</b> 올릴 수 있습니다. 계좌별로 캡처해 함께 넣으세요.<br>
       글자가 클수록 정확합니다. 화면을 확대해 캡처하면 인식률이 올라갑니다.<br>
       최초 1회 인식 데이터 약 22MB를 내려받습니다. 와이파이 환경을 권합니다.
     </div>
-    <input type="file" id="file-img" accept="image/*" hidden>
+    <input type="file" id="file-img" accept="image/*" multiple hidden>
   </div>
+  <div class="shot-list" id="shot-list"></div>
 
   <div class="ocr-prog" id="ocr-prog">
     <div class="prog-bar"><div class="prog-fill" id="prog-fill"></div></div>
@@ -336,9 +373,15 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
       ⚠️ 문자 인식은 완벽하지 않습니다. <b>종목·수량·매입가를 반드시 눈으로 확인</b>하고 고친 뒤 추가하세요.
       특히 숫자 자릿수와 비슷한 이름의 종목을 주의 깊게 봐주세요.
     </div>
+    <div class="review-bulk">
+      <span>모두 이 계좌로 지정</span>
+      <select id="bulk-acct"></select>
+      <button class="btn ghost" id="btn-bulk-apply" style="padding:8px 14px;font-size:12.5px">적용</button>
+    </div>
     <div class="table-wrap">
       <table class="data-table narrow">
-        <thead><tr><th class="tl">인식된 줄</th><th class="tl">매칭된 종목</th><th>수량</th><th>매입가</th><th>추가</th></tr></thead>
+        <thead><tr><th class="tl">인식된 줄</th><th class="tl">매칭된 종목</th><th class="tl">계좌</th>
+          <th>수량</th><th>매입가</th><th>추가</th></tr></thead>
         <tbody id="review-body"></tbody>
       </table>
     </div>
@@ -459,8 +502,13 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 
 <script>
 const BASE='https://ttokjaetv.github.io/portfolio-sheet-data/data/';
-const ACCOUNTS=['연금저축펀드1','연금저축펀드2','IRP','ISA','일반계좌'];
+const DEFAULT_ACCOUNTS=['연금저축펀드1','연금저축펀드2','IRP','ISA','일반계좌'];
 const LS_KEY='ttokjae_portfolio_v2';
+/* 계좌는 이용자가 자유롭게 추가·이름변경할 수 있다.
+   IRP 70% 한도와 절세계좌 비중은 계좌 이름으로 판별한다. */
+const accts=()=>(state.accounts&&state.accounts.length)?state.accounts:DEFAULT_ACCOUNTS;
+const isIRP=a=>/IRP|DC형|DC\b|퇴직연금/i.test(a);
+const isTaxAdv=a=>/연금|IRP|ISA|DC\b|퇴직/i.test(a);
 const COLORS=['#D9542B','#E89A6F','#8B6F47','#C4A57B','#5A6B5A','#A03D1F','#9B9387','#7A8B99'];
 
 let KR={}, US={}, FX=0, STAMP='', STAMP_US='';   // KR = 국내 ETF + 국내 개별주식
@@ -604,7 +652,7 @@ function compute(){
     const valC=m?qty*m.price:0;           // 표시통화 기준 평가금액
     const buy=buyC*fx;                    // 원화 환산 (집계용)
     const val=valC*fx;
-    return {acct:h.acct||ACCOUNTS[0], code:h.code?String(h.code).toUpperCase():'',
+    return {acct:h.acct||accts()[0], code:h.code?String(h.code).toUpperCase():'',
       name:m?m.name:'', found:!!m, isUS, cur:isUS?'USD':'KRW',
       assetClass:m?m.assetClass:'', safe:m?m.safe:false,
       price:m?m.price:0, change:m?m.change:0, qty, avg,
@@ -612,7 +660,7 @@ function compute(){
       buy, val, pl:val-buy, ror:buy>0?((val-buy)/buy*100):0};
   });
   const cash={}; let cashSum=0;
-  ACCOUNTS.forEach(a=>{ const c=num(state.cash[a]); cash[a]=c; cashSum+=c; });
+  accts().forEach(a=>{ const c=num(state.cash[a]); cash[a]=c; cashSum+=c; });
   return {rows,cash,cashSum};
 }
 
@@ -663,8 +711,7 @@ function renderRows(){
     else calc=`${wonShort(r.val)}원<span class="sub ${cls(r.pl)}">${r.pl>=0?'+':''}${wonShort(r.pl)} (${pct(r.ror)})</span>`;
     const mark=r.isUS?'$':'₩';
     return `<div class="holding-row">
-      <div><select data-i="${i}" data-k="acct">${ACCOUNTS.map(a=>
-        `<option ${a===(h.acct||ACCOUNTS[0])?'selected':''}>${a}</option>`).join('')}</select></div>
+      <div><select data-i="${i}" data-k="acct">${acctOptions(h.acct)}</select></div>
       <div class="search-wrap">
         <input data-i="${i}" data-k="code" value="${esc(h.code||'')}" autocomplete="off"
           placeholder="종목명 또는 티커 (예: TIGER 미국S&P500, SCHD)">
@@ -679,8 +726,53 @@ function renderRows(){
     </div>`;
   }).join('');
 }
+/* ---------- 계좌 관리 ---------- */
+function acctOptions(sel){
+  return accts().map(a=>`<option ${a===(sel||accts()[0])?'selected':''}>${esc(a)}</option>`).join('');
+}
+function renderAccts(){
+  const box=document.getElementById('acct-chips');
+  const used={};
+  state.holdings.forEach(h=>{ const a=h.acct||accts()[0]; used[a]=(used[a]||0)+1; });
+  box.innerHTML=accts().map((a,i)=>{
+    const tag = isIRP(a) ? '<span class="tagline">70% 한도</span>'
+              : (isTaxAdv(a) ? '<span class="tagline">절세</span>' : '');
+    return `<span class="acct-chip" data-acct="${i}">${esc(a)}${tag}
+      <span class="cnt">${used[a]||0}종목</span></span>`;
+  }).join('');
+}
+function addAccount(){
+  const name=(prompt('추가할 계좌 이름을 입력하세요.\n예: 연금저축펀드3, IRP2, 일반계좌(해외)')||'').trim();
+  if(!name) return;
+  if(accts().includes(name)){ alert('이미 있는 계좌입니다.'); return; }
+  state.accounts=[...accts(),name];
+  save(); renderAccts(); renderCash(); render();
+}
+function editAccount(i){
+  const list=accts(), old=list[i];
+  const cnt=state.holdings.filter(h=>(h.acct||list[0])===old).length;
+  const name=prompt(`"${old}" 계좌\n\n이름을 바꾸려면 새 이름을 입력하고 확인,\n계좌를 지우려면 내용을 모두 지우고 확인하세요.`
+    +(cnt?`\n\n※ 이 계좌에 ${cnt}개 종목이 들어 있습니다.`:''), old);
+  if(name===null) return;
+  const nm=name.trim();
+
+  if(!nm){                                   // 삭제
+    if(list.length<=1){ alert('계좌는 최소 하나는 있어야 합니다.'); return; }
+    if(cnt&&!confirm(`이 계좌의 종목 ${cnt}개도 함께 지웁니다. 계속할까요?`)) return;
+    state.accounts=list.filter((_,k)=>k!==i);
+    state.holdings=state.holdings.filter(h=>(h.acct||list[0])!==old);
+    delete state.cash[old];
+  }else{                                     // 이름 변경
+    if(nm!==old&&list.includes(nm)){ alert('이미 있는 계좌 이름입니다.'); return; }
+    state.accounts=list.map((a,k)=>k===i?nm:a);
+    state.holdings.forEach(h=>{ if((h.acct||list[0])===old) h.acct=nm; });
+    if(state.cash[old]!==undefined){ state.cash[nm]=state.cash[old]; delete state.cash[old]; }
+  }
+  save(); renderAccts(); renderCash(); render();
+}
+
 function renderCash(){
-  document.getElementById('cash-grid').innerHTML=ACCOUNTS.map(a=>
+  document.getElementById('cash-grid').innerHTML=accts().map(a=>
     `<div><label class="label">${a}</label>
       <input type="number" data-cash="${a}" value="${esc(state.cash[a]??'')}" placeholder="0" min="0" step="1000"></div>`).join('');
 }
@@ -688,6 +780,7 @@ function renderCash(){
 let chartAsset=null, chartAcct=null;
 function render(){
   renderRows();
+  renderAccts();
   const {rows,cash,cashSum}=compute();
   const valid=rows.filter(r=>r.found&&r.qty>0&&(!r.isUS||FX>0));
 
@@ -706,9 +799,9 @@ function render(){
   rorEl.textContent=pct(ror); rorEl.className='stat-value '+cls(ror);
 
   const byAcct={};
-  ACCOUNTS.forEach(a=>byAcct[a]={buy:cash[a],val:cash[a]});
+  accts().forEach(a=>byAcct[a]={buy:cash[a],val:cash[a]});
   valid.forEach(r=>{ byAcct[r.acct].buy+=r.buy; byAcct[r.acct].val+=r.val; });
-  document.getElementById('acct-body').innerHTML=ACCOUNTS.map(a=>{
+  document.getElementById('acct-body').innerHTML=accts().map(a=>{
     const d=byAcct[a]; if(!d.val&&!d.buy) return '';
     const p=d.val-d.buy, rr=d.buy>0?(p/d.buy*100):0, w=val>0?(d.val/val*100):0;
     return `<tr><td class="tl">${a}</td><td>${won(d.buy)}</td><td>${won(d.val)}</td>
@@ -722,7 +815,7 @@ function render(){
   valid.forEach(r=>{ byAsset[r.assetClass]=(byAsset[r.assetClass]||0)+r.val; });
   if(cashSum>0) byAsset['현금']=(byAsset['현금']||0)+cashSum;
   drawDonut('chart-asset',chartAsset,byAsset,c=>chartAsset=c);
-  const acctData={}; ACCOUNTS.forEach(a=>{ if(byAcct[a].val>0) acctData[a]=byAcct[a].val; });
+  const acctData={}; accts().forEach(a=>{ if(byAcct[a].val>0) acctData[a]=byAcct[a].val; });
   drawDonut('chart-acct',chartAcct,acctData,c=>chartAcct=c);
 
   renderGauge(valid,cash);
@@ -748,26 +841,33 @@ function drawDonut(id,prev,data,setter){
 
 function renderGauge(valid,cash){
   const wrap=document.getElementById('gauge-wrap');
-  const rows=valid.filter(r=>r.acct==='IRP'), c=cash['IRP']||0;
-  const total=rows.reduce((s,r)=>s+r.val,0)+c;
-  if(total<=0){ wrap.innerHTML='<div class="empty-note">IRP 계좌에 등록된 자산이 없습니다.</div>'; return; }
-  const safe=rows.filter(r=>r.safe).reduce((s,r)=>s+r.val,0)+c;
-  const risky=total-safe, rp=risky/total*100, ok=rp<=70;
-  wrap.innerHTML=`
-    <div class="gauge-row">
-      <span class="gauge-name">위험자산 비중<span class="badge ${ok?'ok':'warn'}">${ok?'한도 이내':'한도 초과'}</span></span>
-      <span class="gauge-val ${ok?'':'up'}">${rp.toFixed(1)}%</span>
-    </div>
-    <div class="gauge-bar"><div class="gauge-fill" style="width:${Math.min(rp,100)}%;background:${ok?'var(--accent)':'#C0392B'}"></div></div>
-    <div class="gauge-limit">
-      위험자산 ${won(risky)} / 안전자산 ${won(safe)} (예수금 ${won(c)} 포함) · 합계 ${won(total)}<br>
-      ${ok?`한도까지 ${won(total*0.7-risky)} 여유가 있습니다.`
-          :`한도를 ${won(risky-total*0.7)} 넘었습니다. 안전자산을 늘려야 추가 매수가 가능합니다.`}
-      <br><span style="color:#8B8276">
-      ※ 안전자산 분류는 KRX ETF 기본정보 기준이며 증권사마다 다를 수 있습니다.
-      한도는 매수 시점에 적용되므로, 보유 중 평가액이 올라 70%를 넘는 것 자체는 위반이 아닙니다.
-      금융당국이 이 한도의 완화·폐지를 논의 중이라 향후 바뀔 수 있습니다.</span>
-    </div>`;
+  const targets=accts().filter(isIRP);          // 이름에 IRP·DC·퇴직연금이 든 계좌
+  if(!targets.length){
+    wrap.innerHTML='<div class="empty-note">IRP 계좌가 없습니다. '
+      +'계좌 이름에 <b>IRP</b>를 넣으면 이 한도를 계산해 드립니다.</div>'; return;
+  }
+  const blocks=targets.map(acct=>{
+    const rows=valid.filter(r=>r.acct===acct), c=cash[acct]||0;
+    const total=rows.reduce((s,r)=>s+r.val,0)+c;
+    if(total<=0) return `<div class="empty-note" style="margin-bottom:14px">${esc(acct)} — 등록된 자산이 없습니다.</div>`;
+    const safe=rows.filter(r=>r.safe).reduce((s,r)=>s+r.val,0)+c;
+    const risky=total-safe, rp=risky/total*100, ok=rp<=70;
+    return `<div style="margin-bottom:22px">
+      <div class="gauge-row">
+        <span class="gauge-name">${esc(acct)} 위험자산 비중<span class="badge ${ok?'ok':'warn'}">${ok?'한도 이내':'한도 초과'}</span></span>
+        <span class="gauge-val ${ok?'':'up'}">${rp.toFixed(1)}%</span>
+      </div>
+      <div class="gauge-bar"><div class="gauge-fill" style="width:${Math.min(rp,100)}%;background:${ok?'var(--accent)':'#C0392B'}"></div></div>
+      <div class="gauge-limit">
+        위험자산 ${won(risky)} / 안전자산 ${won(safe)} (예수금 ${won(c)} 포함) · 합계 ${won(total)}<br>
+        ${ok?`한도까지 ${won(total*0.7-risky)} 여유가 있습니다.`
+            :`한도를 ${won(risky-total*0.7)} 넘었습니다. 안전자산을 늘려야 추가 매수가 가능합니다.`}
+      </div></div>`;
+  }).join('');
+  wrap.innerHTML=blocks+`<div class="gauge-limit" style="margin-top:0">
+    ※ 안전자산 분류는 KRX ETF 기본정보 기준이며 증권사마다 다를 수 있습니다.
+    한도는 매수 시점에 적용되므로, 보유 중 평가액이 올라 70%를 넘는 것 자체는 위반이 아닙니다.
+    금융당국이 이 한도의 완화·폐지를 논의 중이라 향후 바뀔 수 있습니다.</div>`;
 }
 
 /* 같은 계좌·같은 종목의 로트를 하나로 합친다.
@@ -832,7 +932,7 @@ function renderInsight(valid,byAsset,total,byAcct){
   if(!valid.length) return;
   const keys=Object.keys(byAsset).filter(k=>byAsset[k]>0).sort((a,b)=>byAsset[b]-byAsset[a]);
   const top=keys[0], topPct=total>0?byAsset[top]/total*100:0;
-  const taxAcct=['연금저축펀드1','연금저축펀드2','IRP','ISA'].reduce((s,a)=>s+(byAcct[a]?byAcct[a].val:0),0);
+  const taxAcct=accts().filter(isTaxAdv).reduce((s,a)=>s+(byAcct[a]?byAcct[a].val:0),0);
   const taxPct=total>0?taxAcct/total*100:0;
   t.textContent=`${top} 비중이 ${topPct.toFixed(0)}%, 절세계좌 비중은 ${taxPct.toFixed(0)}%입니다`;
   let m=`전체 ${won(total)} 중 <strong>${esc(top)}</strong>에 ${topPct.toFixed(1)}%가 들어가 있습니다. `;
@@ -887,7 +987,7 @@ document.addEventListener('keydown',e=>{
 document.getElementById('chk-merge').onchange=e=>{
   state.merge=e.target.checked; save(); render();
 };
-document.getElementById('btn-add').onclick=()=>{ state.holdings.push({acct:ACCOUNTS[0],code:'',qty:'',avg:''}); save(); render(); };
+document.getElementById('btn-add').onclick=()=>{ state.holdings.push({acct:accts()[0],code:'',qty:'',avg:''}); save(); render(); };
 document.getElementById('btn-clear').onclick=()=>{
   if(!confirm('입력한 내용을 모두 지웁니다. 계속할까요?')) return;
   state={holdings:[],cash:{},merge:state.merge}; save(); renderCash(); render();
@@ -941,8 +1041,8 @@ drop.onclick=()=>fileImg.click();
 drop.ondragover=e=>{ e.preventDefault(); drop.classList.add('over'); };
 drop.ondragleave=()=>drop.classList.remove('over');
 drop.ondrop=e=>{ e.preventDefault(); drop.classList.remove('over');
-  if(e.dataTransfer.files[0]) runOCR(e.dataTransfer.files[0]); };
-fileImg.onchange=e=>{ if(e.target.files[0]) runOCR(e.target.files[0]); e.target.value=''; };
+  if(e.dataTransfer.files.length) runOCR([...e.dataTransfer.files]); };
+fileImg.onchange=e=>{ if(e.target.files.length) runOCR([...e.target.files]); e.target.value=''; };
 
 /* CDN 이 하나 막혀도 동작하도록 순서대로 시도한다.
    (광고차단기·사내망·일부 통신망에서 특정 CDN 이 차단되는 경우가 있다) */
@@ -993,29 +1093,48 @@ function prog(p,msg){
   document.getElementById('prog-txt').textContent=msg;
 }
 
-async function runOCR(file){
-  if(!file.type.startsWith('image/')){ alert('이미지 파일만 올릴 수 있습니다.'); return; }
+async function runOCR(files){
+  const imgs=files.filter(f=>f.type.startsWith('image/'));
+  if(!imgs.length){ alert('이미지 파일만 올릴 수 있습니다.'); return; }
   document.getElementById('review').classList.remove('on');
-  try{
-    prog(.05,'인식 엔진을 준비하고 있습니다…');
-    await ensureTesseract();
 
-    prog(.15,'인식 데이터를 확인하고 있습니다… (최초 1회 약 22MB)');
-    // 증권사 화면은 티커·ETF명이 대부분 영문이라 eng 가 반드시 필요하다.
-    // kor 단독으로 줄였더니 AMD·QQQM 같은 티커를 전혀 못 읽었다.
-    const {data}=await Tesseract.recognize(file,'kor+eng',{
-      workerPath:OCR_CDN.worker,
-      corePath:OCR_CDN.core,
-      logger:m=>{
-        if(m.status==='loading language traineddata')
-          prog(.15+m.progress*0.35,`한글 인식 데이터 내려받는 중… ${Math.round(m.progress*100)}%`);
-        else if(m.status==='recognizing text')
-          prog(.5+m.progress*0.5,`글자를 읽고 있습니다… ${Math.round(m.progress*100)}%`);
+  const shots=document.getElementById('shot-list');
+  shots.innerHTML=imgs.map(f=>`<span class="shot">🖼 ${esc(f.name)} · 대기</span>`).join('');
+
+  try{
+    prog(.02,'인식 엔진을 준비하고 있습니다…');
+    await ensureTesseract();
+    prog(.08,'인식 데이터를 확인하고 있습니다… (최초 1회 약 22MB)');
+
+    const texts=[];
+    for(let i=0;i<imgs.length;i++){
+      const base=0.1+0.9*(i/imgs.length), span=0.9/imgs.length;
+      const tag=`(${i+1}/${imgs.length}장)`;
+      shots.children[i].textContent=`🖼 ${imgs[i].name} · 인식 중`;
+      try{
+        // 증권사 화면은 티커·ETF명이 대부분 영문이라 eng 가 반드시 필요하다.
+        // kor 단독으로 줄였더니 AMD·QQQM 같은 티커를 전혀 못 읽었다.
+        const {data}=await Tesseract.recognize(imgs[i],'kor+eng',{
+          workerPath:OCR_CDN.worker, corePath:OCR_CDN.core,
+          logger:m=>{
+            if(m.status==='loading language traineddata')
+              prog(base+span*m.progress*0.3,`인식 데이터 내려받는 중… ${Math.round(m.progress*100)}%`);
+            else if(m.status==='recognizing text')
+              prog(base+span*(0.3+m.progress*0.7),`글자를 읽고 있습니다 ${tag}… ${Math.round(m.progress*100)}%`);
+          }
+        });
+        texts.push(data.text||'');
+        shots.children[i].textContent=`🖼 ${imgs[i].name} · 완료`;
+      }catch(err){
+        shots.children[i].className='shot err';
+        shots.children[i].textContent=`🖼 ${imgs[i].name} · 실패`;
       }
-    });
+    }
+    if(!texts.length) throw new Error('모든 이미지에서 글자를 읽지 못했습니다.');
+
     prog(1,'인식 완료');
     setTimeout(()=>document.getElementById('ocr-prog').classList.remove('on'),700);
-    buildReview(data.text||'');
+    buildReview(texts.join('\n'));
   }catch(e){
     document.getElementById('ocr-prog').classList.remove('on');
     alert('캡처를 읽지 못했습니다.\n\n'+e.message
@@ -1060,14 +1179,14 @@ function buildReview(text){
     // "현금 | AMD", "소수점 | AMD" 처럼 구분선 줄이 곧 로트 하나다.
     // 정수주와 소수점주는 평균단가가 다르므로 절대 합치지 않는다.
     pipes.forEach(h=>{
-      ocrRows.push({line:h.line,code:h.m.code,name:h.m.name,lot:h.lot,
+      ocrRows.push({line:h.line,code:h.m.code,name:h.m.name,lot:h.lot,acct:accts()[0],
         isUS:h.m.cur==='USD', qty:h.n[0]??'', avg:h.n[1]??'', use:true});
     });
     // 구분선 줄이 없는 종목(다른 레이아웃 혼재)은 따로 주워 담는다
     const have=new Set(pipes.map(h=>h.m.code));
     hits.filter(h=>h.via!=='pipe'&&!have.has(h.m.code)&&h.n.length>=2).forEach(h=>{
       have.add(h.m.code);
-      ocrRows.push({line:h.line,code:h.m.code,name:h.m.name,lot:'',
+      ocrRows.push({line:h.line,code:h.m.code,name:h.m.name,lot:'',acct:accts()[0],
         isUS:h.m.cur==='USD', qty:h.n[0]??'', avg:h.n[1]??'', use:true});
     });
   }else{
@@ -1078,14 +1197,14 @@ function buildReview(text){
         const nx=hits[++i]; merged.push(nx.line);
         if(nx.n.length>h.n.length) h=nx;
       }
-      ocrRows.push({line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,lot:'',
+      ocrRows.push({line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,lot:'',acct:accts()[0],
         isUS:h.m.cur==='USD', qty:h.n[0]??'', avg:h.n[1]??'', use:true});
     }
   }
 
   const body=document.getElementById('review-body');
   if(!ocrRows.length){
-    body.innerHTML='<tr><td colspan="5" style="text-align:left;color:#8B8276;padding:20px">'
+    body.innerHTML='<tr><td colspan="6" style="text-align:left;color:#8B8276;padding:20px">'
       +'<b>종목을 찾지 못했습니다.</b><br><br>'
       +'글자가 더 크게 나오도록 확대해 다시 캡처해 보세요. '
       +'아래는 실제로 읽어낸 글자입니다. 종목명이 깨져 보인다면 캡처 화질 문제입니다.'
@@ -1094,13 +1213,14 @@ function buildReview(text){
       +esc(ocrRaw.slice(0,2000)||'(읽어낸 글자가 없습니다)')+'</pre></td></tr>';
   }else{
     body.innerHTML=ocrRows.map((r,i)=>`<tr>
-      <td class="tl" style="max-width:230px;white-space:normal;font-size:11px;color:#8B8276;
-        max-height:80px;overflow:auto;display:block">${esc(r.line)}</td>
+      <td class="tl" style="max-width:210px;white-space:normal;font-size:11px;color:#8B8276">${esc(r.line)}</td>
       <td class="tl">${esc(r.name)}<br><span style="font-size:11px;color:#8B8276">
         ${r.isUS?'<span class="flag us">미국</span>':''}${esc(r.code)}${r.lot?` · ${esc(r.lot)}`:''}</span></td>
+      <td class="tl"><select data-ocr="${i}" data-f="acct">${acctOptions(r.acct)}</select></td>
       <td><input type="number" data-ocr="${i}" data-f="qty" value="${esc(r.qty)}" step="any"></td>
       <td><input type="number" data-ocr="${i}" data-f="avg" value="${esc(r.avg)}" step="any"></td>
       <td><input type="checkbox" data-ocr="${i}" data-f="use" checked style="width:auto"></td></tr>`).join('');
+    document.getElementById('bulk-acct').innerHTML=acctOptions();
   }
   document.getElementById('review').classList.add('on');
   document.getElementById('review').scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -1165,12 +1285,25 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('change',e=>{
   const t=e.target;
-  if(t.dataset.ocr!==undefined&&t.dataset.f==='use') ocrRows[+t.dataset.ocr].use=t.checked;
+  if(t.dataset.ocr===undefined) return;
+  const r=ocrRows[+t.dataset.ocr];
+  if(t.dataset.f==='use') r.use=t.checked;
+  else if(t.dataset.f==='acct') r.acct=t.value;
+});
+document.getElementById('btn-bulk-apply').onclick=()=>{
+  const v=document.getElementById('bulk-acct').value;
+  ocrRows.forEach(r=>r.acct=v);
+  document.querySelectorAll('[data-ocr][data-f="acct"]').forEach(s=>s.value=v);
+};
+document.getElementById('btn-acct-add').onclick=addAccount;
+document.addEventListener('click',e=>{
+  const c=e.target.closest('[data-acct]');
+  if(c) editAccount(+c.dataset.acct);
 });
 document.getElementById('btn-apply').onclick=()=>{
   const add=ocrRows.filter(r=>r.use&&num(r.qty)>0);
   if(!add.length){ alert('추가할 항목이 없습니다. 수량을 확인해 주세요.'); return; }
-  add.forEach(r=>state.holdings.push({acct:ACCOUNTS[0],code:r.code,qty:r.qty,avg:r.avg}));
+  add.forEach(r=>state.holdings.push({acct:r.acct||accts()[0],code:r.code,qty:r.qty,avg:r.avg}));
   save(); render();
   document.getElementById('review').classList.remove('on');
   alert(`${add.length}건을 추가했습니다.\n계좌 구분과 매입가를 확인해 주세요.`);
@@ -1181,8 +1314,9 @@ document.getElementById('btn-review-cancel').onclick=()=>{
 
 /* ---------- 시작 ---------- */
 load();
-if(!state.holdings.length) state.holdings.push({acct:ACCOUNTS[0],code:'',qty:'',avg:''});
+if(!state.holdings.length) state.holdings.push({acct:accts()[0],code:'',qty:'',avg:''});
 document.getElementById('chk-merge').checked=!!state.merge;
+renderAccts();
 renderCash();
 render();
 loadAll();
