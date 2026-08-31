@@ -305,7 +305,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <div class="drop-t">📷 캡처 이미지를 여기에 끌어다 놓거나 클릭해 선택</div>
     <div class="drop-s">
       글자가 클수록 정확합니다. 화면을 확대해 캡처하면 인식률이 올라갑니다.<br>
-      최초 1회 인식 데이터 약 12MB를 내려받습니다. 와이파이 환경을 권합니다.
+      최초 1회 인식 데이터 약 22MB를 내려받습니다. 와이파이 환경을 권합니다.
     </div>
     <input type="file" id="file-img" accept="image/*" hidden>
   </div>
@@ -934,9 +934,10 @@ async function runOCR(file){
     prog(.05,'인식 엔진을 준비하고 있습니다…');
     await ensureTesseract();
 
-    prog(.15,'한글 인식 데이터를 확인하고 있습니다… (최초 1회 약 12MB)');
-    // kor 만 쓴다. kor+eng 로 하면 영문 데이터 11MB 가 더 붙어 모바일에서 자주 끊긴다.
-    const {data}=await Tesseract.recognize(file,'kor',{
+    prog(.15,'인식 데이터를 확인하고 있습니다… (최초 1회 약 22MB)');
+    // 증권사 화면은 티커·ETF명이 대부분 영문이라 eng 가 반드시 필요하다.
+    // kor 단독으로 줄였더니 AMD·QQQM 같은 티커를 전혀 못 읽었다.
+    const {data}=await Tesseract.recognize(file,'kor+eng',{
       workerPath:OCR_CDN.worker,
       corePath:OCR_CDN.core,
       logger:m=>{
@@ -956,24 +957,61 @@ async function runOCR(file){
   }
 }
 
-/* 인식 텍스트 → 후보 행 */
+/* 인식 텍스트 → 후보 행
+   증권사 화면은 한 종목이 두 줄로 쪼개지는 경우가 많다.
+     AMD                    40      469.1500   9,916.69   ← 종목명·보유수량·현재가
+     현금 | AMD             40      221.2327    112.06%   ← 구분·티커·매도가능·평균단가
+   그래서 줄 단위로 종목을 찾되, 같은 종목이 연속으로 나오면 하나로 합친다. */
+let ocrRaw='';
+/* 숫자 후보 뽑기.
+   - 매칭된 종목명·티커는 먼저 지운다 ("INVESCO NASDAQ 100" 의 100 이 수량으로 잡히던 문제)
+   - % 가 붙은 값은 수익률이므로 제외한다 */
+function nums(line,hit){
+  let s=line;
+  if(hit){
+    for(const t of [hit.name,hit.code]){
+      if(!t) continue;
+      s=s.replace(new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'ig'),' ');
+    }
+  }
+  s=s.replace(/\d[\d,]*(?:\.\d+)?\s*%/g,' ');     // 수익률 제거
+  return (s.match(/\d[\d,]*(?:\.\d+)?/g)||[])
+    .map(v=>parseFloat(v.replace(/,/g,''))).filter(n=>isFinite(n)&&n>0);
+}
 function buildReview(text){
-  const lines=text.split('\n').map(s=>s.trim()).filter(s=>s.length>2);
-  ocrRows=[];
+  ocrRaw=text||'';
+  const lines=ocrRaw.split('\n').map(s=>s.trim()).filter(s=>s.length>1);
+  const hits=[];
   lines.forEach(line=>{
-    const m=matchStock(line);
-    if(!m) return;
-    const nums=(line.match(/[\d][\d,]*(\.\d+)?/g)||[])
-      .map(s=>parseFloat(s.replace(/,/g,''))).filter(n=>n>0);
-    // 가장 작은 값을 수량, 그 다음을 매입가로 추정 (검수 화면에서 고치는 전제)
-    const sorted=nums.slice().sort((a,b)=>a-b);
-    ocrRows.push({line,code:m.code,name:m.name,isUS:m.cur==='USD',
-      qty:sorted[0]??'', avg:sorted.find(n=>n!==sorted[0])??'', use:true});
+    const r=matchStock(line);
+    if(r) hits.push({line,m:r.m,via:r.via,n:nums(line,r.m)});
   });
+
+  // 연속된 같은 종목 병합.
+  // "현금 | AMD 40 221.2327" 처럼 구분선 뒤에 티커가 오는 줄에 평균단가가 있다.
+  // 그래서 via==='pipe' 인 줄을 최우선으로 삼고, 없으면 숫자가 많은 줄을 쓴다.
+  const score=h=>(h.via==='pipe'?100:0)+h.n.length;
+  ocrRows=[];
+  for(let i=0;i<hits.length;i++){
+    let h=hits[i], merged=[h.line];
+    while(i+1<hits.length&&hits[i+1].m.code===h.m.code){
+      const nx=hits[++i]; merged.push(nx.line);
+      if(score(nx)>score(h)) h=nx;
+    }
+    const n=h.n;   // 보통 "티커 수량 평균단가" 순서
+    ocrRows.push({line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,
+      isUS:h.m.cur==='USD', qty:n[0]??'', avg:n[1]??'', use:true});
+  }
+
   const body=document.getElementById('review-body');
   if(!ocrRows.length){
-    body.innerHTML='<tr><td colspan="5" style="text-align:center;color:#8B8276;padding:24px">'
-      +'종목을 찾지 못했습니다. 글자가 더 크게 나오도록 확대해서 다시 캡처해 보세요.</td></tr>';
+    body.innerHTML='<tr><td colspan="5" style="text-align:left;color:#8B8276;padding:20px">'
+      +'<b>종목을 찾지 못했습니다.</b><br><br>'
+      +'글자가 더 크게 나오도록 확대해 다시 캡처해 보세요. '
+      +'아래는 실제로 읽어낸 글자입니다. 종목명이 깨져 보인다면 캡처 화질 문제입니다.'
+      +'<pre style="margin-top:12px;padding:12px;background:#EFE7DA;border-radius:8px;'
+      +'white-space:pre-wrap;font-size:11px;max-height:220px;overflow:auto">'
+      +esc(ocrRaw.slice(0,2000)||'(읽어낸 글자가 없습니다)')+'</pre></td></tr>';
   }else{
     body.innerHTML=ocrRows.map((r,i)=>`<tr>
       <td class="tl" style="max-width:230px;white-space:normal;font-size:11px;color:#8B8276">${esc(r.line)}</td>
@@ -988,21 +1026,42 @@ function buildReview(text){
 }
 
 /* 인식된 한 줄에서 종목 찾기 */
+const NAME_NOISE=/\bETF\b|\bTRUST\b|\bSERIES\b|\bINDEX\b|\bFUND\b|\bINC\b|\bCORP\b|\bCO\b|[.,()]/g;
+function normName(s){ return s.toUpperCase().replace(NAME_NOISE,' ').replace(/\s+/g,' ').trim(); }
+
 function matchStock(line){
   const up=line.toUpperCase();
-  // 1) 국내 종목코드 6자리
-  const c=up.match(/\b[0-9A-Z]{6}\b/g);
-  if(c) for(const x of c) if(KR[x]) return KR[x];
-  // 2) 국내 종목명 부분 일치 (긴 이름 우선)
+
+  // 1) 국내 종목코드 (문자 섞인 신형 코드 포함)
+  for(const x of up.match(/\b[0-9][0-9A-Z]{5}\b/g)||[]) if(KR[x]) return {m:KR[x],via:'code'};
+
+  // 2) "현금 | AMD" 처럼 구분선 뒤에 오는 티커. 이 줄에 평균단가가 함께 있다.
+  const after=up.split(/[|｜/]/).slice(1).join(' ');
+  for(const t of after.match(/\b[A-Z][A-Z.-]{0,5}\b/g)||[]) if(US[t]) return {m:US[t],via:'pipe'};
+
+  // 3) 줄 어디든 있는 미국 티커 (흔한 오검출 단어 제외)
+  const STOP=new Set(['USD','KRW','ETF','ALL','NEW','TOP','AND','THE','FOR','INC','CORP','CO','S&P']);
+  for(const t of up.match(/\b[A-Z][A-Z.-]{1,5}\b/g)||[])
+    if(!STOP.has(t)&&US[t]) return {m:US[t],via:'ticker'};
+
+  // 4) 종목명 부분 일치 — 국내(긴 이름 우선)
   let best=null;
   for(const k in KR){
     const n=KR[k].name.toUpperCase();
     if(n.length>=6&&up.includes(n)&&(!best||n.length>best.name.length)) best=KR[k];
   }
-  if(best) return best;
-  // 3) 미국 티커 단독 토큰
-  const toks=up.split(/[^A-Z.]+/).filter(t=>t.length>=2&&t.length<=6);
-  for(const t of toks) if(US[t]) return US[t];
+  if(best) return {m:best,via:'name'};
+
+  // 5) 종목명 부분 일치 — 미국 ("INVESCO NASDAQ 100" → QQQM)
+  const norm=normName(line);
+  if(norm.length>=8){
+    let bu=null, bl=0;
+    for(const k in US){
+      const n=normName(US[k].name);
+      if(n.length>=8&&(norm.includes(n)||n.includes(norm))&&n.length>bl){ bu=US[k]; bl=n.length; }
+    }
+    if(bu) return {m:bu,via:'name'};
+  }
   return null;
 }
 
