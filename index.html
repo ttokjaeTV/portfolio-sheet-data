@@ -1717,7 +1717,7 @@ function buildNameIndex(){
 
 /* 조각 매칭. 이름이 얼마나 덮였는지로 점수를 매기고,
    1등이 2등보다 뚜렷하게 앞설 때만 인정한다. */
-function fuzzyKR(line){
+function fuzzyKR(line,nums){
   const L=letters(line);
   if(L.length<GRAM+2) return null;
   const seen=new Set(), tally={};
@@ -1729,23 +1729,51 @@ function fuzzyKR(line){
     if(arr) for(const k of arr) tally[k]=(tally[k]||0)+1;
   }
   const lineGrams=seen.size;
-  let b1=null,s1=0,s2=0;
+  const cand=[];
   for(const k in tally){
     if(tally[k]<5) continue;                 // 조각 5개 미만은 우연일 수 있다
     if(tally[k]/krGramCnt[k]<0.25) continue; // 이름의 4분의 1은 덮여야 한다
     // 짧은 쪽 기준으로 본다. 이름이 심하게 잘려 나가도(TIGER 5(하이닉스단일)
     // 남은 조각이 그 종목에만 있다면 찾아낼 수 있다.
-    const sc=tally[k]/Math.min(krGramCnt[k],lineGrams);
-    // 점수가 같으면 조각이 더 많이 맞은 쪽 = 더 구체적인 이름을 고른다.
-    // (TIME 미국나스닥100액티브 vs TIME 미국나스닥100채권혼합50액티브)
-    if(sc>s1||(sc===s1&&b1&&tally[k]>tally[b1])){ if(sc>s1) s2=s1; s1=sc; b1=k; }
-    else if(sc>s2) s2=sc;
+    cand.push({k,sc:tally[k]/Math.min(krGramCnt[k],lineGrams),n:tally[k]});
   }
-  if(!b1||s1<0.45) return null;
+  if(!cand.length) return null;
+  // 점수가 같으면 조각이 더 많이 맞은 쪽 = 더 구체적인 이름을 고른다.
+  cand.sort((a,b)=>b.sc-a.sc||b.n-a.n);
+
+  // 이름이 비슷한 후보가 여럿이면 현재가로 가린다.
+  // 화면에 찍힌 현재가와 우리 시세가 맞는 종목이 정답이다.
+  //   KODEX AI반도체1068 … 39,025  → TOP2플러스(38,790) ○  핵심장비 ×
+  if(nums&&nums.length){
+    // 현재가 일치는 아주 강한 근거라 후보를 넉넉히 본다.
+      // (핵심장비 0.636 vs TOP2플러스 0.500 처럼 점수가 벌어져도
+      //  화면의 39,025 와 맞는 쪽이 정답이다)
+      const top=cand.filter(c=>c.sc>=cand[0].sc*0.6).slice(0,12);
+    if(top.length>1){
+      let hit=null,best=1;
+      for(const c of top){
+        const p=KR[c.k]&&KR[c.k].price;
+        if(!p) continue;
+        for(const v of nums){
+          const d=Math.abs(v-p)/p;
+          if(d<0.03&&d<best){ best=d; hit=c; }
+        }
+      }
+      if(hit) return {m:KR[hit.k],ambiguous:false};
+    }
+  }
+  const b1=cand[0].k, s1=cand[0].sc, s2=cand[1]?cand[1].sc:0;
+  if(s1<0.45) return null;
   // (H)·TR 처럼 이름이 거의 같은 ETF 가 많다. 1등이 애매하면 버리지 말고
   // 후보로 주되 '추정'으로 표시해 이용자가 확인하게 한다.
   return {m:KR[b1],ambiguous:s1<s2*1.05};
 }
+/* 줄에 있는 숫자만 뽑는다 (종목 후보를 현재가로 가릴 때 쓴다) */
+function rawNums(line){
+  return (String(line).match(/\d[\d,]*(?:\.\d+)?/g)||[])
+    .map(v=>parseFloat(v.replace(/,/g,''))).filter(n=>isFinite(n)&&n>0);
+}
+
 /* 부분 문자열이 더 긴 단어를 잘라 들어간 것인지 확인.
    "하이닉스" 안의 "이닉스" 처럼 앞뒤가 한글로 이어지면 다른 종목이다. */
 function wordish(flat,name){
@@ -1767,10 +1795,19 @@ function wordish(flat,name){
      x{HE|E (H       → 미국 티커 HE(하와이안) 로 새던 문제 */
 function detectMarket(text){
   const t=text||'';
-  if(/해외주식|해외\s*잔고|외화|해외증권/.test(t)) return 'US';
-  // '해외주식' 이 없는데 '국내' 가 있으면 국내 화면이다.
-  // (해외 화면은 반드시 해외주식·해외잔고 라는 말이 들어간다)
-  if(/연금저축|IRP|퇴직연금|국내|KRX|코스피|코스닥/i.test(t)) return 'KR';
+  // 확실한 신호부터 본다. 계좌 이름이나 화면 제목에 박혀 있는 말들.
+  const usStrong=/해외주식\s*잔고|해외\s*잔고|해외주식계좌|해외증권|외화/.test(t);
+  const krStrong=/국내주식\s*잔고|국내\s*잔고|퇴직연금|개인형\s*IRP|연금저축/i.test(t);
+  if(usStrong&&!krStrong) return 'US';
+  if(krStrong&&!usStrong) return 'KR';
+
+  // "자산 | 국내주식 | 해외주식" 같은 탭 바는 둘 다 적혀 있다.
+  // 어느 쪽인지 알 수 없으므로 시장을 정하지 않는다.
+  // (예전에 해외주식만 보고 미국 계좌로 판정해 국내 종목을 통째로 놓쳤다)
+  const hasKR=/국내/.test(t), hasUS=/해외/.test(t);
+  if(hasKR&&hasUS) return null;
+  if(hasUS) return 'US';
+  if(hasKR||/\bIRP\b|KRX|코스피|코스닥/i.test(t)) return 'KR';
   return null;
 }
 
@@ -1812,7 +1849,7 @@ function matchStock(line,mkt){
   // 이름이 부분적으로 깨진 경우 조각으로 찾는다 (TIGER 5(하이닉스단일 → TIGER SK하이닉스단일종목레버리지)
   // 별칭보다 먼저 본다. 별칭에는 '채권혼합50액티브' 처럼 여러 ETF 가 공유하는
   // 꼬리말이 섞여 있어서, 이름 전체를 보는 조각 매칭이 더 정확하다.
-  const fz=okKR?fuzzyKR(line):null;
+  const fz=okKR?fuzzyKR(line,rawNums(line)):null;
   if(fz) return {m:fz.m,via:'fuzzy',nameSure:false};
   // 그래도 못 찾으면 브랜드 뗀 별칭으로 한 번 더 (SK하이닉스 → 하이닉스)
   if(okKR) for(const k in krAlias){
