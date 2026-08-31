@@ -1778,6 +1778,46 @@ function rawNums(line){
     .map(v=>parseFloat(v.replace(/,/g,''))).filter(n=>isFinite(n)&&n>0);
 }
 
+/* 두 글자열이 공유하는 가장 긴 연속 조각의 길이 */
+function lcsLen(a,b){
+  if(!a||!b) return 0;
+  let best=0, prev=new Array(b.length+1).fill(0);
+  for(let i=1;i<=a.length;i++){
+    const cur=new Array(b.length+1).fill(0);
+    for(let j=1;j<=b.length;j++){
+      if(a[i-1]===b[j-1]){ cur[j]=prev[j-1]+1; if(cur[j]>best) best=cur[j]; }
+    }
+    prev=cur;
+  }
+  return best;
+}
+
+/* 이름이 심하게 깨져 조각 매칭도 실패한 경우의 마지막 수단.
+   브랜드(KODEX·TIGER…) + 화면의 현재가 + 살아남은 이름 조각을 함께 본다.
+     "KODEX 시반도체1068 … 39,025"   ← OCR 이 AI 를 시 로 읽었다
+     브랜드 KODEX, 현재가 39,025 근처 후보 4개 중
+     이름에 '반도체' 가 함께 있는 KODEX AI반도체TOP2플러스 하나만 남는다 */
+const BRANDS=/\b(KODEX|TIGER|ACE|RISE|SOL|PLUS|HANARO|KIWOOM|KOACT|TIMEFOLIO|TIME|FOCUS|DAISHIN|MIDAS|BNK|IBK|WON|1Q)\b/i;
+function brandPriceMatch(line,nums){
+  if(!nums||!nums.length) return null;
+  const bm=String(line).toUpperCase().match(BRANDS);
+  if(!bm) return null;
+  const brand=bm[1].toUpperCase();
+  const L=letters(line);
+  const hits=[];
+  for(const k in KR){
+    const m=KR[k];
+    if(!m.price||!krFlat[k].startsWith(brand)) continue;
+    let near=false;
+    for(const v of nums) if(Math.abs(v-m.price)/m.price<0.015){ near=true; break; }
+    if(!near) continue;
+    // 브랜드를 뗀 이름과 줄이 3글자 이상 겹쳐야 한다
+    const rest=krFlat[k].slice(brand.length);
+    if(lcsLen(L,rest)>=3) hits.push(m);
+  }
+  return hits.length===1 ? hits[0] : null;
+}
+
 /* 부분 문자열이 더 긴 단어를 잘라 들어간 것인지 확인.
    "하이닉스" 안의 "이닉스" 처럼 앞뒤가 한글로 이어지면 다른 종목이다. */
 function wordish(flat,name){
@@ -1853,8 +1893,13 @@ function matchStock(line,mkt){
   // 이름이 부분적으로 깨진 경우 조각으로 찾는다 (TIGER 5(하이닉스단일 → TIGER SK하이닉스단일종목레버리지)
   // 별칭보다 먼저 본다. 별칭에는 '채권혼합50액티브' 처럼 여러 ETF 가 공유하는
   // 꼬리말이 섞여 있어서, 이름 전체를 보는 조각 매칭이 더 정확하다.
-  const fz=okKR?fuzzyKR(line,rawNums(line)):null;
+  const rn=rawNums(line);
+  const fz=okKR?fuzzyKR(line,rn):null;
   if(fz) return {m:fz.m,via:'fuzzy',nameSure:false};
+  if(okKR){
+    const bp=brandPriceMatch(line,rn);
+    if(bp) return {m:bp,via:'brandprice',nameSure:false};
+  }
   // 그래도 못 찾으면 브랜드 뗀 별칭으로 한 번 더 (SK하이닉스 → 하이닉스)
   if(okKR) for(const k in krAlias){
     const n=krAlias[k];
