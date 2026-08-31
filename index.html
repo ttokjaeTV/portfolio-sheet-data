@@ -305,7 +305,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <div class="drop-t">📷 캡처 이미지를 여기에 끌어다 놓거나 클릭해 선택</div>
     <div class="drop-s">
       글자가 클수록 정확합니다. 화면을 확대해 캡처하면 인식률이 올라갑니다.<br>
-      최초 1회 한글 인식 데이터(약 15MB)를 내려받습니다.
+      최초 1회 인식 데이터 약 12MB를 내려받습니다. 와이파이 환경을 권합니다.
     </div>
     <input type="file" id="file-img" accept="image/*" hidden>
   </div>
@@ -878,9 +878,48 @@ drop.ondrop=e=>{ e.preventDefault(); drop.classList.remove('over');
   if(e.dataTransfer.files[0]) runOCR(e.dataTransfer.files[0]); };
 fileImg.onchange=e=>{ if(e.target.files[0]) runOCR(e.target.files[0]); e.target.value=''; };
 
-function loadScript(src){
-  return new Promise((ok,ng)=>{ const s=document.createElement('script');
-    s.src=src; s.onload=ok; s.onerror=()=>ng(new Error('스크립트 로드 실패')); document.head.appendChild(s); });
+/* CDN 이 하나 막혀도 동작하도록 순서대로 시도한다.
+   (광고차단기·사내망·일부 통신망에서 특정 CDN 이 차단되는 경우가 있다) */
+const OCR_CDNS=[
+  {name:'jsdelivr', lib:'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+   worker:'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+   core:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/'},
+  {name:'unpkg', lib:'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js',
+   worker:'https://unpkg.com/tesseract.js@5.1.1/dist/worker.min.js',
+   core:'https://unpkg.com/tesseract.js-core@5/'},
+  {name:'cdnjs', lib:'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js',
+   worker:'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/worker.min.js',
+   core:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/'}
+];
+let OCR_CDN=null;
+
+function loadScript(src,timeout=20000){
+  return new Promise((ok,ng)=>{
+    const s=document.createElement('script');
+    let done=false;
+    const finish=(fn,arg)=>{ if(!done){ done=true; fn(arg); } };
+    s.src=src;
+    s.onload=()=>finish(ok);
+    s.onerror=()=>finish(ng,new Error('차단됨'));
+    setTimeout(()=>finish(ng,new Error('시간 초과')),timeout);
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureTesseract(){
+  if(window.Tesseract&&OCR_CDN) return;
+  const errs=[];
+  for(const cdn of OCR_CDNS){
+    try{
+      prog(.1,`인식 엔진을 내려받고 있습니다… (${cdn.name})`);
+      await loadScript(cdn.lib);
+      if(window.Tesseract){ OCR_CDN=cdn; return; }
+      errs.push(`${cdn.name}: 로드됐으나 초기화 실패`);
+    }catch(e){ errs.push(`${cdn.name}: ${e.message}`); }
+  }
+  throw new Error('인식 엔진을 어느 경로로도 받지 못했습니다.\n\n'+errs.join('\n')
+    +'\n\n광고 차단 확장이나 보안 프로그램이 CDN 을 막고 있을 수 있습니다.\n'
+    +'다른 브라우저나 네트워크(예: 모바일 데이터 ↔ 와이파이)로 시도해 보세요.');
 }
 function prog(p,msg){
   document.getElementById('ocr-prog').classList.add('on');
@@ -893,17 +932,27 @@ async function runOCR(file){
   document.getElementById('review').classList.remove('on');
   try{
     prog(.05,'인식 엔진을 준비하고 있습니다…');
-    if(!window.Tesseract) await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
-    prog(.15,'한글 인식 데이터를 확인하고 있습니다… (최초 1회 약 15MB)');
-    const {data}=await Tesseract.recognize(file,'kor+eng',{
-      logger:m=>{ if(m.status==='recognizing text') prog(.2+m.progress*0.75,`글자를 읽고 있습니다… ${Math.round(m.progress*100)}%`); }
+    await ensureTesseract();
+
+    prog(.15,'한글 인식 데이터를 확인하고 있습니다… (최초 1회 약 12MB)');
+    // kor 만 쓴다. kor+eng 로 하면 영문 데이터 11MB 가 더 붙어 모바일에서 자주 끊긴다.
+    const {data}=await Tesseract.recognize(file,'kor',{
+      workerPath:OCR_CDN.worker,
+      corePath:OCR_CDN.core,
+      logger:m=>{
+        if(m.status==='loading language traineddata')
+          prog(.15+m.progress*0.35,`한글 인식 데이터 내려받는 중… ${Math.round(m.progress*100)}%`);
+        else if(m.status==='recognizing text')
+          prog(.5+m.progress*0.5,`글자를 읽고 있습니다… ${Math.round(m.progress*100)}%`);
+      }
     });
     prog(1,'인식 완료');
     setTimeout(()=>document.getElementById('ocr-prog').classList.remove('on'),700);
     buildReview(data.text||'');
   }catch(e){
     document.getElementById('ocr-prog').classList.remove('on');
-    alert('인식에 실패했습니다: '+e.message+'\n\n직접 입력하시거나 다시 시도해 주세요.');
+    alert('캡처를 읽지 못했습니다.\n\n'+e.message
+      +'\n\n아래 STEP 01 에서 직접 입력하셔도 됩니다.');
   }
 }
 
