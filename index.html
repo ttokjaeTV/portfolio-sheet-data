@@ -227,6 +227,18 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .toggle-switch input:checked+.toggle-slider:before{transform:translateX(23px)}
 .merge-note{font-size:12px;color:var(--ink-mute);font-weight:600;line-height:1.7;margin-bottom:2px}
 
+/* 계좌 필터 */
+.acct-filter{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 2px}
+.fchip{display:inline-flex;align-items:center;gap:7px;background:var(--white);
+  border:1.5px solid var(--border);border-radius:999px;padding:7px 15px;font-size:13px;
+  font-weight:700;cursor:pointer;transition:all .15s ease;color:var(--ink-soft)}
+.fchip:hover{border-color:var(--accent);color:var(--accent)}
+.fchip.on{background:var(--dark-warm);border-color:var(--dark-warm);color:var(--white)}
+.fchip .fcnt{font-size:11px;font-weight:700;opacity:.75}
+.fchip .fval{font-size:11px;font-weight:700;opacity:.75}
+#acct-body tr{cursor:pointer}
+#acct-body tr.on td{background:var(--accent-soft) !important}
+
 /* 계좌 관리 */
 .acct-mgr{margin-top:26px;padding-top:20px;border-top:1px dashed var(--border)}
 .acct-mgr-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
@@ -323,6 +335,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   .holding-row>div:last-child{grid-column:1/-1}
   .cash-grid{grid-template-columns:1fr}
   .acct-grid{grid-template-columns:1fr}
+  .acct-filter{gap:6px}
+  .fchip{padding:6px 12px;font-size:12px}
   .chart-container{height:260px}
   .insight-box{padding:24px 18px;border-radius:16px}.insight-title{font-size:18px}
   .insight-cta{flex-direction:column;align-items:stretch}.cta-link{justify-content:center}
@@ -548,7 +562,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 06 / 보유 종목 상세</span></div>
   <div class="detail-head">
     <div class="card-desc" style="margin-bottom:0">
-      국내 시세는 장중 약 10분 주기, 미국 시세는 전 거래일 종가 기준으로 갱신됩니다.
+      국내 시세는 장중 약 10분 주기, 미국 시세는 전 거래일 종가 기준으로 갱신됩니다.<br>
+      계좌 이름을 누르면 그 계좌 종목만 볼 수 있습니다. 위쪽 계좌별 표의 행을 눌러도 됩니다.
     </div>
     <label class="merge-toggle">
       <span class="merge-label">같은 종목 합쳐 보기</span>
@@ -559,6 +574,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     </label>
   </div>
   <div class="merge-note" id="merge-note"></div>
+  <div class="acct-filter" id="acct-filter"></div>
   <div class="table-wrap">
     <table class="data-table">
       <thead><tr>
@@ -914,6 +930,7 @@ function renderCash(){
 }
 
 let chartAsset=null, chartAcct=null;
+let detailFilter='';        // '' 이면 전체 보기 (새로고침하면 초기화)
 function render(){
   renderRows();
   renderAccts();
@@ -941,7 +958,7 @@ function render(){
     const d=byAcct[a]; if(!d.val&&!d.buy) return '';
     const p=d.val-d.buy, rr=d.buy>0?(p/d.buy*100):0, w=val>0?(d.val/val*100):0;
     const note=(state.notes||{})[a];
-    return `<tr><td class="tl">${esc(a)}${note?`<span class="acct-note">${esc(note)}</span>`:''}</td>
+    return `<tr data-arow="${esc(a)}" class="${detailFilter===a?'on':''}"><td class="tl">${esc(a)}${note?`<span class="acct-note">${esc(note)}</span>`:''}</td>
       <td>${won(d.buy)}</td><td>${won(d.val)}</td>
       <td class="${cls(p)}">${(p>=0?'+':'')+won(p)}</td><td class="${cls(rr)}">${pct(rr)}</td><td>${w.toFixed(1)}%</td></tr>`;
   }).join('')||'<tr><td colspan="6" style="text-align:center;color:#8B8276;padding:24px">데이터가 없습니다</td></tr>';
@@ -1029,9 +1046,25 @@ function mergeLots(rows){
   });
 }
 
-function renderDetail(valid,total){
+function renderDetail(all,total){
   const body=document.getElementById('detail-body');
   const note=document.getElementById('merge-note');
+  const fbox=document.getElementById('acct-filter');
+
+  // 계좌 필터 칩 — 계좌가 둘 이상 쓰일 때만 보여준다
+  const used=accts().filter(a=>all.some(r=>r.acct===a));
+  if(fbox){
+    if(used.length>1){
+      if(detailFilter&&!used.includes(detailFilter)) detailFilter='';
+      const chip=(key,label,cnt,val)=>`<span class="fchip ${detailFilter===key?'on':''}" data-f="${esc(key)}">
+        ${esc(label)}<span class="fcnt">${cnt}종목</span><span class="fval">${wonShort(val)}원</span></span>`;
+      fbox.innerHTML=chip('','전체',all.length,all.reduce((s,r)=>s+r.val,0))
+        +used.map(a=>chip(a,a,all.filter(r=>r.acct===a).length,
+                          all.filter(r=>r.acct===a).reduce((s,r)=>s+r.val,0))).join('');
+    }else{ fbox.innerHTML=''; detailFilter=''; }
+  }
+
+  const valid = detailFilter ? all.filter(r=>r.acct===detailFilter) : all;
   if(!valid.length){
     body.innerHTML='<tr><td colspan="12" style="text-align:center;color:#8B8276;padding:24px">데이터가 없습니다</td></tr>';
     note.textContent=''; return;
@@ -1039,10 +1072,11 @@ function renderDetail(valid,total){
 
   const rows = state.merge ? mergeLots(valid) : valid;
   const multi = state.merge ? rows.filter(r=>r.lots>1).length : 0;
-  note.innerHTML = state.merge
+  const fnote = detailFilter ? `<b>${esc(detailFilter)}</b> 계좌만 보고 있습니다. ` : '';
+  note.innerHTML = fnote + (state.merge
     ? (multi ? `같은 계좌 안에서 같은 종목 <b>${multi}건</b>을 합쳤습니다. 매입단가는 수량 가중평균입니다.`
              : '합칠 종목이 없습니다. 모두 한 건씩만 보유 중입니다.')
-    : '정수주와 소수점주처럼 매입단가가 다른 로트를 따로 보여줍니다.';
+    : '정수주와 소수점주처럼 매입단가가 다른 로트를 따로 보여줍니다.');
 
   body.innerHTML=rows.slice().sort((a,b)=>b.val-a.val).map(r=>{
     const price=r.isUS?usd(r.price):won(r.price);
@@ -1117,6 +1151,17 @@ document.addEventListener('change',e=>{
   }
 });
 document.addEventListener('click',e=>{
+  // 계좌 필터 칩
+  const fc=e.target.closest('[data-f]');
+  if(fc){ detailFilter=fc.dataset.f; render(); return; }
+  // 계좌별 요약표의 행을 눌러도 같은 계좌만 보기
+  const ar=e.target.closest('[data-arow]');
+  if(ar){
+    detailFilter = detailFilter===ar.dataset.arow ? '' : ar.dataset.arow;
+    render();
+    document.getElementById('acct-filter').scrollIntoView({behavior:'smooth',block:'center'});
+    return;
+  }
   // 검수 행을 누르면 캡처에서 읽어온 위치를 표시
   const rv=e.target.closest('tr.rv');
   if(rv&&!e.target.closest('input,select,button')) markRow(+rv.dataset.row);
