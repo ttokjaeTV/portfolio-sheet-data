@@ -1584,7 +1584,8 @@ function nums(line,hit){
   // 매입금액 = 평가금액 - 평가손익 검산을 아예 못 한다.
   //   목레버리지 -3,463,518  511  15,118   ← 이 -3,463,518 이 있어야 15,118 을 확정한다
   const out=[];
-  const re=/(^|[\s(₩$])([-−–])?(\d[\d.,]*\d|\d)(?=$|[\s)원]|$)/g;
+  // 뒤에 붙는 단위도 숫자의 끝으로 본다. "현금 548주" 의 548 을 놓치고 있었다.
+  const re=/(^|[\s(₩$])([-−–])?(\d[\d.,]*\d|\d)(?=$|[\s)원주좌개]|$)/g;
   let m;
   while((m=re.exec(s))){
     const v=parseFloat(fixThousands(m[3]))*(m[2]?-1:1);
@@ -1753,7 +1754,9 @@ function detectAcct(text){
   const rules=[
     [/개인형\s*IRP|\bIRP\b|퇴직연금|DC형/i, /IRP|DC\b|퇴직/i],
     [/연금저축/,                              /연금저축|연금/],
-    [/\bISA\b|중개형/i,                      /ISA/i],
+    // OCR 이 "처음ISA" 를 "SISA" 로 읽으면 \bISA\b 가 안 걸린다.
+    // 앞글자 경계를 풀되 VISA(비자) 만 뺀다.
+    [/(?<!V)ISA(?![A-Z])|중개형/i,           /ISA/i],
     [/해외주식|위탁|종합|일반계좌|주식계좌/,        /일반|위탁|종합/]
   ];
   for(const [inText,inName] of rules)
