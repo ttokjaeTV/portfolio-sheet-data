@@ -1483,8 +1483,12 @@ function parseShot(src,si){
     // 아랫줄만으로 이미 j 가 나온다면 그 줄은 별개 종목이다. 합치면 한 건이 사라진다.
     //   하이닉스 1,574,000 ... / 삼성전자 8,846,582 ...  ← 합치면 안 됨
     //   KODEX 미국나 / 스닥100 925                      ← 합쳐야 함
+    // 아랫줄이 그 자체로 '확실한' 다른 종목이면 합치지 않는다.
+    //   하이닉스 … / 삼성전자 …        ← 아랫줄이 정확한 이름 일치. 합치면 한 건이 사라진다
+    //   TIME 미국나스닥100 … / 채권혼합50액티브 …
+    //                                ← 아랫줄은 이름 조각일 뿐(추정 매칭). 합쳐야 한다
     const alone=matched[i+1];
-    const needJoin=j&&(!alone||alone.m.code!==j.m.code);
+    const needJoin=j&&(!alone||!alone.nameSure||alone.m.code!==j.m.code);
     const better=needJoin&&j.m.code!==a.m.code
       &&((j.nameSure&&!a.nameSure)||j.m.name.length>a.m.name.length);
     if(better){
