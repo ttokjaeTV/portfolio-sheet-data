@@ -1237,11 +1237,17 @@ function inferQtyAvg(list,price){
       if(q<=0||q===c.cur) continue;
       // 수량 × 현재가 = 평가금액 이 화면에 있어야 한다
       if(!list.some(x=>x!==q&&x!==c.cur&&near(x,q*c.cur,c.onScreen?0.005:0.05))) continue;
+      const val=list.find(x=>x!==q&&x!==c.cur&&near(x,q*c.cur,c.onScreen?0.005:0.05));
       for(const a of list){
         if(a<=0||a===q||a===c.cur) continue;
         if(a<c.cur*0.05||a>c.cur*20) continue;         // 매입가는 현재가와 자릿수가 비슷하다
-        // 수량 × 매입가 = 매입금액 도 화면에 있어야 한다
+        // (가) 수량 × 매입가 = 매입금액 이 화면에 있는 경우
         if(list.some(x=>x!==q&&x!==a&&x!==c.cur&&near(x,q*a,0.005)))
+          return {qty:q,avg:a,sure:c.onScreen};
+        // (나) 매입금액 열이 없는 화면. 평가손익으로 유도한다.
+        //     매입금액 = 평가금액 - 평가손익  →  매입단가 = 그 값 / 수량
+        if(val!==undefined&&list.some(pl=>pl!==q&&pl!==a&&pl!==c.cur&&pl!==val
+              &&near(a,(val-pl)/q,0.005)))
           return {qty:q,avg:a,sure:c.onScreen};
       }
     }
@@ -1258,24 +1264,57 @@ function buildReview(shots){
 }
 
 /* 캡처 한 장을 파싱해 ocrRows 에 담는다. si = 몇 번째 캡처인지 */
+/* 캡처 안의 계좌 표기로 어느 계좌인지 추측한다.
+   "개인형IRP" · "위탁(국내수수료우대)" · "연금저축" 같은 문구가 잔고 화면 상단에 찍힌다. */
+function detectAcct(text){
+  const t=text||'';
+  const rules=[
+    [/개인형\s*IRP|\bIRP\b|퇴직연금|DC형/i, /IRP|DC\b|퇴직/i],
+    [/연금저축/,                              /연금저축|연금/],
+    [/\bISA\b|중개형/i,                      /ISA/i],
+    [/위탁|종합|일반계좌|주식계좌/,               /일반|위탁|종합/]
+  ];
+  for(const [inText,inName] of rules)
+    if(inText.test(t)){ const hit=accts().find(a=>inName.test(a)); if(hit) return hit; }
+  return null;
+}
+
 function parseShot(text,si){
+  const guess=detectAcct(text)||accts()[0];
   const lines=(text||'').split('\n').map(s=>s.trim()).filter(s=>s.length>1);
   const hits=[];
   const matched=lines.map(l=>matchStock(l));
 
+  // 종목명이 두 줄에 걸쳐 잘리는 화면이 있다.
+  //   TIME 미국나스닥100 626,272 585 11,979
+  //   채권혼합50액티브   8.94% 7,634,250 13,050
+  // 이러면 각 줄이 따로 엉뚱한 종목에 걸린다. 다음 줄까지 붙여 다시 찾아보고
+  // 더 긴 이름이 나오면 그쪽을 쓴다.
+  const skip=new Set(), joined=new Set();
+  for(let i=0;i<lines.length-1;i++){
+    const a=matched[i];
+    if(!a||a.nameSure) continue;                 // 코드·티커로 확정된 건 건드리지 않는다
+    const j=matchStock(lines[i]+' '+lines[i+1]);
+    if(j&&j.m.code!==a.m.code&&j.m.name.length>a.m.name.length){
+      matched[i]=j; skip.add(i+1); joined.add(i); // 숫자도 아랫줄 것을 같이 쓴다
+    }
+  }
+
   lines.forEach((line,li)=>{
+    if(skip.has(li)) return;
     const r=matched[li];
     if(!r) return;
-    let n=nums(line,r.m), joined=line;
+    let n=nums(line,r.m), text=line;
+    if(joined.has(li)){ n=n.concat(nums(lines[li+1],r.m)); text+='  ⏎  '+lines[li+1]; }
     // 종목명 없이 숫자만 있는 다음 줄은 같은 종목의 이어지는 칸이다.
     // 미래에셋처럼 보유수량·평균단가가 아랫줄에 오는 레이아웃 대응.
     for(let j=li+1;j<lines.length&&j<=li+2;j++){
       if(matched[j]) break;
       const more=nums(lines[j],null);
       if(more.length<2||HANGUL.test(lines[j].replace(/[^가-힣]/g,''))&&letters(lines[j]).length>4) break;
-      n=n.concat(more); joined+='  ⏎  '+lines[j];
+      n=n.concat(more); text+='  ⏎  '+lines[j];
     }
-    hits.push({line:joined,m:r.m,via:r.via,lot:r.lot||'',nameSure:r.nameSure!==false,n});
+    hits.push({line:text,m:r.m,via:r.via,lot:r.lot||'',nameSure:r.nameSure!==false,n});
   });
 
   const pipes=hits.filter(h=>h.via==='pipe');
@@ -1285,7 +1324,7 @@ function parseShot(text,si){
     // 정수주와 소수점주는 평균단가가 다르므로 절대 합치지 않는다.
     pipes.forEach(h=>{
       const g=inferQtyAvg(h.n,h.m.price);
-      ocrRows.push({src:si,line:h.line,code:h.m.code,name:h.m.name,lot:h.lot,acct:accts()[0],nameSure:h.nameSure,
+      ocrRows.push({src:si,line:h.line,code:h.m.code,name:h.m.name,lot:h.lot,acct:guess,nameSure:h.nameSure,
         isUS:h.m.cur==='USD', qty:g?g.qty:(h.n[0]??''), avg:g?g.avg:(h.n[1]??''),
         sure:!!(g&&g.sure), use:true});
     });
@@ -1294,7 +1333,7 @@ function parseShot(text,si){
     hits.filter(h=>h.via!=='pipe'&&!have.has(h.m.code)&&h.n.length>=2).forEach(h=>{
       have.add(h.m.code);
       const g=inferQtyAvg(h.n,h.m.price);
-      ocrRows.push({src:si,line:h.line,code:h.m.code,name:h.m.name,lot:'',acct:accts()[0],nameSure:h.nameSure,
+      ocrRows.push({src:si,line:h.line,code:h.m.code,name:h.m.name,lot:'',acct:guess,nameSure:h.nameSure,
         isUS:h.m.cur==='USD', qty:g?g.qty:(h.n[0]??''), avg:g?g.avg:(h.n[1]??''),
         sure:!!(g&&g.sure), use:true});
     });
@@ -1311,7 +1350,7 @@ function parseShot(text,si){
         if(nx.n.length>h.n.length) h=nx;
       }
       const g=inferQtyAvg(h.n,h.m.price);
-      ocrRows.push({src:si,line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,lot:'',acct:accts()[0],nameSure:h.nameSure,
+      ocrRows.push({src:si,line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,lot:'',acct:guess,nameSure:h.nameSure,
         isUS:h.m.cur==='USD', qty:g?g.qty:(h.n[0]??''), avg:g?g.avg:(h.n[1]??''),
         sure:!!(g&&g.sure), use:true});
     }
@@ -1427,7 +1466,10 @@ function fuzzyKR(line){
     // 짧은 쪽 기준으로 본다. 이름이 심하게 잘려 나가도(TIGER 5(하이닉스단일)
     // 남은 조각이 그 종목에만 있다면 찾아낼 수 있다.
     const sc=tally[k]/Math.min(krGramCnt[k],lineGrams);
-    if(sc>s1){ s2=s1; s1=sc; b1=k; } else if(sc>s2) s2=sc;
+    // 점수가 같으면 조각이 더 많이 맞은 쪽 = 더 구체적인 이름을 고른다.
+    // (TIME 미국나스닥100액티브 vs TIME 미국나스닥100채권혼합50액티브)
+    if(sc>s1||(sc===s1&&b1&&tally[k]>tally[b1])){ if(sc>s1) s2=s1; s1=sc; b1=k; }
+    else if(sc>s2) s2=sc;
   }
   if(!b1||s1<0.45) return null;
   // (H)·TR 처럼 이름이 거의 같은 ETF 가 많다. 1등이 애매하면 버리지 말고
@@ -1467,21 +1509,29 @@ function matchStock(line){
   //    길이 제한을 두면 안 된다. OCR 이 넣는 공백도 무시하고 비교한다.
   //    가장 긴 이름이 이긴다 ("현대차2우B" 가 "현대차" 보다 우선).
   const flat=up.replace(/\s+/g,'');
+  // 3S·E1 처럼 짧은 영문 종목명은 글자 사이에 우연히 박히기 쉽다.
+  // ("ACE 미국S&P500" 오인식분 안의 3S, "TIME 나스닥100" 안의 E1)
+  // 그래서 독립 토큰으로 떨어질 때만 인정한다.
+  const tokens=new Set((up.match(/[가-힣A-Z0-9&.]+/g)||[]));
   let best=null,bl=0;
   for(const k in KR){
     const n=krFlat[k];
-    if(n.length>=2&&n.length>bl&&flat.includes(n)&&wordish(flat,n)){ best=KR[k]; bl=n.length; }
+    if(n.length<2||n.length<=bl) continue;
+    const shortLatin=n.length<=3&&!HANGUL.test(n);
+    if(shortLatin ? tokens.has(n) : (flat.includes(n)&&wordish(flat,n))){ best=KR[k]; bl=n.length; }
   }
   if(best) return {m:best,via:'name',nameSure:true};
-  // 정식 이름으로 못 찾으면 브랜드 뗀 별칭으로 한 번 더 (SK하이닉스 → 하이닉스)
+  // 이름이 부분적으로 깨진 경우 조각으로 찾는다 (TIGER 5(하이닉스단일 → TIGER SK하이닉스단일종목레버리지)
+  // 별칭보다 먼저 본다. 별칭에는 '채권혼합50액티브' 처럼 여러 ETF 가 공유하는
+  // 꼬리말이 섞여 있어서, 이름 전체를 보는 조각 매칭이 더 정확하다.
+  const fz=fuzzyKR(line);
+  if(fz) return {m:fz.m,via:'fuzzy',nameSure:false};
+  // 그래도 못 찾으면 브랜드 뗀 별칭으로 한 번 더 (SK하이닉스 → 하이닉스)
   for(const k in krAlias){
     const n=krAlias[k];
     if(n.length>bl&&flat.includes(n)&&wordish(flat,n)){ best=KR[k]; bl=n.length; }
   }
   if(best) return {m:best,via:'alias',nameSure:false};
-  // 이름이 부분적으로 깨진 경우 조각으로 찾는다 (TIGER 5(하이닉스단일 → TIGER SK하이닉스단일종목레버리지)
-  const fz=fuzzyKR(line);
-  if(fz) return {m:fz.m,via:'fuzzy',nameSure:false};
 
   // 4) 줄 어디든 있는 미국 티커.
   //    반드시 원문에서 대문자여야 한다. OCR 이 "Vv" 같은 글자를 티커로 오인하는 걸 막는다.
