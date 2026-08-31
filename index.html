@@ -1493,9 +1493,14 @@ function parseShot(src,si){
     //                                ← 아랫줄은 이름 조각일 뿐(추정 매칭). 합쳐야 한다
     const alone=matched[i+1];
     const needJoin=j&&(!alone||!alone.nameSure||alone.m.code!==j.m.code);
+    // 혼자서는 못 찾았는데 붙이니 찾은 경우.
+    // 단, 찾은 이름의 조각이 이 줄에 실제로 있어야 한다.
+    // (그러지 않으면 "종목코드 평가금액 현재가" 같은 헤더 줄이
+    //  아랫줄 종목을 가로채 진짜 행을 지워 버린다)
+    const onThisLine=!a&&!!j&&lcsLen(letters(lines[i]),letters(j.m.name))>=3;
     const better=needJoin&&(
-      !a                                          // 혼자서는 못 찾았는데 붙이니 찾은 경우
-      || (j.m.code!==a.m.code
+      onThisLine
+      || (a&&j.m.code!==a.m.code
           && ((j.nameSure&&!a.nameSure)||j.m.name.length>a.m.name.length)));
     if(better){
       matched[i]=j; skip.add(i+1); joined.add(i); // 숫자도 아랫줄 것을 같이 쓴다
