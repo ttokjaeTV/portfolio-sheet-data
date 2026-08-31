@@ -166,18 +166,29 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .table-wrap{overflow-x:auto;margin-top:16px;border-radius:12px}
 .data-table{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
 .data-table.narrow{min-width:640px}
-.data-table th{background:var(--bg-alt);padding:12px 10px;text-align:right;font-weight:700;
+.data-table th{background:var(--bg-alt);padding:12px 10px;text-align:right;font-weight:700;border-left:1px solid var(--border);
   color:var(--ink-soft);font-size:11px;border-bottom:1.5px solid var(--border);white-space:nowrap}
-.data-table th:first-child,.data-table th.tl{text-align:left}
+.data-table th:first-child{text-align:left;border-left:none}
+.data-table th.tl{text-align:left}
 .data-table td{padding:11px 10px;text-align:right;border-bottom:1px solid var(--border);
   font-weight:600;color:var(--ink);white-space:nowrap}
 .data-table td:first-child,.data-table td.tl{text-align:left}
 .data-table tbody tr:hover{background:var(--bg-alt)}
 .data-table tfoot td{background:var(--bg-alt);font-weight:800;border-top:1.5px solid var(--border)}
 .data-table input,.data-table select{padding:7px 9px;font-size:13px}
-.data-table .rv-in{min-width:118px}
-.data-table .rv-in input{min-width:104px;text-align:right}
-.data-table .rv-ac{min-width:130px}
+.data-table tr.rv td{border-left:1px solid var(--border)}
+.data-table tr.rv td:first-child{border-left:none}
+/* PC 에서도 어느 칸이 수량이고 어느 칸이 매입가인지 바로 보이게 칸 이름을 붙인다.
+   왼쪽 두 칸은 헤더만으로 충분해 라벨을 빼고, 모바일은 카드 규칙이 따로 처리한다. */
+@media (min-width:769px){
+  .data-table tr.rv td[data-l]::before{content:attr(data-l);display:block;font-size:9.5px;
+    font-weight:800;letter-spacing:.4px;color:var(--ink-mute);margin-bottom:5px;text-align:left}
+  .data-table tr.rv td.rv-raw::before,
+  .data-table tr.rv td.rv-nm::before{content:none}
+}
+.data-table .rv-in{min-width:126px;vertical-align:middle}
+.data-table .rv-in input{min-width:112px;text-align:right}
+.data-table .rv-ac{min-width:140px;vertical-align:middle}
 .data-table .rv-raw{max-width:210px;white-space:normal;font-size:11px;color:var(--ink-mute)}
 .chip{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;
   background:var(--bg-alt);color:var(--ink-soft)}
@@ -1404,10 +1415,14 @@ function detectAcct(text){
    다른 숫자를 수량·매입가에 밀어 넣으면 안 된다. 없으면 비워두고 알려준다. */
 function detectCols(text){
   const t=text||'';
-  return {
-    qty: /보유수량|매도가능|주문가능|수량|보유(?!잔고)/.test(t),
-    avg: /매입단가|평균단가|매수단가|매입가|평단/.test(t)
-  };
+  const AVG=/매입단가|평균단가|매수단가|매입가|평단/;
+  const QTY=/보유수량|매도가능|주문가능|수량/;
+  // 다른 열 이름과 같은 줄에 있을 때만 헤더로 본다.
+  // "보유 | 매매손익 | 체결" 같은 탭 이름을 열 이름으로 오인하지 않기 위해서다.
+  const OTHER=/평가금액|평가손익|매입단가|평균단가|매수단가|현재가|수익률|종목명|종목코드/;
+  let qty=QTY.test(t);
+  if(!qty) qty=t.split('\n').some(l=>/보유(?!잔고)/.test(l)&&OTHER.test(l));
+  return {qty, avg:AVG.test(t)};
 }
 
 function parseShot(src,si){
