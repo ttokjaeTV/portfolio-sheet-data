@@ -173,6 +173,10 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .data-table tbody tr:hover{background:var(--bg-alt)}
 .data-table tfoot td{background:var(--bg-alt);font-weight:800;border-top:1.5px solid var(--border)}
 .data-table input,.data-table select{padding:7px 9px;font-size:13px}
+.data-table .rv-in{min-width:118px}
+.data-table .rv-in input{min-width:104px;text-align:right}
+.data-table .rv-ac{min-width:130px}
+.data-table .rv-raw{max-width:210px;white-space:normal;font-size:11px;color:var(--ink-mute)}
 .chip{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;
   background:var(--bg-alt);color:var(--ink-soft)}
 .chip.lot{background:var(--accent-soft);color:var(--accent)}
@@ -280,6 +284,29 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   .table-wrap{margin:16px -16px 0;padding:0 16px;-webkit-overflow-scrolling:touch}
   .data-table{font-size:11px;min-width:700px}
   .data-table th{padding:8px 6px;font-size:10px}.data-table td{padding:8px 6px}
+
+  /* 검수 표는 가로 스크롤 대신 카드로. 숫자가 잘리면 확인 자체가 안 된다 */
+  #review .table-wrap{margin:16px 0 0;padding:0;overflow:visible}
+  #review .data-table{min-width:0;width:100%;display:block;font-size:13px}
+  #review .data-table thead{display:none}
+  #review .data-table tbody{display:block}
+  #review tr.rv{display:block;background:var(--white);border:1px solid var(--border);
+    border-radius:14px;padding:14px;margin-bottom:12px}
+  #review tr.rv td{display:block;border:none;padding:0;text-align:left;white-space:normal}
+  #review tr.rv td[data-l]::before{content:attr(data-l);display:block;font-size:10px;
+    font-weight:800;letter-spacing:.5px;color:var(--ink-mute);margin:10px 0 5px}
+  #review tr.rv .rv-raw{background:var(--bg-alt);border-radius:8px;padding:8px 10px;
+    font-size:11px;line-height:1.6}
+  #review tr.rv .rv-raw::before{margin-top:0}
+  #review tr.rv .rv-nm{font-size:15px;font-weight:800}
+  #review tr.rv .rv-in input{width:100%;font-size:16px;padding:11px 12px;text-align:left}
+  #review tr.rv .rv-use{display:flex;align-items:center;gap:8px;margin-top:14px;
+    padding-top:12px;border-top:1px dashed var(--border)}
+  #review tr.rv .rv-use::before{margin:0}
+  #review tr.rv .rv-use input{width:20px;height:20px}
+  #review tr.shot-group{display:block;margin:0 0 12px}
+  #review tr.shot-group td{display:block;border-radius:12px}
+  #review .guess-tag{text-align:left}
 }
 </style>
 </head>
@@ -1417,19 +1444,19 @@ function renderReview(){
       +'white-space:pre-wrap;font-size:11px;max-height:220px;overflow:auto">'
       +esc(ocrRaw.slice(0,2000)||'(읽어낸 글자가 없습니다)')+'</pre></td></tr>';
   }else{
-    const rowHtml=(r,i)=>`<tr>
-      <td class="tl" style="max-width:210px;white-space:normal;font-size:11px;color:#8B8276">${esc(r.line)}</td>
-      <td class="tl"><span class="${r.nameSure?'':'name-guess'}">${esc(r.name)}</span>
+    const rowHtml=(r,i)=>`<tr class="rv">
+      <td class="tl rv-raw" data-l="인식된 줄">${esc(r.line)}</td>
+      <td class="tl rv-nm" data-l="매칭된 종목"><span class="${r.nameSure?'':'name-guess'}">${esc(r.name)}</span>
         ${r.nameSure?'':'<div class="guess-tag" style="text-align:left">종목명 추정 · 확인 필요</div>'}
         <span style="font-size:11px;color:#8B8276">
         ${r.isUS?'<span class="flag us">미국</span>':''}${esc(r.code)}${r.lot?` · ${esc(r.lot)}`:''}
         ${r.sure?'<span class="chip ok-chip">검산됨</span>':''}</span></td>
-      <td class="tl"><select data-ocr="${i}" data-f="acct">${acctOptions(r.acct)}</select></td>
-      <td><input type="number" data-ocr="${i}" data-f="qty" value="${esc(r.qty)}" step="any"
+      <td class="tl rv-ac" data-l="계좌"><select data-ocr="${i}" data-f="acct">${acctOptions(r.acct)}</select></td>
+      <td class="rv-in" data-l="수량"><input type="number" data-ocr="${i}" data-f="qty" value="${esc(r.qty)}" step="any"
         class="${r.sure?'':'guess'}"></td>
-      <td><input type="number" data-ocr="${i}" data-f="avg" value="${esc(r.avg)}" step="any"
+      <td class="rv-in" data-l="${r.isUS?'매입가 ($)':'매입가 (원)'}"><input type="number" data-ocr="${i}" data-f="avg" value="${esc(r.avg)}" step="any"
         class="${r.sure?'':'guess'}">${r.sure?'':'<div class="guess-tag">확인 필요</div>'}</td>
-      <td><input type="checkbox" data-ocr="${i}" data-f="use" ${r.use?'checked':''} style="width:auto"></td></tr>`;
+      <td class="rv-use" data-l="추가"><input type="checkbox" data-ocr="${i}" data-f="use" ${r.use?'checked':''} style="width:auto"></td></tr>`;
 
     let html='';
     // 캡처가 여러 장이면 장별로 묶고, 묶음마다 계좌를 한 번에 지정할 수 있게 한다
