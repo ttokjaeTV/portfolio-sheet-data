@@ -231,6 +231,19 @@ input.guess:focus{border-color:var(--red);box-shadow:0 0 0 3px #F6D9D4}
   display:inline-flex;align-items:center;gap:8px}
 .shot-group-set select{width:auto;min-width:150px;padding:6px 10px;font-size:12.5px}
 
+/* 캡처 미리보기 + 위치 표시 */
+.shot-view{position:relative;margin-top:12px;max-height:340px;overflow:auto;
+  border:1px solid var(--border);border-radius:10px;background:var(--white)}
+.shot-view img{display:block;width:100%;height:auto}
+.shot-box{position:absolute;display:none;border:2.5px solid var(--accent);border-radius:5px;
+  background:rgba(217,84,43,.14);box-shadow:0 0 0 9999px rgba(58,47,38,.18);
+  pointer-events:none;transition:all .15s ease}
+.shot-box.on{display:block}
+.shot-hint{position:sticky;bottom:0;background:rgba(58,47,38,.82);color:var(--white);
+  font-size:11px;font-weight:700;padding:6px 10px;text-align:center}
+tr.rv{cursor:pointer}
+tr.rv.sel td{background:var(--accent-soft) !important}
+
 .insight-box{background:var(--dark-warm);color:var(--white);border-radius:20px;padding:36px;margin-bottom:24px}
 .insight-label{display:flex;align-items:center;gap:8px;margin-bottom:16px}
 .insight-label-text{font-size:12px;font-weight:800;letter-spacing:1.5px;color:var(--accent-soft)}
@@ -390,7 +403,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 02 / 캡처로 불러오기 (선택)</span></div>
   <div class="card-desc">
     증권사 앱 잔고 화면을 캡처해 올리면 종목과 수량을 자동으로 읽어옵니다.
-    <b>캡처를 여러 장 한 번에 올릴 수 있고</b>, 캡처마다 계좌를 따로 지정할 수 있습니다.
+    <b>캡처를 여러 장 한 번에 올릴 수 있고</b>, 캡처마다 계좌가 자동으로 나뉩니다. 같은 종류 계좌가 겹치면 일반계좌2·연금저축펀드2 처럼 번호를 붙여 만들어 드립니다.
     읽은 결과는 바로 반영하지 않고 <b>검수 화면에서 확인한 뒤</b> 추가합니다.
   </div>
 
@@ -415,7 +428,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <div class="warn-box">
       ⚠️ 문자 인식은 완벽하지 않습니다. <b>종목·수량·매입가를 반드시 눈으로 확인</b>하고 고친 뒤 추가하세요.<br>
       캡처에 <b>보유수량·평균단가 열이 보이지 않으면</b> 화면에 있는 다른 숫자(평가손익·평가금액)를
-      집어옵니다. 증권사 앱에서 그 두 열이 나오도록 좌우로 밀어 캡처하시면 정확도가 크게 올라갑니다.
+      집어옵니다. 증권사 앱에서 그 두 열이 나오도록 좌우로 밀어 캡처하시면 정확도가 크게 올라갑니다.<br><b>행을 누르면</b> 그 종목을 캡처의 어디에서 읽었는지 네모로 표시합니다.
     </div>
     <div class="review-bulk">
       <span>모두 이 계좌로 지정</span>
@@ -1033,6 +1046,10 @@ document.addEventListener('change',e=>{
   }
 });
 document.addEventListener('click',e=>{
+  // 검수 행을 누르면 캡처에서 읽어온 위치를 표시
+  const rv=e.target.closest('tr.rv');
+  if(rv&&!e.target.closest('input,select,button')) markRow(+rv.dataset.row);
+
   const pick=e.target.closest('[data-pick]');
   if(pick){
     const menu=pick.closest('.search-menu');
@@ -1161,6 +1178,7 @@ async function runOCR(files){
   const imgs=files.filter(f=>f.type.startsWith('image/'));
   if(!imgs.length){ alert('이미지 파일만 올릴 수 있습니다.'); return; }
   document.getElementById('review').classList.remove('on');
+  freeShots();
 
   const shots=document.getElementById('shot-list');
   shots.innerHTML=imgs.map(f=>`<span class="shot">🖼 ${esc(f.name)} · 대기</span>`).join('');
@@ -1187,7 +1205,12 @@ async function runOCR(files){
               prog(base+span*(0.3+m.progress*0.7),`글자를 읽고 있습니다 ${tag}… ${Math.round(m.progress*100)}%`);
           }
         });
-        texts.push({name:imgs[i].name, text:data.text||''});
+        // 줄 단위 텍스트와 좌표를 함께 보관한다. 검수할 때 캡처 위에 위치를 표시한다.
+        const ln=(data.lines||[]).map(l=>({text:(l.text||'').trim(),bbox:l.bbox}))
+                                 .filter(l=>l.text.length>1);
+        texts.push({name:imgs[i].name, text:data.text||'', lines:ln,
+                    url:URL.createObjectURL(imgs[i]),
+                    w:(data.words&&data.words[0]?0:0)||0});
         shots.children[i].textContent=`🖼 ${imgs[i].name} · 완료`;
       }catch(err){
         shots.children[i].className='shot err';
@@ -1300,12 +1323,51 @@ function inferQtyAvg(list,price,fxMul){
   }
   return fallback;
 }
+let shotAcct=[];
+
+/* 계좌 이름의 다음 번호를 만든다. 일반계좌 → 일반계좌2, 연금저축펀드1 → 연금저축펀드2 */
+function nextAcctName(base,taken){
+  const m=String(base).match(/^(.*?)(\d*)$/);
+  const stem=m[1]||base;
+  let n=m[2]?parseInt(m[2],10):1;
+  for(let k=0;k<50;k++){
+    n++;
+    const cand=stem+n;
+    if(!taken.has(cand)) return cand;
+  }
+  return base+'_'+Date.now();
+}
+
+/* 캡처가 여러 장이고 같은 종류의 계좌로 잡히면 한 장에 한 계좌씩 나눠 준다.
+   캡처1 → 일반계좌, 캡처2 → 일반계좌2 … 없는 계좌는 만들어 준다.
+   같은 계좌를 국내·해외 두 장으로 찍은 경우라면 검수 화면에서 되돌리면 된다. */
+function spreadAccounts(){
+  if(ocrShots.length<2) return;
+  const used=new Set(), list=[...accts()];
+  const taken=new Set(list);
+  const map={};
+  ocrShots.forEach((_,si)=>{
+    let a=shotAcct[si]||list[0];
+    if(used.has(a)){
+      // 같은 이름의 다음 번호가 이미 계좌에 있으면 그걸 쓰고, 없으면 만든다
+      let cand=a;
+      do{ cand=nextAcctName(cand,used); }while(used.has(cand));
+      if(!taken.has(cand)){ list.push(cand); taken.add(cand); }
+      a=cand;
+    }
+    used.add(a); map[si]=a;
+  });
+  if(list.length!==accts().length){ state.accounts=list; save(); renderAccts(); renderCash(); }
+  ocrRows.forEach(r=>{ if(map[r.src]) r.acct=map[r.src]; });
+}
+
 function buildReview(shots){
   if(typeof shots==='string') shots=[{name:'캡처',text:shots}];
   ocrRaw=shots.map(s=>s.text).join('\n');
-  ocrShots=shots.map(s=>s.name);
-  ocrRows=[];
-  shots.forEach((shot,si)=>parseShot(shot.text,si));
+  ocrShots=shots.map(s=>({name:s.name,url:s.url||''}));
+  ocrRows=[]; shotAcct=[];
+  shots.forEach((shot,si)=>parseShot(shot.lines&&shot.lines.length?shot.lines:shot.text,si));
+  spreadAccounts();
   renderReview();
 }
 
@@ -1325,10 +1387,19 @@ function detectAcct(text){
   return null;
 }
 
-function parseShot(text,si){
-  const guess=detectAcct(text)||accts()[0];
-  const mkt=detectMarket(text);
-  const lines=(text||'').split('\n').map(s=>s.trim()).filter(s=>s.length>1);
+function parseShot(src,si){
+  // src 가 문자열이면 줄로 쪼개고, {text,bbox} 배열이면 좌표를 함께 쓴다
+  const rows = typeof src==='string'
+    ? (src||'').split('\n').map(t=>({text:t.trim(),bbox:null})).filter(r=>r.text.length>1)
+    : src;
+  const whole=rows.map(r=>r.text).join('\n');
+  const guess=detectAcct(whole)||accts()[0];
+  shotAcct[si]=guess;
+  const mkt=detectMarket(whole);
+  const lines=rows.map(r=>r.text);
+  const boxes=rows.map(r=>r.bbox);
+  const union=(a,b)=>!a?b:(!b?a:{x0:Math.min(a.x0,b.x0),y0:Math.min(a.y0,b.y0),
+                                  x1:Math.max(a.x1,b.x1),y1:Math.max(a.y1,b.y1)});
   const hits=[];
   const matched=lines.map(l=>matchStock(l,mkt));
 
@@ -1384,8 +1455,9 @@ function parseShot(text,si){
     if(skip.has(li)) return;
     const r=matched[li];
     if(!r) return;
-    let n=nums(line,r.m), text=line;
-    if(joined.has(li)){ n=n.concat(nums(lines[li+1],r.m)); text+='  ⏎  '+lines[li+1]; }
+    let n=nums(line,r.m), text=line, box=boxes[li];
+    if(joined.has(li)){ n=n.concat(nums(lines[li+1],r.m)); text+='  ⏎  '+lines[li+1];
+      box=union(box,boxes[li+1]); }
     // 다음 종목이 나올 때까지의 줄은 모두 이 종목의 숫자다.
     // OCR 은 한 행을 여러 줄로 잘게 쪼개 놓기 때문에(TIGER 미국나스 / 닥 3,624,970 /
     // 52 108,829 / ...) 몇 줄까지만 붙이면 정작 필요한 수량·단가를 놓친다.
@@ -1394,9 +1466,9 @@ function parseShot(text,si){
       if(matched[j]||skip.has(j)) break;          // 다음 종목 시작
       const more=nums(lines[j],null);
       if(more.length) n=n.concat(more);
-      text+='  ⏎  '+lines[j];
+      text+='  ⏎  '+lines[j]; box=union(box,boxes[j]);
     }
-    hits.push({line:text,m:r.m,via:r.via,lot:r.lot||'',nameSure:r.nameSure!==false,n});
+    hits.push({line:text,box,m:r.m,via:r.via,lot:r.lot||'',nameSure:r.nameSure!==false,n});
   });
 
   const pipes=hits.filter(h=>h.via==='pipe');
@@ -1406,7 +1478,7 @@ function parseShot(text,si){
     // 정수주와 소수점주는 평균단가가 다르므로 절대 합치지 않는다.
     pipes.forEach(h=>{
       const g=inferQtyAvg(h.n,h.m.price,h.m.cur==='USD'?FX:0);
-      ocrRows.push({src:si,line:h.line,code:h.m.code,name:h.m.name,lot:h.lot,acct:guess,nameSure:h.nameSure,
+      ocrRows.push({src:si,box:h.box,line:h.line,code:h.m.code,name:h.m.name,lot:h.lot,acct:guess,nameSure:h.nameSure,
         isUS:h.m.cur==='USD', qty:g?g.qty:(h.n[0]??''), avg:g?g.avg:(h.n[1]??''),
         sure:!!(g&&g.sure), use:true});
     });
@@ -1415,7 +1487,7 @@ function parseShot(text,si){
     hits.filter(h=>h.via!=='pipe'&&!have.has(h.m.code)&&h.n.length>=2).forEach(h=>{
       have.add(h.m.code);
       const g=inferQtyAvg(h.n,h.m.price,h.m.cur==='USD'?FX:0);
-      ocrRows.push({src:si,line:h.line,code:h.m.code,name:h.m.name,lot:'',acct:guess,nameSure:h.nameSure,
+      ocrRows.push({src:si,box:h.box,line:h.line,code:h.m.code,name:h.m.name,lot:'',acct:guess,nameSure:h.nameSure,
         isUS:h.m.cur==='USD', qty:g?g.qty:(h.n[0]??''), avg:g?g.avg:(h.n[1]??''),
         sure:!!(g&&g.sure), use:true});
     });
@@ -1435,12 +1507,12 @@ function parseShot(text,si){
       while(i+1<hits.length&&hits[i+1].m.code===h.m.code
             &&(shares(h,hits[i+1])||pairUp(h,hits[i+1]))){
         const nx=hits[++i]; merged.push(nx.line);
-        n=n.concat(nx.n);
+        n=n.concat(nx.n); h={...h,box:union(h.box,nx.box)};
         if(nx.n.length>h.n.length) h={...nx,n};
       }
       h={...h,n};
       const g=inferQtyAvg(h.n,h.m.price,h.m.cur==='USD'?FX:0);
-      ocrRows.push({src:si,line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,lot:'',acct:guess,nameSure:h.nameSure,
+      ocrRows.push({src:si,box:h.box,line:merged.join('  ⏎  '),code:h.m.code,name:h.m.name,lot:'',acct:guess,nameSure:h.nameSure,
         isUS:h.m.cur==='USD', qty:g?g.qty:(h.n[0]??''), avg:g?g.avg:(h.n[1]??''),
         sure:!!(g&&g.sure), use:true});
     }
@@ -1449,6 +1521,43 @@ function parseShot(text,si){
 }
 
 let ocrShots=[];
+
+/* 캡처 이미지를 검수 표 안에 함께 보여준다.
+   행을 누르면 그 종목이 이미지의 어디에서 읽혔는지 네모로 표시한다. */
+function shotImg(si){
+  const sh=ocrShots[si];
+  if(!sh||!sh.url) return '';
+  return `<div class="shot-view" data-view="${si}">
+    <img src="${sh.url}" alt="캡처 ${si+1}" data-img="${si}">
+    <div class="shot-box" data-box="${si}"></div>
+    <div class="shot-hint">행을 누르면 캡처에서 읽어온 위치를 표시합니다</div>
+  </div>`;
+}
+
+/* 특정 행의 좌표를 이미지 위에 표시 */
+function markRow(i){
+  const r=ocrRows[i]; if(!r) return;
+  document.querySelectorAll('.shot-box').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('tr.rv').forEach(t=>t.classList.remove('sel'));
+  const tr=document.querySelector(`tr.rv[data-row="${i}"]`);
+  if(tr) tr.classList.add('sel');
+  if(!r.box) return;
+  const img=document.querySelector(`img[data-img="${r.src}"]`);
+  const box=document.querySelector(`.shot-box[data-box="${r.src}"]`);
+  if(!img||!box||!img.naturalWidth) return;
+  const sx=img.clientWidth/img.naturalWidth, sy=img.clientHeight/img.naturalHeight;
+  const pad=4;
+  box.style.left  =Math.max(0,r.box.x0*sx-pad)+'px';
+  box.style.top   =Math.max(0,r.box.y0*sy-pad)+'px';
+  box.style.width =((r.box.x1-r.box.x0)*sx+pad*2)+'px';
+  box.style.height=((r.box.y1-r.box.y0)*sy+pad*2)+'px';
+  box.classList.add('on');
+  const view=box.parentElement;
+  // 표시된 위치가 보이도록 이미지 안에서 스크롤
+  view.scrollTop=Math.max(0,r.box.y0*sy-view.clientHeight/2);
+  view.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
 function renderReview(){
   // 관심종목 패널 등이 같이 캡처되면 같은 행이 여러 번 잡힌다. 중복 제거.
   const seenRow=new Set();
@@ -1468,7 +1577,7 @@ function renderReview(){
       +'white-space:pre-wrap;font-size:11px;max-height:220px;overflow:auto">'
       +esc(ocrRaw.slice(0,2000)||'(읽어낸 글자가 없습니다)')+'</pre></td></tr>';
   }else{
-    const rowHtml=(r,i)=>`<tr class="rv">
+    const rowHtml=(r,i)=>`<tr class="rv" data-row="${i}">
       <td class="tl rv-raw" data-l="인식된 줄">${esc(r.line)}</td>
       <td class="tl rv-nm" data-l="매칭된 종목"><span class="${r.nameSure?'':'name-guess'}">${esc(r.name)}</span>
         ${r.nameSure?'':'<div class="guess-tag" style="text-align:left">종목명 추정 · 확인 필요</div>'}
@@ -1484,20 +1593,24 @@ function renderReview(){
 
     let html='';
     // 캡처가 여러 장이면 장별로 묶고, 묶음마다 계좌를 한 번에 지정할 수 있게 한다
+    const shotHead=(si,nm,cnt,acct)=>`<tr class="shot-group"><td colspan="6">
+      <div class="shot-group-in">
+        <span class="shot-group-nm">🖼 ${esc(nm)} · ${cnt}종목</span>
+        <span class="shot-group-set">이 캡처 전체를
+          <select data-shot="${si}">${acctOptions(acct)}</select> 로</span>
+      </div>${shotImg(si)}</td></tr>`;
+
     if(ocrShots.length>1){
-      ocrShots.forEach((nm,si)=>{
+      ocrShots.forEach((sh,si)=>{
         const idx=ocrRows.map((r,i)=>[r,i]).filter(([r])=>r.src===si);
         if(!idx.length) return;
-        html+=`<tr class="shot-group"><td colspan="6">
-          <div class="shot-group-in">
-            <span class="shot-group-nm">🖼 ${esc(nm)} · ${idx.length}종목</span>
-            <span class="shot-group-set">이 캡처 전체를
-              <select data-shot="${si}">${acctOptions(ocrRows[idx[0][1]].acct)}</select> 로</span>
-          </div></td></tr>`;
+        html+=shotHead(si,sh.name,idx.length,ocrRows[idx[0][1]].acct);
         html+=idx.map(([r,i])=>rowHtml(r,i)).join('');
       });
     }else{
-      html=ocrRows.map(rowHtml).join('');
+      const sh=ocrShots[0];
+      if(sh&&sh.url) html+=`<tr class="shot-group"><td colspan="6">${shotImg(0)}</td></tr>`;
+      html+=ocrRows.map(rowHtml).join('');
     }
     body.innerHTML=html;
     document.getElementById('bulk-acct').innerHTML=acctOptions();
@@ -1683,6 +1796,7 @@ document.addEventListener('change',e=>{
 
   // 검수 행
   if(t.dataset.ocr!==undefined){
+    markRow(+t.dataset.ocr);
     const r=ocrRows[+t.dataset.ocr];
     if(t.dataset.f==='use') r.use=t.checked;
     else if(t.dataset.f==='acct'){
@@ -1723,10 +1837,15 @@ document.getElementById('btn-apply').onclick=()=>{
   add.forEach(r=>state.holdings.push({acct:r.acct||accts()[0],code:r.code,qty:r.qty,avg:r.avg}));
   save(); render();
   document.getElementById('review').classList.remove('on');
+  freeShots();
   alert(`${add.length}건을 추가했습니다.\n계좌 구분과 매입가를 확인해 주세요.`);
 };
+function freeShots(){
+  ocrShots.forEach(sh=>{ if(sh&&sh.url) try{ URL.revokeObjectURL(sh.url); }catch(e){} });
+  ocrShots=[];
+}
 document.getElementById('btn-review-cancel').onclick=()=>{
-  document.getElementById('review').classList.remove('on'); ocrRows=[];
+  document.getElementById('review').classList.remove('on'); ocrRows=[]; freeShots();
 };
 
 /* ---------- 시작 ---------- */
