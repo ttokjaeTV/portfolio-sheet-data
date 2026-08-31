@@ -121,7 +121,9 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .drop{border:2px dashed var(--border);border-radius:16px;padding:32px;text-align:center;
   background:var(--bg-alt);cursor:pointer;transition:all .15s ease}
 .drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
-.drop-t{font-size:15px;font-weight:800;margin-bottom:6px}
+.drop-t{font-size:15px;font-weight:800;margin-bottom:8px}
+.drop-multi{display:inline-block;background:var(--accent);color:var(--white);
+  font-size:12px;font-weight:800;padding:5px 14px;border-radius:999px;margin-bottom:12px}
 .drop-s{font-size:12px;color:var(--ink-mute);font-weight:600;line-height:1.7}
 .ocr-prog{margin-top:16px;display:none}
 .ocr-prog.on{display:block}
@@ -356,14 +358,16 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 02 / 캡처로 불러오기 (선택)</span></div>
   <div class="card-desc">
     증권사 앱 잔고 화면을 캡처해 올리면 종목과 수량을 자동으로 읽어옵니다.
+    <b>캡처를 여러 장 한 번에 올릴 수 있고</b>, 캡처마다 계좌를 따로 지정할 수 있습니다.
     읽은 결과는 바로 반영하지 않고 <b>검수 화면에서 확인한 뒤</b> 추가합니다.
   </div>
 
   <div class="drop" id="drop">
-    <div class="drop-t">📷 캡처 이미지를 여기에 끌어다 놓거나 클릭해 선택</div>
+    <div class="drop-t">📷 캡처 이미지를 끌어다 놓거나 클릭해 선택</div>
+    <div class="drop-multi">여러 장 한 번에 선택 가능 · 계좌별로 캡처해 함께 넣으세요</div>
     <div class="drop-s">
-      <b>여러 장을 한 번에</b> 올릴 수 있습니다. 계좌별로 캡처해 함께 넣으세요.<br>
       글자가 클수록 정확합니다. 화면을 확대해 캡처하면 인식률이 올라갑니다.<br>
+      <b>보유수량·평균단가 열이 보이도록</b> 좌우로 밀어 캡처하면 훨씬 정확합니다.<br>
       최초 1회 인식 데이터 약 22MB를 내려받습니다. 와이파이 환경을 권합니다.
     </div>
     <input type="file" id="file-img" accept="image/*" multiple hidden>
