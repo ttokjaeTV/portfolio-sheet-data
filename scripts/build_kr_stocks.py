@@ -108,6 +108,7 @@ def fetch_prices(codes):
                     c = d.get("itemCode")
                     if c:
                         prices[c] = {
+                            "name": (d.get("stockName") or "").strip(),
                             "price": num(d.get("closePriceRaw", d.get("closePrice"))),
                             "change": num(d.get("compareToPreviousClosePriceRaw",
                                                 d.get("compareToPreviousClosePrice"))),
@@ -125,6 +126,29 @@ def fetch_prices(codes):
     return prices
 
 
+def preferred_candidates(items):
+    """우선주 코드를 규칙으로 만들어 낸다.
+
+    KIND 상장법인목록에는 우선주가 없다(법인 단위 목록이라 삼성전자우·현대차2우B 가 빠진다).
+    한국 우선주는 보통주 코드의 끝자리만 바뀌므로 후보를 만들어 네이버에 물어본다.
+    없는 코드는 네이버가 조용히 빼고 돌려주므로 그대로 걸러진다.
+        005930 삼성전자 → 005935 삼성전자우
+        005380 현대차   → 005385 현대차우 / 005387 현대차2우B / 005389 현대차3우B
+    """
+    base = {x["code"] for x in items}
+    out = []
+    for x in items:
+        c = x["code"]
+        if not re.fullmatch(r"\d{5}0", c):
+            continue
+        for last in ("5", "7", "9"):
+            cand = c[:5] + last
+            if cand not in base:
+                out.append({"code": cand, "name": "", "market": x["market"],
+                            "industry": x["industry"]})
+    return out
+
+
 def main():
     now = datetime.now(KST).strftime("%Y-%m-%d %H:%M")
 
@@ -132,28 +156,39 @@ def main():
     items = load_kind()
     etf = load_etf_codes()
     items = [x for x in items if x["code"] not in etf]
-    print(f"  개별주식 {len(items)}종목 (ETF 제외)", file=sys.stderr)
+    print(f"  보통주 {len(items)}종목 (ETF 제외)", file=sys.stderr)
+
+    cands = preferred_candidates(items)
+    print(f"  우선주 후보 {len(cands)}개 추가 조회", file=sys.stderr)
+    allitems = items + cands
 
     print("시세 조회...", file=sys.stderr)
-    prices = fetch_prices([x["code"] for x in items])
+    prices = fetch_prices([x["code"] for x in allitems])
 
-    missing = 0
+    rows = []
+    for x in allitems:
+        p = prices.get(x["code"]) or {}
+        if not p.get("price"):
+            continue                        # 없는 우선주 코드·거래정지 종목은 여기서 걸러진다
+        # 종목명은 네이버 것을 쓴다. KIND 는 정식 법인명(현대자동차)이라
+        # 증권사 화면 표기(현대차)와 달라 캡처 인식이 안 된다.
+        name = p.get("name") or x["name"]
+        if not name:
+            continue
+        rows.append([x["code"], name, x["market"], x["industry"],
+                     p["price"], p["change"], p["rate"], now])
+
     os.makedirs(os.path.dirname(OUT_PATH) or ".", exist_ok=True)
     with open(OUT_PATH, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["종목코드", "종목명", "시장", "업종", "현재가", "전일대비", "등락률", "갱신시각"])
-        for x in sorted(items, key=lambda v: v["code"]):
-            p = prices.get(x["code"]) or {}
-            if not p.get("price"):
-                missing += 1
-                continue                    # 시세 없는 종목은 제외 (거래정지 등)
-            w.writerow([x["code"], x["name"], x["market"], x["industry"],
-                        p["price"], p["change"], p["rate"], now])
+        for r in sorted(rows, key=lambda v: v[0]):
+            w.writerow(r)
 
-    kept = len(items) - missing
-    print(f"완료: {OUT_PATH} ({kept}행, 시세 없어 제외 {missing}건)", file=sys.stderr)
+    pref = sum(1 for r in rows if re.fullmatch(r"\d{5}[579]", r[0]))
+    print(f"완료: {OUT_PATH} ({len(rows)}행, 이 중 우선주 {pref}건)", file=sys.stderr)
 
-    if kept < len(items) * 0.5:
+    if len(rows) < len(items) * 0.5:
         print("시세 확보가 절반 미만입니다. 배포 중단.", file=sys.stderr)
         sys.exit(1)
 

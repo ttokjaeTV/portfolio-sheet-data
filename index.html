@@ -600,6 +600,7 @@ async function loadAll(){
     document.getElementById('kr-count').textContent=etfN.toLocaleString();
     document.getElementById('stk-count').textContent=(Object.keys(KR).length-etfN).toLocaleString();
     document.getElementById('us-count').textContent=Object.keys(US).length.toLocaleString();
+    buildNameIndex();
     stamp.innerHTML=`국내 <b>${STAMP}</b><br>미국 <b>${STAMP_US}</b><br>USD/KRW <b>${FX?FX.toLocaleString('ko-KR'):'—'}</b>`;
   }catch(e){
     stamp.innerHTML='<span style="color:#C0392B">시세를 불러오지 못했습니다</span><br>네트워크를 확인해 주세요';
@@ -1231,7 +1232,14 @@ const NAME_NOISE=/\bETF\b|\bTRUST\b|\bSERIES\b|\bINDEX\b|\bFUND\b|\bINC\b|\bCORP
 function normName(s){ return s.toUpperCase().replace(NAME_NOISE,' ').replace(/\s+/g,' ').trim(); }
 
 /* 계좌번호·헤더 등 종목이 있을 리 없는 줄 */
-const SKIP_LINE=/\d{3,4}-\d{3,4}-\d{2,3}|계좌|잔고|합계|총액|예수금|출금가능|증거금/;
+const SKIP_LINE=/\d{3,4}-\d{3,4}-\d{2,3}|계좌|잔고|합계|총액|예수금|출금가능|증거금|평가손익|수익률순|매매구분/;
+
+/* 국내 종목명을 공백 없는 대문자로 미리 만들어 둔다 (매 줄마다 만들면 느리다) */
+let krFlat={};
+function buildNameIndex(){
+  krFlat={};
+  for(const k in KR) krFlat[k]=KR[k].name.toUpperCase().replace(/\s+/g,'');
+}
 
 function matchStock(line){
   const up=line.toUpperCase();
@@ -1249,19 +1257,22 @@ function matchStock(line){
       if(US[t]) return {m:US[t],via:'pipe',lot:parts[0].trim().slice(0,6)};
   }
 
-  // 3) 줄 어디든 있는 미국 티커.
+  // 3) 국내 종목명. 한글 종목명은 "삼성전자"(4자) "현대차"(3자)처럼 짧아서
+  //    길이 제한을 두면 안 된다. OCR 이 넣는 공백도 무시하고 비교한다.
+  //    가장 긴 이름이 이긴다 ("현대차2우B" 가 "현대차" 보다 우선).
+  const flat=up.replace(/\s+/g,'');
+  let best=null,bl=0;
+  for(const k in KR){
+    const n=krFlat[k];
+    if(n.length>=2&&n.length>bl&&flat.includes(n)){ best=KR[k]; bl=n.length; }
+  }
+  if(best) return {m:best,via:'name'};
+
+  // 4) 줄 어디든 있는 미국 티커.
   //    반드시 원문에서 대문자여야 한다. OCR 이 "Vv" 같은 글자를 티커로 오인하는 걸 막는다.
   const STOP=new Set(['USD','KRW','ETF','ALL','NEW','TOP','AND','THE','FOR','INC','CORP','CO','S&P']);
   for(const t of line.match(/\b[A-Z][A-Z.-]{1,5}\b/g)||[])
     if(!STOP.has(t)&&US[t]) return {m:US[t],via:'ticker'};
-
-  // 4) 종목명 부분 일치 — 국내(긴 이름 우선)
-  let best=null;
-  for(const k in KR){
-    const n=KR[k].name.toUpperCase();
-    if(n.length>=6&&up.includes(n)&&(!best||n.length>best.name.length)) best=KR[k];
-  }
-  if(best) return {m:best,via:'name'};
 
   // 5) 종목명 부분 일치 — 미국 ("INVESCO NASDAQ 100" → QQQM)
   const norm=normName(line);
