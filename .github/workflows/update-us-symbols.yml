@@ -1,0 +1,38 @@
+name: 미국 종목코드 매핑 갱신
+
+# 네이버 reutersCode 에는 규칙이 없어(NASDAQ=.O, NYSE=접미사 없음,
+# AMEX 는 SCHD.K 인데 SPY 는 접미사 없음) 한 번 조회해 캐싱해야 한다.
+# 캐시에 있는 티커는 건너뛰므로 평소에는 신규 상장분만 조회하고 몇 초면 끝난다.
+
+on:
+  schedule:
+    - cron: "0 20 * * 6"      # 매주 토요일 05:00 KST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 신규 상장분 종목코드 해석
+        run: python scripts/build_us_symbols.py
+
+      - name: 변경분만 커밋
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data/us_symbols.json; then
+            echo "변경 없음"; exit 0
+          fi
+          git add data/us_symbols.json
+          git commit -m "미국 종목코드 매핑 갱신: $(TZ=Asia/Seoul date '+%Y-%m-%d')"
+          git push

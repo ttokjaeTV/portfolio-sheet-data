@@ -38,30 +38,35 @@ def get_json(url, timeout=30):
 
 
 def load_master():
-    """마스터에서 (종목코드, 종목명) 목록을 뽑는다."""
+    """마스터에서 종목 메타를 뽑는다."""
     data = get_json(MASTER_URL, timeout=60)
     etfs = data.get("etfs", [])
     meta = data.get("meta", {})
 
-    out = []
+    seen, out = set(), []
     for e in etfs:
         code = (e.get("ticker") or "").strip()
         name = (e.get("name") or "").strip()
-        if code and name:
-            out.append((code, name))
+        if not code or not name or code in seen:
+            continue
+        seen.add(code)
 
-    # 중복 제거(코드 기준), 순서 유지
-    seen, uniq = set(), []
-    for code, name in out:
-        if code not in seen:
-            seen.add(code)
-            uniq.append((code, name))
+        expense = e.get("expenseRatio")
+        out.append({
+            "code": code,
+            "name": name,
+            "assetClass": (e.get("assetClass") or "").strip(),   # 주식/채권/혼합자산/원자재/부동산/통화/기타
+            "market": (e.get("market") or "").strip(),           # 국내/해외/국내&해외
+            "expense": "" if expense in (None, "") else str(expense),
+            # 연금계좌 안전자산 30% 규칙 판정용
+            "safe": "Y" if e.get("isPensionSafeAsset") else "N",
+        })
 
-    if not uniq:
+    if not out:
         print("마스터에서 종목을 하나도 읽지 못했습니다.", file=sys.stderr)
         sys.exit(1)
 
-    return uniq, meta
+    return out, meta
 
 
 def num(v):
@@ -112,7 +117,7 @@ def main():
     print(f"  ETF {len(master)}종목 (기준일 {meta.get('dataDate', '?')})", file=sys.stderr)
 
     print("시세 조회...", file=sys.stderr)
-    prices = fetch_prices([c for c, _ in master])
+    prices = fetch_prices([m["code"] for m in master])
 
     now = datetime.now(KST).strftime("%Y-%m-%d %H:%M")
     missing = 0
@@ -120,14 +125,17 @@ def main():
     os.makedirs(os.path.dirname(OUT_PATH) or ".", exist_ok=True)
     with open(OUT_PATH, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["종목코드", "종목명", "현재가", "전일대비", "등락률", "갱신시각"])
-        for code, name in master:
-            p = prices.get(code)
-            if not p or p["price"] == "":
+        w.writerow(["종목코드", "종목명", "자산군", "시장", "총보수",
+                    "안전자산", "현재가", "전일대비", "등락률", "갱신시각"])
+        for m in master:
+            p = prices.get(m["code"]) or {}
+            if not p.get("price"):
                 missing += 1
-                w.writerow([code, name, "", "", "", now])
-            else:
-                w.writerow([code, name, p["price"], p["change"], p["rate"], now])
+            w.writerow([
+                m["code"], m["name"], m["assetClass"], m["market"],
+                m["expense"], m["safe"],
+                p.get("price", ""), p.get("change", ""), p.get("rate", ""), now,
+            ])
 
     print(f"완료: {OUT_PATH} ({len(master)}행, 시세 없음 {missing}건)", file=sys.stderr)
 
