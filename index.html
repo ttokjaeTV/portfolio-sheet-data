@@ -157,6 +157,44 @@ input::placeholder{color:#BFB6A6;font-weight:500}
   align-items:center;gap:7px;flex-wrap:wrap}
 .acct-card input{background:var(--white)}
 .acct-note{font-size:11px;color:var(--ink-mute);font-weight:600;display:block;margin-top:2px}
+.th-sub{font-size:10px;font-weight:700;opacity:.7}
+
+/* 자산 추이 */
+.trend-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.trend-stats{display:flex;gap:20px;flex-wrap:wrap}
+.trend-s{line-height:1.3}
+.trend-s-l{font-size:11px;font-weight:800;color:var(--ink-mute)}
+.trend-s-v{font-size:18px;font-weight:900;letter-spacing:-.4px}
+.btn-ghost{background:none;border:1px solid var(--border);border-radius:9px;padding:7px 13px;
+  font-size:12px;font-weight:700;color:var(--ink-mute);cursor:pointer;font-family:inherit}
+.btn-ghost:hover{background:var(--bg-alt);color:var(--accent);border-color:var(--accent)}
+.trend-canvas{height:260px;margin:10px 0 6px}
+.trend-empty{padding:34px 20px;text-align:center;color:var(--ink-mute);font-size:13px;font-weight:600;
+  background:var(--bg-alt);border-radius:12px}
+.trend-log{display:flex;flex-direction:column;gap:1px;background:var(--border);
+  border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.trend-log:empty{display:none}
+.tl-row{background:var(--white);padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:12px}
+.tl-d{font-weight:800;color:var(--ink-mute);flex:none;width:88px}
+.tl-k{font-weight:800;padding:2px 8px;border-radius:6px;font-size:11px;flex:none}
+.tl-k.add{background:#DCE8DC;color:var(--green)}
+.tl-k.del{background:#F5DCD7;color:#C0392B}
+.tl-k.ren{background:var(--accent-soft);color:var(--accent)}
+.tl-t{font-weight:700}
+@media (max-width:768px){
+  .trend-canvas{height:200px}
+  .tl-row{flex-wrap:wrap;gap:6px}
+  .tl-d{width:auto}
+}
+/* 계좌 성격 색 — 왼쪽 띠로 구분한다 */
+.kind-cell{position:relative;padding-left:16px !important}
+.kind-cell::before{content:'';position:absolute;left:6px;top:50%;transform:translateY(-50%);
+  width:4px;height:22px;border-radius:2px;background:var(--kc,var(--accent))}
+.kind-sum td{background:var(--bg-alt);font-weight:800}
+.kind-sum .kind-cell{color:var(--kc,var(--accent))}
+.kind-sum .acct-note{font-weight:700;opacity:.8}
+.kind-dot{display:inline-block;width:8px;height:8px;border-radius:50%;
+  background:var(--kc,var(--accent));margin-right:6px;flex:none}
 .acct-hold{margin-top:14px;padding-top:12px;border-top:1px dashed var(--border)}
 .acct-hold>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;
   font-size:12.5px;font-weight:800;color:var(--ink-soft);white-space:nowrap}
@@ -638,12 +676,27 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <table class="data-table">
       <thead><tr>
         <th class="tl">계좌</th><th class="tl">종목</th><th class="tl">자산군</th>
-        <th>수량</th><th>평균매입가</th><th>현재가</th><th>전일대비</th>
+        <th>수량</th><th>평균매입가</th><th>현재가</th><th>전일대비<br><span class="th-sub">종목 통화 기준</span></th>
         <th>매입금액</th><th>평가금액</th><th>평가손익</th><th>수익률</th><th>비중</th>
       </tr></thead>
       <tbody id="detail-body"></tbody>
     </table>
   </div>
+</div>
+
+<div class="card">
+  <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 07 / 자산 추이</span></div>
+  <div class="card-desc">
+    도구를 열 때마다 그날의 전체 평가금액을 하루 한 번 기록합니다.
+    계좌를 추가하거나 지운 날도 함께 표시해, 자산이 늘어난 게 시장 덕인지 새로 넣은 돈 덕인지 구분할 수 있습니다.<br>
+    <b>기록은 이 브라우저에만 쌓입니다.</b> 다른 기기에서도 이어 보려면 STEP 01 위의 저장 파일을 옮겨 주세요.
+  </div>
+  <div class="trend-head">
+    <div class="trend-stats" id="trend-stats"></div>
+    <button class="btn-ghost" id="btn-trend-clear" type="button">기록 지우기</button>
+  </div>
+  <div class="trend-canvas"><canvas id="chart-trend"></canvas></div>
+  <div class="trend-log" id="trend-log"></div>
 </div>
 
 <div class="insight-box">
@@ -681,7 +734,29 @@ const DEFAULT_ACCOUNTS=['연금저축펀드1','연금저축펀드2','IRP','ISA',
 const LS_KEY='ttokjae_portfolio_v2';
 /* 계좌는 이용자가 자유롭게 추가·이름변경할 수 있다.
    IRP 70% 한도와 절세계좌 비중은 계좌 이름으로 판별한다. */
-const accts=()=>(state.accounts&&state.accounts.length)?state.accounts:DEFAULT_ACCOUNTS;
+// 같은 계열끼리 모아 번호순으로 놓는다.
+//   연금저축펀드1·2·3·4  IRP  ISA  일반계좌·2·3
+// 계열끼리의 순서는 먼저 나온 쪽을 앞에 둔다. 사용자가 만든 순서를 뒤집지 않기 위해서다.
+// 번호가 없는 이름(일반계좌)은 1번으로 친다.
+function sortAccts(list){
+  const stem=a=>String(a).replace(/\d+$/,'');
+  const no=a=>{ const m=String(a).match(/(\d+)$/); return m?parseInt(m[1],10):1; };
+  const order=new Map();
+  list.forEach(a=>{ if(!order.has(stem(a))) order.set(stem(a),order.size); });
+  return list.slice().sort((x,y)=>
+    (order.get(stem(x))-order.get(stem(y)))
+    || (no(x)-no(y))
+    || String(x).localeCompare(String(y),'ko'));
+}
+// 계좌 성격 = 번호를 뗀 이름. 연금저축펀드1·2·3 은 모두 '연금저축펀드' 다.
+const acctKind=a=>String(a).replace(/\d+$/,'')||String(a);
+const KIND_COLORS=['#D9542B','#2C6FA8','#4E7C4A','#8A5BA6','#B8860B','#A0522D','#3A2F26'];
+function kindColor(a){
+  const kinds=[...new Set(accts().map(acctKind))];
+  const i=kinds.indexOf(acctKind(a));
+  return KIND_COLORS[(i<0?0:i)%KIND_COLORS.length];
+}
+const accts=()=>sortAccts((state.accounts&&state.accounts.length)?state.accounts:DEFAULT_ACCOUNTS);
 const isIRP=a=>/IRP|DC형|DC\b|퇴직연금/i.test(a);
 const isTaxAdv=a=>/연금|IRP|ISA|DC\b|퇴직/i.test(a);
 const COLORS=['#D9542B','#E89A6F','#8B6F47','#C4A57B','#5A6B5A','#A03D1F','#9B9387','#7A8B99'];
@@ -1031,7 +1106,7 @@ function renderAccts(){
   box.innerHTML=accts().map((a,i)=>{
     const tag = isIRP(a) ? '<span class="tagline">70% 한도</span>'
               : (isTaxAdv(a) ? '<span class="tagline">절세</span>' : '');
-    return `<span class="acct-chip" data-acct="${i}">${esc(a)}${tag}
+    return `<span class="acct-chip" data-acct="${i}" style="--kc:${kindColor(a)}"><span class="kind-dot"></span>${esc(a)}${tag}
       <span class="cnt">${used[a]||0}종목</span></span>`;
   }).join('');
 }
@@ -1042,6 +1117,7 @@ function addAccount(){
   if(!name) return null;
   if(base.includes(name)){ alert('이미 있는 계좌입니다.'); return null; }
   state.accounts=[...base,name];
+  logEvent('add',name);
   save(); renderAccts(); renderCash(); render();
   return name;
 }
@@ -1057,12 +1133,14 @@ function editAccount(i){
     if(list.length<=1){ alert('계좌는 최소 하나는 있어야 합니다.'); return; }
     if(cnt&&!confirm(`이 계좌의 종목 ${cnt}개도 함께 지웁니다. 계속할까요?`)) return;
     state.accounts=list.filter((_,k)=>k!==i);
+    logEvent('del',old);
     state.holdings=state.holdings.filter(h=>(h.acct||list[0])!==old);
     delete state.cash[old];
     if(state.notes) delete state.notes[old];
   }else{                                     // 이름 변경
     if(nm!==old&&list.includes(nm)){ alert('이미 있는 계좌 이름입니다.'); return; }
     state.accounts=list.map((a,k)=>k===i?nm:a);
+    if(nm!==old) logEvent('ren',old,nm);
     state.holdings.forEach(h=>{ if((h.acct||list[0])===old) h.acct=nm; });
     if(state.cash[old]!==undefined){ state.cash[nm]=state.cash[old]; delete state.cash[old]; }
     if(state.notes&&state.notes[old]!==undefined){ state.notes[nm]=state.notes[old]; delete state.notes[old]; }
@@ -1159,14 +1237,32 @@ function render(){
   const byAcct={};
   accts().forEach(a=>byAcct[a]={buy:cash[a],val:cash[a]});
   valid.forEach(r=>{ byAcct[r.acct].buy+=r.buy; byAcct[r.acct].val+=r.val; });
-  document.getElementById('acct-body').innerHTML=accts().map(a=>{
-    const d=byAcct[a]; if(!d.val&&!d.buy) return '';
+  // 계좌를 성격끼리 묶어 보여준다. 연금저축펀드가 넷이면 넷을 붙여 놓고 소계를 낸다.
+  const shown=accts().filter(a=>byAcct[a].val||byAcct[a].buy);
+  const arow=(a,d,color)=>{
     const p=d.val-d.buy, rr=d.buy>0?(p/d.buy*100):0, w=val>0?(d.val/val*100):0;
     const note=(state.notes||{})[a];
-    return `<tr data-arow="${esc(a)}" class="${detailFilter===a?'on':''}"><td class="tl">${esc(a)}${note?`<span class="acct-note">${esc(note)}</span>`:''}</td>
+    return `<tr data-arow="${esc(a)}" class="${detailFilter===a?'on':''}" style="--kc:${color}">
+      <td class="tl kind-cell">${esc(a)}${note?`<span class="acct-note">${esc(note)}</span>`:''}</td>
       <td>${won(d.buy)}</td><td>${won(d.val)}</td>
       <td class="${cls(p)}">${(p>=0?'+':'')+won(p)}</td><td class="${cls(rr)}">${pct(rr)}</td><td>${w.toFixed(1)}%</td></tr>`;
-  }).join('')||'<tr><td colspan="6" style="text-align:center;color:#8B8276;padding:24px">데이터가 없습니다</td></tr>';
+  };
+  let body='';
+  for(let i=0;i<shown.length;){
+    const kind=acctKind(shown[i]), color=kindColor(shown[i]);
+    const grp=[]; while(i<shown.length&&acctKind(shown[i])===kind) grp.push(shown[i++]);
+    grp.forEach(a=>{ body+=arow(a,byAcct[a],color); });
+    if(grp.length>1){                       // 한 종류가 여럿일 때만 소계를 낸다
+      const gb=grp.reduce((t,a)=>t+byAcct[a].buy,0), gv=grp.reduce((t,a)=>t+byAcct[a].val,0);
+      const gp=gv-gb, gr=gb>0?(gp/gb*100):0, gw=val>0?(gv/val*100):0;
+      body+=`<tr class="kind-sum" style="--kc:${color}">
+        <td class="tl kind-cell">${esc(kind)} 합계<span class="acct-note">${grp.length}개 계좌</span></td>
+        <td>${won(gb)}</td><td>${won(gv)}</td>
+        <td class="${cls(gp)}">${(gp>=0?'+':'')+won(gp)}</td><td class="${cls(gr)}">${pct(gr)}</td><td>${gw.toFixed(1)}%</td></tr>`;
+    }
+  }
+  document.getElementById('acct-body').innerHTML=body
+    ||'<tr><td colspan="6" style="text-align:center;color:#8B8276;padding:24px">데이터가 없습니다</td></tr>';
   document.getElementById('acct-foot').innerHTML= val>0
     ? `<td class="tl">합계</td><td>${won(buy)}</td><td>${won(val)}</td>
        <td class="${cls(pl)}">${(pl>=0?'+':'')+won(pl)}</td><td class="${cls(ror)}">${pct(ror)}</td><td>100.0%</td>` : '';
@@ -1182,6 +1278,103 @@ function render(){
   renderAcctHoldings(valid,cash);
   renderDetail(valid,val);
   renderInsight(valid,byAsset,val,byAcct);
+  snapshot(val,buy,cashSum,valid.length);
+  renderTrend();
+}
+
+/* ---------- 자산 추이 ---------- */
+// 하루에 한 건만 남긴다. 같은 날 여러 번 열면 마지막 값으로 덮어쓴다.
+// 과거는 만들어 낼 수 없으므로 이 기능을 켠 날부터 쌓인다.
+const today=()=>{ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10); };
+let chartTrend=null;
+
+function logEvent(kind,a,b){
+  state.events=state.events||[];
+  state.events.push({d:today(),k:kind,a:a,b:b||''});
+  if(state.events.length>500) state.events=state.events.slice(-500);
+}
+
+function snapshot(val,buy,cash,n){
+  if(!(n>0)) return;                       // 종목이 없으면 기록하지 않는다
+  state.hist=state.hist||[];
+  const d=today(), last=state.hist[state.hist.length-1];
+  const row={d,val:Math.round(val),buy:Math.round(buy),cash:Math.round(cash),n};
+  if(last&&last.d===d) state.hist[state.hist.length-1]=row;
+  else state.hist.push(row);
+  if(state.hist.length>1200) state.hist=state.hist.slice(-1200);
+  save();
+}
+
+function renderTrend(){
+  const hist=(state.hist||[]).slice();
+  const box=document.getElementById('chart-trend');
+  const statBox=document.getElementById('trend-stats');
+  const logBox=document.getElementById('trend-log');
+  const wrap=box?box.parentElement:null;
+  if(!box||!wrap) return;
+
+  const evs=(state.events||[]).slice().reverse().slice(0,12);
+  logBox.innerHTML=evs.map(e=>{
+    const k=e.k==='add'?['add','계좌 추가']:e.k==='del'?['del','계좌 삭제']:['ren','이름 변경'];
+    const t=e.k==='ren'?`${esc(e.a)} → ${esc(e.b)}`:esc(e.a);
+    return `<div class="tl-row"><span class="tl-d">${esc(e.d)}</span>
+      <span class="tl-k ${k[0]}">${k[1]}</span><span class="tl-t">${t}</span></div>`;
+  }).join('');
+
+  if(hist.length<2){
+    if(chartTrend){ chartTrend.destroy(); chartTrend=null; }
+    wrap.innerHTML='<div class="trend-empty">기록이 하루치뿐입니다. 내일 다시 열면 흐름이 그려집니다.</div>';
+    statBox.innerHTML=hist.length
+      ? `<div class="trend-s"><div class="trend-s-l">${hist[0].d} 기록</div>
+         <div class="trend-s-v">${won(hist[0].val)}</div></div>` : '';
+    return;
+  }
+  if(!wrap.querySelector('canvas')) wrap.innerHTML='<canvas id="chart-trend"></canvas>';
+  const el=document.getElementById('chart-trend');
+
+  const first=hist[0], last=hist[hist.length-1];
+  const diff=last.val-first.val, rate=first.val>0?diff/first.val*100:0;
+  const peak=hist.reduce((m,r)=>r.val>m.val?r:m,hist[0]);
+  statBox.innerHTML=`
+    <div class="trend-s"><div class="trend-s-l">현재</div><div class="trend-s-v">${won(last.val)}</div></div>
+    <div class="trend-s"><div class="trend-s-l">${first.d} 이후</div>
+      <div class="trend-s-v ${cls(diff)}">${(diff>=0?'+':'')+won(diff)} (${rate>=0?'+':''}${rate.toFixed(1)}%)</div></div>
+    <div class="trend-s"><div class="trend-s-l">최고 ${peak.d}</div><div class="trend-s-v">${won(peak.val)}</div></div>
+    <div class="trend-s"><div class="trend-s-l">기록</div><div class="trend-s-v">${hist.length}일</div></div>`;
+
+  // 계좌를 건드린 날은 점을 크게 찍는다. 자산이 뛴 게 시장 때문인지 입금 때문인지 갈라 보려는 것이다.
+  const evDay=new Set((state.events||[]).map(e=>e.d));
+  const evText={};
+  (state.events||[]).forEach(e=>{
+    const t=e.k==='add'?`계좌 추가: ${e.a}`:e.k==='del'?`계좌 삭제: ${e.a}`:`이름 변경: ${e.a} → ${e.b}`;
+    (evText[e.d]=evText[e.d]||[]).push(t);
+  });
+
+  const g=el.getContext('2d').createLinearGradient(0,0,0,240);
+  g.addColorStop(0,'rgba(217,84,43,.22)'); g.addColorStop(1,'rgba(217,84,43,0)');
+  if(chartTrend) chartTrend.destroy();
+  chartTrend=new Chart(el,{type:'line',
+    data:{labels:hist.map(r=>r.d),datasets:[
+      {label:'평가금액',data:hist.map(r=>r.val),borderColor:'#D9542B',borderWidth:2,
+       backgroundColor:g,fill:true,tension:.15,
+       pointRadius:hist.map(r=>evDay.has(r.d)?5:0),
+       pointBackgroundColor:'#3A2F26',pointBorderColor:'#fff',pointBorderWidth:2,pointHoverRadius:5},
+      {label:'매입금액',data:hist.map(r=>r.buy),borderColor:'#8B8276',borderWidth:1.5,
+       borderDash:[5,4],fill:false,tension:.15,pointRadius:0,pointHoverRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{position:'bottom',labels:{boxWidth:12,font:{size:11,weight:'700'},color:'#8B8276'}},
+        tooltip:{backgroundColor:'#3A2F26',padding:10,displayColors:false,
+          callbacks:{
+            title:c=>c[0].label,
+            label:c=>c.dataset.label+' '+won(c.parsed.y),
+            afterBody:c=>evText[c[0].label]||[]}}},
+      scales:{
+        x:{grid:{display:false},ticks:{maxTicksLimit:7,font:{size:10},color:'#8A7B6C',
+          callback(i){ const d=this.getLabelForValue(i); return d?d.slice(5).replace('-','.'):''; }}},
+        y:{position:'right',grid:{color:'rgba(58,47,38,.07)'},
+          ticks:{maxTicksLimit:5,font:{size:10},color:'#8A7B6C',callback:v=>wonShort(v)+'원'}}}}});
 }
 
 function drawDonut(id,prev,data,setter){
@@ -1266,7 +1459,8 @@ function renderDetail(all,total){
       // 연금저축펀드1·2 처럼 이름만으로는 어느 증권사인지 알 수 없기 때문이다.
       const chip=(key,label,cnt,val)=>{
         const nt=(state.notes||{})[key];
-        return `<span class="fchip ${detailFilter===key?'on':''}" data-f="${esc(key)}">
+        return `<span class="fchip ${detailFilter===key?'on':''}" data-f="${esc(key)}" style="--kc:${key?kindColor(key):'var(--ink-mute)'}">
+        ${key?'<span class="kind-dot"></span>':''}
         <span class="fname">${esc(label)}${nt?`<span class="fnote">${esc(nt)}</span>`:''}</span>
         <span class="fcnt">${cnt}종목</span><span class="fval">${wonShort(val)}원</span></span>`;
       };
@@ -1295,8 +1489,9 @@ function renderDetail(all,total){
   body.innerHTML=rows.slice().sort((a,b)=>b.val-a.val).map(r=>{
     const price=r.isUS?usd(r.price):won(r.price);
     const avg=r.isUS?usd(r.avg):won(r.avg);
-    const chg=r.isUS?(r.change>=0?'+':'')+r.change.toFixed(2)
-                    :(r.change>=0?'+':'')+Math.round(r.change).toLocaleString('ko-KR');
+    // 전일대비도 통화를 붙인다. 미국 종목과 국내 종목이 한 표에 섞여 있어
+    // 숫자만 있으면 달러인지 원인지 알 수 없다.
+    const chg=(r.change>=0?'+':'-')+(r.isUS?usd(Math.abs(r.change)):won(Math.abs(r.change)));
     return `<tr>
       <td class="tl"><span class="chip">${r.acct}</span>${
         (state.notes||{})[r.acct]?`<span class="acct-note">${esc(state.notes[r.acct])}</span>`:''}</td>
@@ -1366,6 +1561,14 @@ document.addEventListener('change',e=>{
   }
 });
 document.addEventListener('click',e=>{
+  // 자산 추이 기록 지우기
+  if(e.target.id==='btn-trend-clear'){
+    const n=(state.hist||[]).length;
+    if(!n){ alert('아직 기록이 없습니다.'); return; }
+    if(!confirm(`쌓인 기록 ${n}일치와 계좌 변경 내역을 모두 지웁니다.\n보유 종목은 그대로 둡니다. 계속할까요?`)) return;
+    state.hist=[]; state.events=[]; save(); render();
+    return;
+  }
   // 계좌 필터 칩
   const fc=e.target.closest('[data-f]');
   if(fc){ detailFilter=fc.dataset.f; render(); return; }
@@ -1405,7 +1608,9 @@ document.getElementById('chk-merge').onchange=e=>{
 document.getElementById('btn-add').onclick=()=>{ state.holdings.push({acct:accts()[0],code:'',qty:'',avg:''}); save(); render(); };
 document.getElementById('btn-clear').onclick=()=>{
   if(!confirm('입력한 내용을 모두 지웁니다. 계속할까요?')) return;
-  state={holdings:[],cash:{},notes:{},accounts:state.accounts,merge:state.merge}; save(); renderCash(); render();
+  state={holdings:[],cash:{},notes:{},accounts:state.accounts,merge:state.merge,
+         hist:state.hist,events:state.events};   // 추이 기록은 남긴다
+  save(); renderCash(); render();
 };
 document.getElementById('btn-sample').onclick=()=>{
   state={holdings:[
@@ -1733,7 +1938,7 @@ function spreadAccounts(){
     if(used.has(a)){
       let cand=nextAcctName(a,used);
       while(used.has(cand)) cand=nextAcctName(cand,used);
-      if(!taken.has(cand)){ list.push(cand); taken.add(cand); }
+      if(!taken.has(cand)){ list.push(cand); taken.add(cand); logEvent('add',cand); }
       a=cand;
     }
     used.add(a); map[si]=a;
