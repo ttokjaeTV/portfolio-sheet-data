@@ -27,14 +27,26 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 .price-stamp{font-size:11px;font-weight:700;color:var(--ink-mute);text-align:right;line-height:1.7}
 .price-stamp b{color:var(--accent);font-weight:800}
 
-.hero{text-align:center;margin-bottom:56px}
-.tag{display:inline-flex;align-items:center;gap:6px;background:var(--white);border:1.5px solid var(--accent);
-  color:var(--accent);padding:6px 14px;border-radius:999px;font-size:12px;font-weight:700;
-  letter-spacing:.5px;margin-bottom:28px}
-.tag .dot{width:6px;height:6px;background:var(--accent);border-radius:50%}
-.hero-title{font-size:64px;font-weight:900;letter-spacing:-2.5px;line-height:1.05;margin-bottom:24px}
-.underline-mark{background:linear-gradient(transparent 60%,var(--accent-soft) 60%);padding:0 4px}
-.hero-desc{font-size:17px;color:var(--ink-soft);line-height:1.7;font-weight:500;max-width:660px;margin:0 auto}
+/* 지수 상황판 */
+.board{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);
+  border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:28px}
+.board-skel{grid-column:1/-1;background:var(--white);padding:26px;text-align:center;
+  color:var(--ink-mute);font-size:13px;font-weight:600}
+.bi{background:var(--white);padding:14px 12px;text-align:center}
+.bi-name{font-size:11px;font-weight:800;color:var(--ink-mute);letter-spacing:.3px;margin-bottom:6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bi-val{font-size:19px;font-weight:900;letter-spacing:-.6px;line-height:1.15}
+.bi-chg{font-size:11px;font-weight:700;margin-top:4px;white-space:nowrap}
+.bi.fx{background:var(--bg-alt)}
+.board-note{font-size:11px;color:var(--ink-mute);font-weight:600;text-align:right;
+  margin:-20px 2px 26px;line-height:1.6}
+
+/* 저장 바 */
+.savebar{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:16px 22px;
+  margin-bottom:28px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px}
+.savebar-text{font-size:12.5px;color:var(--ink-mute);font-weight:600;line-height:1.7;max-width:640px}
+.savebar-btns{display:flex;gap:10px;flex-wrap:wrap}
+.savebar-btns .btn{padding:10px 16px;font-size:13px}
 
 .top-cta{background:var(--bg-alt);border:1px solid var(--border);border-radius:16px;padding:18px 24px;
   margin-bottom:32px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px}
@@ -177,14 +189,25 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .cta-link.secondary{background:rgba(255,255,255,.08);color:var(--white);border:1px solid rgba(255,255,255,.15)}
 footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12px;font-weight:600;line-height:1.9}
 
-@media (max-width:900px){.grid-4{grid-template-columns:1fr 1fr}.cash-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:1000px){
+  .board{grid-template-columns:repeat(4,1fr) !important}
+  .grid-4{grid-template-columns:1fr 1fr}
+  .cash-grid{grid-template-columns:1fr 1fr}
+}
 @media (max-width:768px){
   body{padding:16px 12px}
-  header{margin-bottom:28px;flex-wrap:wrap}
+  header{margin-bottom:20px;flex-wrap:wrap}
   .card{padding:18px 16px;margin-bottom:20px;border-radius:16px}
-  .hero{margin-bottom:32px}
-  .hero-title{font-size:32px;letter-spacing:-1.2px;line-height:1.15}
-  .hero-desc{font-size:14px}.hero-desc br{display:none}
+  .board{grid-template-columns:repeat(3,1fr) !important;border-radius:14px;margin-bottom:22px}
+  .bi{padding:11px 6px}
+  .bi-name{font-size:10px;margin-bottom:4px}
+  .bi-val{font-size:15px;letter-spacing:-.4px}
+  .bi-chg{font-size:10px}
+  .board-note{margin:-16px 2px 20px;text-align:left;font-size:10px}
+  .savebar{padding:14px 16px;margin-bottom:20px;border-radius:14px}
+  .savebar-text{font-size:12px}
+  .savebar-btns{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .savebar-btns .btn{justify-content:center}
   .top-cta{flex-direction:column;align-items:stretch;padding:16px}
   .top-cta-links{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .top-cta-link{justify-content:center}
@@ -218,13 +241,21 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="price-stamp" id="price-stamp">시세 불러오는 중…</div>
 </header>
 
-<div class="hero">
-  <span class="tag"><span class="dot"></span>포트폴리오 관리 도구</span>
-  <h1 class="hero-title">흩어진 계좌,<br><span class="underline-mark">한 화면</span>에서 봅니다</h1>
-  <p class="hero-desc">
-    연금저축·IRP·ISA·일반계좌에 나눠 담은 국내 ETF와 미국 직투를 한 번에 모아<br>
-    평가손익과 자산 비중, IRP 안전자산 한도까지 자동으로 계산합니다.
-  </p>
+<div class="board" id="board">
+  <div class="board-skel">지수를 불러오는 중…</div>
+</div>
+<div class="board-note" id="board-note"></div>
+
+<div class="savebar">
+  <div class="savebar-text">
+    입력 내용은 이 브라우저에 자동 저장됩니다. 브라우저 데이터를 지우면 사라지니,
+    파일로 내려받아 두면 다른 기기에서도 그대로 불러올 수 있습니다.
+  </div>
+  <div class="savebar-btns">
+    <button class="btn" id="btn-export">💾 파일로 저장</button>
+    <button class="btn ghost" id="btn-import">📂 파일 불러오기</button>
+    <input type="file" id="file-json" accept="application/json,.json" hidden>
+  </div>
 </div>
 
 <div class="top-cta">
@@ -369,19 +400,6 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   </div>
 </div>
 
-<div class="card">
-  <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 07 / 내 컴퓨터에 저장</span></div>
-  <div class="card-desc">
-    입력한 내용은 이 브라우저에 자동 저장되지만, 브라우저 데이터를 지우면 사라집니다.<br>
-    파일로 내려받아 두면 다른 기기나 브라우저에서도 그대로 불러올 수 있습니다.
-  </div>
-  <div class="btn-row" style="margin-top:0">
-    <button class="btn" id="btn-export">💾 파일로 저장</button>
-    <button class="btn ghost" id="btn-import">📂 파일 불러오기</button>
-    <input type="file" id="file-json" accept="application/json,.json" hidden>
-  </div>
-</div>
-
 <div class="insight-box">
   <div class="insight-label">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D9542B" stroke-width="2"><path d="M12 3l1.9 5.8L20 10l-4.5 3.3L17 20l-5-3.5L7 20l1.5-6.7L4 10l6.1-1.2L12 3z"/></svg>
@@ -471,12 +489,14 @@ function lookup(key){
 async function loadAll(){
   const stamp=document.getElementById('price-stamp');
   try{
-    const [krT,stkT,usT,fxT]=await Promise.all([
+    const [krT,stkT,usT,fxT,idxT]=await Promise.all([
       fetch(BASE+'etf_prices.csv',{cache:'no-store'}).then(r=>r.text()),
       fetch(BASE+'kr_stocks.csv',{cache:'no-store'}).then(r=>r.text()).catch(()=>''),
       fetch(BASE+'us_prices.csv',{cache:'no-store'}).then(r=>r.text()),
-      fetch(BASE+'fx.csv',{cache:'no-store'}).then(r=>r.text()).catch(()=>'')
+      fetch(BASE+'fx.csv',{cache:'no-store'}).then(r=>r.text()).catch(()=>''),
+      fetch(BASE+'indices.csv',{cache:'no-store'}).then(r=>r.text()).catch(()=>'')
     ]);
+    if(idxT) renderBoard(parseCSV(idxT));
 
     parseCSV(krT).slice(1).forEach(r=>{
       if(!r[0]) return;
@@ -509,6 +529,31 @@ async function loadAll(){
     stamp.innerHTML='<span style="color:#C0392B">시세를 불러오지 못했습니다</span><br>네트워크를 확인해 주세요';
   }
   render();
+}
+
+/* ---------- 지수 상황판 ---------- */
+function renderBoard(rows){
+  const items=rows.slice(1).filter(r=>r[1]&&r[2]);
+  if(!items.length) return;
+  const board=document.getElementById('board');
+  board.innerHTML=items.map(r=>{
+    const [kind,name,val,chg,rate]=r;
+    const v=num(val), c=num(chg), rt=num(rate);
+    const arrow = rt>0?'▲':(rt<0?'▼':'—');
+    // 방향은 화살표가 알려주므로 숫자에는 부호를 붙이지 않는다
+    const chgTxt = chg!==''
+      ? `${arrow} ${Math.abs(c).toLocaleString('ko-KR',{maximumFractionDigits:2})} (${Math.abs(rt).toFixed(2)}%)`
+      : `${arrow} ${Math.abs(rt).toFixed(2)}%`;
+    return `<div class="bi ${kind==='환율'?'fx':''}">
+      <div class="bi-name">${esc(name)}</div>
+      <div class="bi-val">${v.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      <div class="bi-chg ${cls(rt)}">${chgTxt}</div>
+    </div>`;
+  }).join('');
+  board.style.gridTemplateColumns=`repeat(${items.length},1fr)`;
+  const stamp=items[0][5]||'';
+  document.getElementById('board-note').textContent=
+    `기준 ${stamp} · 해외지수는 전 거래일 종가, 환율은 하나은행 고시 매매기준율`;
 }
 
 /* ---------- 저장 ---------- */
