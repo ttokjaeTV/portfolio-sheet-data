@@ -38,6 +38,40 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 .bi-val{font-size:19px;font-weight:900;letter-spacing:-.6px;line-height:1.15}
 .bi-chg{font-size:11px;font-weight:700;margin-top:4px;white-space:nowrap}
 .bi.fx{background:var(--bg-alt)}
+.bi{cursor:pointer;transition:background .12s;position:relative}
+.bi:hover{background:var(--bg-alt)}
+.bi.fx:hover{background:var(--border)}
+.bi-more{font-size:10px;font-weight:700;color:var(--ink-mute);opacity:0;transition:opacity .12s;margin-top:3px}
+.bi:hover .bi-more{opacity:.85}
+
+/* 지수 차트 */
+.idx-back{position:fixed;inset:0;background:rgba(58,47,38,.45);z-index:80;
+  display:flex;align-items:center;justify-content:center;padding:20px}
+.idx-box{background:var(--white);border-radius:18px;width:100%;max-width:680px;
+  box-shadow:0 18px 50px rgba(58,47,38,.25);overflow:hidden}
+.idx-head{padding:18px 22px 14px;border-bottom:1px solid var(--border);
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.idx-t{font-size:13px;font-weight:800;color:var(--ink-mute);letter-spacing:.3px}
+.idx-v{font-size:26px;font-weight:900;letter-spacing:-.8px;margin-top:2px}
+.idx-c{font-size:12px;font-weight:700;margin-top:3px}
+.idx-x{background:none;border:1px solid var(--border);border-radius:9px;width:32px;height:32px;
+  font-size:16px;font-weight:800;color:var(--ink-mute);cursor:pointer;flex:none;line-height:1}
+.idx-x:hover{background:var(--bg-alt)}
+.idx-ranges{display:flex;gap:6px;padding:14px 22px 0}
+.idx-r{flex:1;padding:7px 0;border:1px solid var(--border);background:var(--white);
+  border-radius:9px;font-size:12px;font-weight:800;color:var(--ink-mute);cursor:pointer;font-family:inherit}
+.idx-r.on{background:var(--dark-warm);border-color:var(--dark-warm);color:var(--white)}
+.idx-canvas{padding:12px 16px 4px;height:260px}
+.idx-foot{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);
+  border-top:1px solid var(--border)}
+.idx-f{background:var(--white);padding:12px 8px;text-align:center}
+.idx-f-l{font-size:10px;font-weight:800;color:var(--ink-mute);margin-bottom:3px}
+.idx-f-v{font-size:14px;font-weight:900;letter-spacing:-.3px}
+@media (max-width:768px){
+  .idx-back{padding:10px}
+  .idx-v{font-size:22px}
+  .idx-canvas{height:200px;padding:10px 8px 2px}
+}
 .board-note{font-size:11px;color:var(--ink-mute);font-weight:600;text-align:right;
   margin:-20px 2px 26px;line-height:1.6}
 
@@ -758,16 +792,123 @@ function renderBoard(rows){
     const chgTxt = chg!==''
       ? `${arrow} ${Math.abs(c).toLocaleString('ko-KR',{maximumFractionDigits:2})} (${Math.abs(rt).toFixed(2)}%)`
       : `${arrow} ${Math.abs(rt).toFixed(2)}%`;
-    return `<div class="bi ${kind==='환율'?'fx':''}">
+    return `<div class="bi ${kind==='환율'?'fx':''}" role="button" tabindex="0"
+      onclick="openIdx('${esc(name)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openIdx('${esc(name)}')}">
       <div class="bi-name">${esc(name)}</div>
       <div class="bi-val">${v.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
       <div class="bi-chg ${cls(rt)}">${chgTxt}</div>
+      <div class="bi-more">흐름 보기</div>
     </div>`;
   }).join('');
   board.style.gridTemplateColumns=`repeat(${items.length},1fr)`;
   const stamp=items[0][5]||'';
   document.getElementById('board-note').textContent=
-    `기준 ${stamp} · 해외지수는 전 거래일 종가, 환율은 하나은행 고시 매매기준율`;
+    `기준 ${stamp} · 타일을 누르면 1년 흐름 · 해외지수는 전 거래일 종가, 환율은 하나은행 고시 매매기준율`;
+  BOARD={}; items.forEach(r=>{ BOARD[r[1]]={val:num(r[2]),rate:num(r[4])}; });
+}
+
+/* ---------- 지수 흐름 차트 ---------- */
+// 이력은 처음 눌렀을 때 한 번만 받는다. 상황판만 볼 사람에게 56KB 를 미리 물리지 않는다.
+let BOARD={}, HIST=null, HIST_P=null, IDX_CHART=null, IDX_NAME='', IDX_DAYS=250;
+const RANGES=[['1개월',22],['3개월',65],['6개월',130],['1년',400]];
+
+function loadHist(){
+  if(HIST_P) return HIST_P;
+  HIST_P=fetch(BASE+'indices_history.csv',{cache:'no-store'}).then(r=>r.text()).then(t=>{
+    HIST={};
+    parseCSV(t).slice(1).forEach(r=>{
+      if(!r[0]||!r[1]) return;
+      (HIST[r[0]]=HIST[r[0]]||[]).push({d:r[1],v:num(r[2])});
+    });
+    for(const k in HIST) HIST[k].sort((a,b)=>a.d<b.d?-1:1);
+    return HIST;
+  }).catch(()=>{ HIST={}; return HIST; });
+  return HIST_P;
+}
+
+async function openIdx(name){
+  IDX_NAME=name; IDX_DAYS=250;
+  let box=document.getElementById('idx-back');
+  if(!box){
+    box=document.createElement('div');
+    box.id='idx-back'; box.className='idx-back';
+    box.onclick=e=>{ if(e.target===box) closeIdx(); };
+    document.body.appendChild(box);
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeIdx(); });
+  }
+  box.style.display='flex';
+  box.innerHTML=`<div class="idx-box"><div class="idx-head"><div><div class="idx-t">${esc(name)}</div>
+    <div class="idx-v">불러오는 중…</div></div>
+    <button class="idx-x" onclick="closeIdx()" aria-label="닫기">×</button></div></div>`;
+  await loadHist();
+  drawIdx();
+}
+function closeIdx(){
+  const b=document.getElementById('idx-back');
+  if(b) b.style.display='none';
+  if(IDX_CHART){ IDX_CHART.destroy(); IDX_CHART=null; }
+}
+function setIdxRange(d){ IDX_DAYS=d; drawIdx(); }
+
+function drawIdx(){
+  const box=document.getElementById('idx-back');
+  const all=(HIST&&HIST[IDX_NAME])||[];
+  const cur=BOARD[IDX_NAME]||{};
+  if(!all.length){
+    box.innerHTML=`<div class="idx-box"><div class="idx-head"><div><div class="idx-t">${esc(IDX_NAME)}</div>
+      <div class="idx-v">이력이 없습니다</div>
+      <div class="idx-c" style="color:var(--ink-mute)">잠시 뒤 다시 시도해 주세요</div></div>
+      <button class="idx-x" onclick="closeIdx()" aria-label="닫기">×</button></div></div>`;
+    return;
+  }
+  const rows=all.slice(-IDX_DAYS);
+  const first=rows[0].v, last=rows[rows.length-1].v;
+  const diff=last-first, pct=first?diff/first*100:0;
+  const hi=Math.max(...rows.map(r=>r.v)), lo=Math.min(...rows.map(r=>r.v));
+  const fmt=v=>v.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const arrow=pct>0?'▲':(pct<0?'▼':'—');
+  const label=(RANGES.find(r=>r[1]===IDX_DAYS)||['기간'])[0];
+
+  box.innerHTML=`<div class="idx-box">
+    <div class="idx-head">
+      <div>
+        <div class="idx-t">${esc(IDX_NAME)}</div>
+        <div class="idx-v">${fmt(cur.val||last)}</div>
+        <div class="idx-c ${cls(pct)}">${label} ${arrow} ${fmt(Math.abs(diff))} (${Math.abs(pct).toFixed(2)}%)</div>
+      </div>
+      <button class="idx-x" onclick="closeIdx()" aria-label="닫기">×</button>
+    </div>
+    <div class="idx-ranges">${RANGES.map(([t,d])=>
+      `<button class="idx-r ${d===IDX_DAYS?'on':''}" onclick="setIdxRange(${d})">${t}</button>`).join('')}</div>
+    <div class="idx-canvas"><canvas id="idx-canvas"></canvas></div>
+    <div class="idx-foot">
+      <div class="idx-f"><div class="idx-f-l">기간 고점</div><div class="idx-f-v">${fmt(hi)}</div></div>
+      <div class="idx-f"><div class="idx-f-l">기간 저점</div><div class="idx-f-v">${fmt(lo)}</div></div>
+      <div class="idx-f"><div class="idx-f-l">거래일</div><div class="idx-f-v">${rows.length}일</div></div>
+    </div></div>`;
+
+  // 오를 때 붉게, 내릴 때 푸르게. 상황판 색과 같은 규칙이다.
+  const up=pct>=0, line=up?'#C0392B':'#2C6FA8';
+  const el=document.getElementById('idx-canvas');
+  const g=el.getContext('2d').createLinearGradient(0,0,0,220);
+  g.addColorStop(0, up?'rgba(192,57,43,.20)':'rgba(44,111,168,.20)');
+  g.addColorStop(1, up?'rgba(192,57,43,0)':'rgba(44,111,168,0)');
+  if(IDX_CHART) IDX_CHART.destroy();
+  IDX_CHART=new Chart(el,{type:'line',
+    data:{labels:rows.map(r=>r.d),datasets:[{data:rows.map(r=>r.v),
+      borderColor:line,borderWidth:2,backgroundColor:g,fill:true,
+      pointRadius:0,pointHoverRadius:4,pointHoverBackgroundColor:line,tension:.15}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#3A2F26',padding:10,displayColors:false,
+        callbacks:{title:c=>c[0].label,label:c=>fmt(c.parsed.y)}}},
+      scales:{
+        x:{grid:{display:false},ticks:{maxTicksLimit:6,font:{size:10},color:'#8A7B6C',
+          callback(i){ const d=this.getLabelForValue(i); return d?d.slice(2).replace(/-/g,'.'):''; }}},
+        y:{position:'right',grid:{color:'rgba(58,47,38,.07)'},
+          ticks:{maxTicksLimit:5,font:{size:10},color:'#8A7B6C',
+            callback:v=>v.toLocaleString('ko-KR',{maximumFractionDigits:0})}}}}});
 }
 
 /* ---------- 저장 ---------- */
