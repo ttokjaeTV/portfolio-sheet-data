@@ -358,6 +358,27 @@ input::placeholder{color:#BFB6A6;font-weight:500}
   font-weight:700;cursor:pointer;transition:all .15s ease}
 .acct-chip:hover{border-color:var(--accent);color:var(--accent)}
 .acct-chip .cnt{font-size:11px;font-weight:700;color:var(--ink-mute)}
+/* 계좌 지우기 */
+/* 보유 목록 계좌별 접기 */
+.hgrp{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;
+  background:var(--white)}
+.hgrp>summary{list-style:none;cursor:pointer;padding:11px 14px;display:flex;align-items:center;gap:9px;
+  background:var(--bg-alt);font-weight:800;font-size:13px;user-select:none}
+.hgrp>summary::-webkit-details-marker{display:none}
+.hgrp>summary::after{content:'▾';margin-left:auto;font-size:12px;color:var(--ink-mute);
+  transition:transform .15s}
+.hgrp[open]>summary::after{transform:rotate(180deg)}
+.hgrp>summary:hover{background:var(--border)}
+.hg-nm{color:var(--ink)}
+.hg-cnt{font-size:11px;font-weight:700;color:var(--ink-mute)}
+.hg-val{font-size:12px;font-weight:800;color:var(--ink-mute)}
+.hg-body{padding:4px 0}
+.acct-x{background:none;border:none;padding:0 2px;margin-left:2px;cursor:pointer;
+  font-size:15px;line-height:1;font-weight:800;color:var(--ink-mute);opacity:.45;
+  border-radius:5px;font-family:inherit;flex:none}
+.acct-x:hover{opacity:1;color:#C0392B;background:#F5DCD7}
+.acct-chip:hover .acct-x{opacity:.8}
+.acct-x.card{margin-left:auto;font-size:17px;opacity:.4}
 .acct-chip .tagline{font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;
   background:var(--accent-soft);color:var(--accent)}
 .acct-hint{font-size:11.5px;color:var(--ink-mute);font-weight:600;line-height:1.7;margin-top:12px}
@@ -545,6 +566,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="btn-row">
     <button class="btn" id="btn-add">+ 종목 추가</button>
     <button class="btn ghost" id="btn-sample">예시 채우기</button>
+    <button class="btn ghost" id="btn-fold">모두 접기</button>
     <button class="btn ghost" id="btn-clear">전체 지우기</button>
   </div>
 
@@ -555,7 +577,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     </div>
     <div class="acct-chips" id="acct-chips"></div>
     <div class="acct-hint">
-      계좌를 클릭하면 이름을 바꾸거나 지울 수 있습니다.
+      계좌를 클릭하면 이름을 바꿀 수 있고, × 를 누르면 지웁니다.
       이름에 <b>IRP</b>가 들어가면 위험자산 70% 한도를, <b>연금·ISA</b>가 들어가면 절세계좌로 계산합니다.
     </div>
   </div>
@@ -577,7 +599,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <div class="drop-s">
       글자가 클수록 정확합니다. 화면을 확대해 캡처하면 인식률이 올라갑니다.<br>
       <span class="need">보유수량</span>·<span class="need">매입단가</span> 열이 보이도록 좌우로 밀어 캡처하면 훨씬 정확합니다.<br><b>보유 목록만 잘라서</b> 캡처하세요. 관심종목 같은 옆 화면이 같이 들어가면 섞여 읽힙니다.<br>
-      최초 1회 인식 데이터 약 8MB를 내려받습니다. <span style="opacity:.75">(v7)</span>
+      최초 1회 인식 데이터 약 8MB를 내려받습니다. <span style="opacity:.75">(v8)</span>
     </div>
     <input type="file" id="file-img" accept="image/*" multiple hidden>
   </div>
@@ -1085,8 +1107,13 @@ function renderRows(){
   document.getElementById('holdings-empty').style.display=state.holdings.length?'none':'block';
   const {rows}=compute();
 
-  box.innerHTML=state.holdings.map((h,i)=>{
-    const r=rows[i];
+  // 종목이 늘면 목록이 길어져 스크롤이 고통스럽다. 계좌별로 묶어 접을 수 있게 한다.
+  const groups={};
+  state.holdings.forEach((h,i)=>{ const a=h.acct||accts()[0]; (groups[a]=groups[a]||[]).push(i); });
+  const order=accts().filter(a=>groups[a]);
+  const fold=state.fold||{};
+  const rowHtml=i=>{
+    const h=state.holdings[i], r=rows[i];
     let calc;
     if(!h.code) calc='<span class="sub">종목을 입력하세요</span>';
     else if(!r.found) calc='<span class="sub" style="color:#C0392B">찾을 수 없는 종목입니다</span>';
@@ -1109,6 +1136,18 @@ function renderRows(){
       <div class="row-calc">${calc}</div>
       <div><button class="row-del" data-del="${i}" title="삭제">×</button></div>
     </div>`;
+  };
+  box.innerHTML=order.map(a=>{
+    const list=groups[a];
+    const val=list.reduce((t,i)=>t+((rows[i].found&&(!rows[i].isUS||FX))?rows[i].val:0),0);
+    // 계좌가 하나뿐이면 접을 이유가 없다
+    const open=order.length<2||!fold[a];
+    return `<details class="hgrp" data-fold="${esc(a)}" ${open?'open':''} style="--kc:${kindColor(a)}">
+      <summary><span class="kind-dot"></span><span class="hg-nm">${esc(a)}</span>
+        <span class="hg-cnt">${list.length}종목</span>
+        <span class="hg-val">${wonShort(val)}원</span></summary>
+      <div class="hg-body">${list.map(rowHtml).join('')}</div>
+    </details>`;
   }).join('');
 }
 /* ---------- 계좌 관리 ---------- */
@@ -1145,7 +1184,8 @@ function renderAccts(){
     const tag = isIRP(a) ? '<span class="tagline">70% 한도</span>'
               : (isTaxAdv(a) ? '<span class="tagline">절세</span>' : '');
     return `<span class="acct-chip" data-acct="${i}" style="--kc:${kindColor(a)}"><span class="kind-dot"></span>${esc(a)}${tag}
-      <span class="cnt">${used[a]||0}종목</span></span>`;
+      <span class="cnt">${used[a]||0}종목</span>
+      <button class="acct-x" data-adel="${i}" title="${esc(a)} 계좌 지우기" aria-label="${esc(a)} 계좌 지우기">×</button></span>`;
   }).join('');
 }
 function addAccount(){
@@ -1159,6 +1199,27 @@ function addAccount(){
   save(); renderAccts(); renderCash(); render();
   return name;
 }
+/* 계좌 삭제. 칩·카드의 × 와 이름 비우기가 모두 이리로 온다. */
+function deleteAccount(i){
+  const list=accts(), old=list[i];
+  if(old===undefined) return;
+  if(list.length<=1){ alert('계좌는 최소 하나는 있어야 합니다.'); return; }
+  const cnt=state.holdings.filter(h=>(h.acct||list[0])===old).length;
+  const cash=+(state.cash[old]||0);
+  const msg=`"${old}" 계좌를 지웁니다.\n\n`
+    +(cnt?`이 계좌의 종목 ${cnt}개도 함께 지워집니다.\n`:'담긴 종목은 없습니다.\n')
+    +(cash?`예수금 ${won(cash)}도 함께 지워집니다.\n`:'')
+    +'\n되돌릴 수 없습니다. 계속할까요?';
+  if(!confirm(msg)) return;
+  state.accounts=list.filter((_,k)=>k!==i);
+  logEvent('del',old);
+  state.holdings=state.holdings.filter(h=>(h.acct||list[0])!==old);
+  delete state.cash[old];
+  if(state.notes) delete state.notes[old];
+  if(detailFilter===old) detailFilter='';
+  save(); renderAccts(); renderCash(); render();
+}
+
 function editAccount(i){
   const list=accts(), old=list[i];
   const cnt=state.holdings.filter(h=>(h.acct||list[0])===old).length;
@@ -1167,15 +1228,8 @@ function editAccount(i){
   if(name===null) return;
   const nm=name.trim();
 
-  if(!nm){                                   // 삭제
-    if(list.length<=1){ alert('계좌는 최소 하나는 있어야 합니다.'); return; }
-    if(cnt&&!confirm(`이 계좌의 종목 ${cnt}개도 함께 지웁니다. 계속할까요?`)) return;
-    state.accounts=list.filter((_,k)=>k!==i);
-    logEvent('del',old);
-    state.holdings=state.holdings.filter(h=>(h.acct||list[0])!==old);
-    delete state.cash[old];
-    if(state.notes) delete state.notes[old];
-  }else{                                     // 이름 변경
+  if(!nm){ deleteAccount(i); return; }       // 이름을 비우면 삭제
+  {                                          // 이름 변경
     if(nm!==old&&list.includes(nm)){ alert('이미 있는 계좌 이름입니다.'); return; }
     state.accounts=list.map((a,k)=>k===i?nm:a);
     if(nm!==old) logEvent('ren',old,nm);
@@ -1236,7 +1290,9 @@ function renderCash(){
     const tag = isIRP(a) ? '<span class="tagline">70% 한도</span>'
               : (isTaxAdv(a) ? '<span class="tagline">절세</span>' : '');
     return `<div class="acct-card" style="--kc:${kindColor(a)}">
-      <div class="acct-card-nm">${esc(a)}${tag}</div>
+      <div class="acct-card-nm">${esc(a)}${tag}
+        <button class="acct-x card" data-adel="${accts().indexOf(a)}"
+          title="${esc(a)} 계좌 지우기" aria-label="${esc(a)} 계좌 지우기">×</button></div>
       <label class="label">비고 (증권사 · 계좌번호)</label>
       <input type="text" data-note="${esc(a)}" value="${esc((state.notes||{})[a]??'')}"
         placeholder="예: 미래에셋 1234, 키움 연금" maxlength="40">
@@ -1684,6 +1740,19 @@ document.addEventListener('click',e=>{
     state.hist=[]; state.events=[]; save(); render();
     return;
   }
+  // 보유 목록 전체 펼치기 / 접기
+  if(e.target.id==='btn-fold'){
+    const box=document.getElementById('holdings');
+    const all=[...box.querySelectorAll('details.hgrp')];
+    const anyOpen=all.some(d=>d.open);
+    state.fold=state.fold||{};
+    all.forEach(d=>{ d.open=!anyOpen; state.fold[d.dataset.fold]=anyOpen; });
+    e.target.textContent=anyOpen?'모두 펼치기':'모두 접기';
+    save(); return;
+  }
+  // 계좌 지우기 (× 는 칩·카드 클릭보다 먼저 본다)
+  const adel=e.target.closest('[data-adel]');
+  if(adel){ e.stopPropagation(); deleteAccount(+adel.dataset.adel); return; }
   // 계좌 필터 칩
   const fc=e.target.closest('[data-f]');
   if(fc){ detailFilter=fc.dataset.f; render(); return; }
@@ -1727,6 +1796,15 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape') closeMenus();
 });
+// 접었는지 펼쳤는지 기억한다. 다시 열었을 때 그대로 보이는 편이 낫다.
+document.addEventListener('toggle',e=>{
+  const d=e.target;
+  if(d.classList&&d.classList.contains('hgrp')){
+    state.fold=state.fold||{};
+    state.fold[d.dataset.fold]=!d.open;
+    save();
+  }
+},true);
 
 /* 검수 화면에서 종목을 직접 바꾼다.
    OCR 이 "현대차2우B" 를 "현대차2우6" 으로 읽으면 사람이 고치는 수밖에 없다. */
@@ -1750,7 +1828,10 @@ document.addEventListener('focusout',e=>{
 document.getElementById('chk-merge').onchange=e=>{
   state.merge=e.target.checked; save(); render();
 };
-document.getElementById('btn-add').onclick=()=>{ state.holdings.push({acct:accts()[0],code:'',qty:'',avg:''}); save(); render(); };
+document.getElementById('btn-add').onclick=()=>{
+  if(state.fold) delete state.fold[accts()[0]];    // 새 종목이 접힌 채로 숨지 않게
+  state.holdings.push({acct:accts()[0],code:'',qty:'',avg:''}); save(); render();
+};
 document.getElementById('btn-clear').onclick=()=>{
   if(!confirm('입력한 내용을 모두 지웁니다. 계속할까요?')) return;
   state={holdings:[],cash:{},notes:{},accounts:state.accounts,merge:state.merge,
