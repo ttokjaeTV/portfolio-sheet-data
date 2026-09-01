@@ -376,6 +376,12 @@ input.guess:focus{border-color:var(--red);box-shadow:0 0 0 3px #F6D9D4}
 .guess-tag{font-size:10px;font-weight:800;color:var(--red);margin-top:4px;text-align:right}
 .chip.ok-chip{background:#DCE8DC;color:var(--green);margin-left:4px}
 .calc-tag{font-size:10px;font-weight:800;color:var(--green);margin-top:3px;text-align:right}
+/* 검수 화면의 종목 바꾸기 칸 */
+.rv-pick{position:relative}
+.rv-pick input{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;
+  background:var(--white);font-size:13px;font-weight:700;font-family:inherit;color:var(--ink)}
+.rv-pick input:focus{border-color:var(--accent);outline:none}
+.rv-pick input.name-guess{color:#C0392B;border-color:#E6B8AE}
 .name-guess{color:var(--red);font-weight:800;border-bottom:2px dotted var(--red)}
 .shot-group td{background:var(--bg-alt) !important;padding:10px 12px !important;
   border-bottom:1.5px solid var(--border)}
@@ -571,7 +577,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <div class="drop-s">
       글자가 클수록 정확합니다. 화면을 확대해 캡처하면 인식률이 올라갑니다.<br>
       <span class="need">보유수량</span>·<span class="need">매입단가</span> 열이 보이도록 좌우로 밀어 캡처하면 훨씬 정확합니다.<br><b>보유 목록만 잘라서</b> 캡처하세요. 관심종목 같은 옆 화면이 같이 들어가면 섞여 읽힙니다.<br>
-      최초 1회 인식 데이터 약 8MB를 내려받습니다. <span style="opacity:.75">(v6)</span>
+      최초 1회 인식 데이터 약 8MB를 내려받습니다. <span style="opacity:.75">(v7)</span>
     </div>
     <input type="file" id="file-img" accept="image/*" multiple hidden>
   </div>
@@ -1699,6 +1705,17 @@ document.addEventListener('click',e=>{
   const pick=e.target.closest('[data-pick]');
   if(pick){
     const menu=pick.closest('.search-menu');
+    if(menu.dataset.rvmenu!==undefined){
+      const r=ocrRows[+menu.dataset.rvmenu];
+      const code=pick.dataset.pick;
+      const m=KR[code.toUpperCase()]||US[code.toUpperCase()];
+      if(r&&m){
+        r.code=m.code; r.name=m.name; r.isUS=m.cur==='USD'; r.nameSure=true;
+        // 종목이 바뀌면 앞서 한 검산은 더 이상 그 종목 것이 아니다
+        r.sure=false; r.derived=false;
+      }
+      closeMenus(); renderReview(); return;
+    }
     const input=menu.parentElement.querySelector('input[data-k="code"]');
     state.holdings[+input.dataset.i].code=pick.dataset.pick;
     save(); closeMenus(); render(); return;
@@ -1709,6 +1726,25 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape') closeMenus();
+});
+
+/* 검수 화면에서 종목을 직접 바꾼다.
+   OCR 이 "현대차2우B" 를 "현대차2우6" 으로 읽으면 사람이 고치는 수밖에 없다. */
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.dataset&&t.dataset.f==='code'&&t.dataset.ocr!==undefined) openMenu(t);
+});
+document.addEventListener('focusin',e=>{
+  const t=e.target;
+  if(t.dataset&&t.dataset.f==='code'&&t.dataset.ocr!==undefined) t.select();
+});
+// 고르지 않고 나가면 원래 이름으로 되돌린다. 친 글자가 남아 있으면 바뀐 줄 안다.
+document.addEventListener('focusout',e=>{
+  const t=e.target;
+  if(t.dataset&&t.dataset.f==='code'&&t.dataset.ocr!==undefined){
+    const r=ocrRows[+t.dataset.ocr];
+    setTimeout(()=>{ if(r&&t.value!==r.name) t.value=r.name; },200);
+  }
 });
 
 document.getElementById('chk-merge').onchange=e=>{
@@ -2680,7 +2716,12 @@ function renderReview(){
   }else{
     const rowHtml=(r,i)=>`<tr class="rv" data-row="${i}">
       <td class="tl rv-raw" data-l="인식된 줄">${esc(r.line)}</td>
-      <td class="tl rv-nm" data-l="매칭된 종목"><span class="${r.nameSure?'':'name-guess'}">${esc(r.name)}</span>
+      <td class="tl rv-nm" data-l="매칭된 종목">
+        <div class="search-wrap rv-pick">
+          <input data-ocr="${i}" data-f="code" value="${esc(r.name)}" autocomplete="off"
+            class="${r.nameSure?'':'name-guess'}" placeholder="종목명 또는 티커로 바꾸기">
+          <div class="search-menu" data-rvmenu="${i}"></div>
+        </div>
         ${r.nameSure?'':(r.sure||r.derived
           ?'<div class="calc-tag" style="text-align:left">이름은 흐릿하지만 금액이 맞습니다</div>'
           :'<div class="guess-tag" style="text-align:left">종목명 추정 · 확인 필요</div>')}
@@ -3130,7 +3171,9 @@ document.addEventListener('input',e=>{
   const t=e.target;
   if(t.dataset.ocr!==undefined&&t.dataset.f){
     const r=ocrRows[+t.dataset.ocr];
-    if(t.dataset.f==='use') r.use=t.checked; else r[t.dataset.f]=t.value;
+    // code 칸은 종목을 찾기 위한 검색어일 뿐이다. 목록에서 골라야 실제로 바뀐다.
+    if(t.dataset.f==='use') r.use=t.checked;
+    else if(t.dataset.f!=='code') r[t.dataset.f]=t.value;
   }
 });
 document.addEventListener('change',e=>{
