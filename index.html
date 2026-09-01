@@ -571,7 +571,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <div class="drop-s">
       글자가 클수록 정확합니다. 화면을 확대해 캡처하면 인식률이 올라갑니다.<br>
       <span class="need">보유수량</span>·<span class="need">매입단가</span> 열이 보이도록 좌우로 밀어 캡처하면 훨씬 정확합니다.<br><b>보유 목록만 잘라서</b> 캡처하세요. 관심종목 같은 옆 화면이 같이 들어가면 섞여 읽힙니다.<br>
-      최초 1회 인식 데이터 약 8MB를 내려받습니다. <span style="opacity:.75">(v5)</span>
+      최초 1회 인식 데이터 약 8MB를 내려받습니다. <span style="opacity:.75">(v6)</span>
     </div>
     <input type="file" id="file-img" accept="image/*" multiple hidden>
   </div>
@@ -1830,6 +1830,50 @@ async function fetchLang(path,f,onBytes){
   }finally{ clearTimeout(t); }
 }
 
+/* tesseract 는 받은 언어 데이터를 IndexedDB(keyval-store / keyval)에
+   "./kor.traineddata" 같은 키로 넣어 두고, 다음부터는 거기서 읽는다.
+   그 자리에 우리가 미리 넣어 두면 작업자(worker)가 네트워크를 아예 타지 않는다.
+
+   작업자 안에서 일어나는 요청은 바깥에서 손댈 수도, 지켜볼 수도 없다.
+   보안 프로그램이 그 요청만 막으면 진행률이 선 채로 영영 끝나지 않는다.
+   아예 요청이 일어나지 않게 만드는 것이 확실하다. */
+function idb(mode,fn){
+  return new Promise((ok,ng)=>{
+    const req=indexedDB.open('keyval-store');
+    req.onupgradeneeded=()=>{ try{ req.result.createObjectStore('keyval'); }catch(e){} };
+    req.onerror=()=>ng(req.error);
+    req.onsuccess=()=>{
+      const db=req.result;
+      let store;
+      try{ store=db.transaction('keyval',mode).objectStore('keyval'); }
+      catch(e){ db.close(); return ng(e); }
+      const r=fn(store);
+      store.transaction.oncomplete=()=>{ db.close(); ok(r&&r.result); };
+      store.transaction.onerror=()=>{ db.close(); ng(store.transaction.error); };
+    };
+  });
+}
+
+async function seedLangCache(path){
+  if(typeof DecompressionStream!=='function'||!self.indexedDB) return 0;
+  let n=0;
+  for(const f of ['eng','kor']){
+    const key='./'+f+'.traineddata';
+    try{
+      const has=await idb('readonly',st=>st.get(key));
+      if(has&&has.length>100000){ n++; continue; }
+      const r=await fetch(path+'/'+f+'.traineddata.gz');
+      if(!r.ok||!r.body) continue;
+      const buf=await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+      if(buf.byteLength<100000) continue;
+      await idb('readwrite',st=>st.put(new Uint8Array(buf),key));
+      LANG_DIAG.push(`캐시 ${f} ${(buf.byteLength/1048576).toFixed(2)}MB`);
+      n++;
+    }catch(e){ LANG_DIAG.push(`캐시 ${f} 실패: ${e.message}`); }
+  }
+  return n;
+}
+
 async function pickLangPath(){
   if(OCR_LANG) return OCR_LANG;
   LANG_DIAG.length=0;
@@ -1914,7 +1958,9 @@ async function runOCR(files){
       +LANG_DIAG.join('\n')
       +'\n\n광고 차단 확장이나 보안 프로그램이 막고 있을 수 있습니다.\n'
       +'다른 브라우저나 네트워크(모바일 데이터 ↔ 와이파이)로 시도해 보세요.');
-    prog(.08,'인식 데이터를 확인하고 있습니다… (최초 1회 약 4.5MB)');
+    prog(.085,'인식 데이터를 자리잡는 중…');
+    await seedLangCache(langPath);
+    prog(.09,'인식 데이터를 확인하고 있습니다…');
 
     const texts=[];
     for(let i=0;i<imgs.length;i++){
