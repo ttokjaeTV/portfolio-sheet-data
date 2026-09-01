@@ -44,7 +44,7 @@ KST = timezone(timedelta(hours=9))
 UA = {"User-Agent": "Mozilla/5.0"}
 
 HEADER = ["종목코드", "구분", "주당배당금", "배당수익률", "지급주기", "연지급횟수",
-          "연배당_실지급", "연배당_연환산", "과표_실지급", "최근지급일", "출처", "갱신시각"]
+          "연배당_실지급", "연배당_연환산", "과표_실지급", "지급월", "최근지급일", "출처", "갱신시각"]
 
 
 def now_kst():
@@ -126,8 +126,11 @@ def build_etf(today):
             tax_sum = round(sum(x[2] for x in paid), 4)
             last_d, last_amt = (paid[-1][0], paid[-1][1]) if paid else (rows[-1][0], 0.0)
             annual = round(last_amt * n, 4) if n else 0.0
+            # 실제로 지급이 있었던 달. 캘린더는 추정이 아니라 이 값으로 그린다.
+            months = sorted({int(x[0][5:7]) for x in paid})
             out[code.upper()] = [code.upper(), "국내ETF", "", "", cycle_name(n), n,
-                                 real, annual, tax_sum, last_d, "montly-div", ""]
+                                 real, annual, tax_sum,
+                                 "|".join(str(m) for m in months), last_d, "montly-div", ""]
     if not got:
         print("  트래커 JSON 을 한 건도 못 받았습니다.", file=sys.stderr)
     return out
@@ -167,9 +170,11 @@ def build_stocks(today):
                     continue
                 # 국내 상장사는 대부분 연 1회 결산배당이다.
                 # 분기배당사도 DPS 는 연간 누계로 들어오므로 실지급=연환산으로 둔다.
+                # KRX 펀더멘털은 지급월을 주지 않는다. 캘린더에서는
+                # 추측해 넣지 않고 '지급월 미상'으로 따로 센다.
                 out[str(code).upper()] = [str(code).upper(), "국내주식",
                                           dps, div, "연", 1,
-                                          dps, dps, "", "", "KRX", ""]
+                                          dps, dps, "", "", "", "KRX", ""]
         if got_any:
             ok = True
             print(f"  KRX 기준일 {d} · 배당 있는 종목 {len(out)}건", file=sys.stderr)

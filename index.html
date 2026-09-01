@@ -196,6 +196,44 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .empty-note{padding:28px;text-align:center;color:var(--ink-mute);font-size:14px;font-weight:600;
   background:var(--bg-alt);border-radius:14px}
 
+/* ---------- 배당 탭 ---------- */
+.div-block{margin-top:30px;padding-top:24px;border-top:1px solid var(--border)}
+.div-stamp{display:block;margin-top:6px;font-size:11px;font-weight:700;color:var(--ink-mute)}
+.div-note{font-size:12px;font-weight:600;color:var(--ink-mute);line-height:1.8;margin-top:12px;
+  background:var(--bg-alt);border-radius:11px;padding:13px 15px}
+.div-note b{color:var(--ink-soft);font-weight:800}
+/* 월별 막대 : 캔버스 대신 CSS 로 그린다. 탭이 숨어 있어도 크기가 안 깨진다 */
+.cal{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;align-items:end;height:190px;margin-top:16px}
+.cal-c{display:flex;flex-direction:column;justify-content:flex-end;height:100%;text-align:center}
+.cal-v{font-size:10.5px;font-weight:800;color:var(--ink-soft);margin-bottom:4px;white-space:nowrap}
+.cal-b{background:var(--accent);border-radius:6px 6px 0 0;min-height:3px;transition:height .2s ease}
+.cal-c.zero .cal-b{background:var(--border)}
+.cal-c.zero .cal-v{color:var(--ink-mute);font-weight:600}
+.cal-m{font-size:11px;font-weight:800;color:var(--ink-mute);margin-top:7px}
+.cal-legend{font-size:12px;font-weight:700;color:var(--ink-mute);margin-top:14px;line-height:1.7}
+.cal-legend b{color:var(--accent);font-weight:900}
+/* 종합과세 한도 막대 */
+.dgauge{margin-top:16px}
+.dgauge-bar{position:relative;height:30px;background:var(--bg-alt);border-radius:9px;overflow:hidden}
+.dgauge-fill{height:100%;background:var(--green);transition:width .3s ease}
+.dgauge-fill.over{background:var(--red)}
+.dgauge-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:9px;flex-wrap:wrap}
+.dgauge-l{font-size:13.5px;font-weight:800}
+.dgauge-v{font-size:19px;font-weight:900;letter-spacing:-.5px}
+.dgauge-sub{font-size:12px;font-weight:600;color:var(--ink-mute);margin-top:9px;line-height:1.75}
+.dv-warn{color:var(--red);font-weight:800}
+.dv-none{color:var(--ink-mute);font-weight:600}
+.dv-chip{display:inline-block;font-size:11px;font-weight:800;padding:2px 7px;border-radius:6px;
+  background:var(--bg-alt);color:var(--ink-mute)}
+.dv-chip.part{background:#DCE4EE;color:var(--blue)}
+.dv-chip.zero{background:#DCE8DC;color:var(--green)}
+.dv-chip.miss{background:#F6D9D4;color:var(--red)}
+@media (max-width:768px){
+  .cal{grid-template-columns:repeat(6,1fr);height:auto;row-gap:14px}
+  .cal-c{height:120px}
+  .div-block{margin-top:22px;padding-top:18px}
+}
+
 /* 추가매수 입력판 : 계좌 묶음 바깥에 떠 있다는 인상을 주려고
    점선 테두리 + 흰 바탕 + 아래로 꽂히는 화살표를 쓴다 */
 .buy-panel{position:relative;margin:18px 0 26px;padding:18px 20px 20px;background:var(--white);
@@ -660,7 +698,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <button class="tab" type="button" data-tab="shot" role="tab"><span class="tab-n">2</span>캡처로 불러오기</button>
   <button class="tab" type="button" data-tab="sum" role="tab"><span class="tab-n">3</span>전체 현황</button>
   <button class="tab" type="button" data-tab="detail" role="tab"><span class="tab-n">4</span>종목 상세</button>
-  <button class="tab" type="button" data-tab="trend" role="tab"><span class="tab-n">5</span>자산 추이</button>
+  <button class="tab" type="button" data-tab="div" role="tab"><span class="tab-n">5</span>배당</button>
+  <button class="tab" type="button" data-tab="trend" role="tab"><span class="tab-n">6</span>자산 추이</button>
 </nav>
 
 <section class="tabpane on" data-pane="hold">
@@ -910,6 +949,64 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 
 </section>
 
+<section class="tabpane" data-pane="div">
+<div class="card">
+  <div class="step-label"><div class="step-line"></div><span class="step-text">배당 · 분배금</span></div>
+  <div class="card-desc">
+    최근 1년 실제 지급액을 기준으로 내 보유수량에 곱해 계산합니다. 미래 배당을 약속하는 값이 아닙니다.<br>
+    <b>국내 종목만 집계합니다.</b> 미국 주식·ETF 배당은 아직 수집하지 않아 빠집니다.
+    국내 ETF는 월배당 트래커에 실린 종목만 데이터가 있습니다.
+    <span id="div-stamp" class="div-stamp"></span>
+  </div>
+
+  <div class="grid-4" id="div-stats"></div>
+
+  <div class="div-block">
+    <div class="chart-title">월별 배당 흐름</div>
+    <div class="chart-subtitle">최근 1년에 실제로 지급된 달 기준입니다. 개별주는 지급월을 알 수 없어 따로 셉니다.</div>
+    <div id="div-cal"></div>
+  </div>
+
+  <div class="div-block">
+    <div class="chart-title">계좌별 배당</div>
+    <div class="chart-subtitle">배당을 받는 그 시점에 실제로 떼이는 세금만 반영했습니다</div>
+    <div class="table-wrap">
+      <table class="data-table narrow">
+        <thead><tr><th class="tl">계좌</th><th>연 배당금(세전)</th><th>과세 대상</th>
+          <th>원천징수</th><th>연 배당금(세후)</th><th>월평균</th></tr></thead>
+        <tbody id="div-acct-body"></tbody>
+        <tfoot><tr id="div-acct-foot"></tr></tfoot>
+      </table>
+    </div>
+    <div class="div-note" id="div-tax-note"></div>
+  </div>
+
+  <div class="div-block">
+    <div class="chart-title">금융소득 종합과세 한도</div>
+    <div class="chart-subtitle">이자·배당 합계가 연 2,000만원을 넘으면 초과분이 다른 소득과 합산됩니다</div>
+    <div id="div-gauge"></div>
+  </div>
+
+  <div class="div-block">
+    <div class="chart-title">종목별 배당</div>
+    <div class="chart-subtitle">실지급 = 최근 12개월 합계 · 연환산 = 최근 1회 × 연 지급횟수</div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr>
+          <th class="tl">계좌</th><th class="tl">종목</th><th>주당 배당금<br><span class="th-sub">최근 1회</span></th>
+          <th>지급주기</th><th>연 배당금<br><span class="th-sub">실지급</span></th>
+          <th>연 배당금<br><span class="th-sub">연환산</span></th>
+          <th>배당률<br><span class="th-sub">현재가 대비</span></th>
+          <th>YOC<br><span class="th-sub">내 매입가 대비</span></th>
+          <th class="tl">과표</th><th>최근 지급일</th>
+        </tr></thead>
+        <tbody id="div-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</section>
+
 <section class="tabpane" data-pane="trend">
 <div class="card">
   <div class="step-label"><div class="step-line"></div><span class="step-text">자산 추이</span></div>
@@ -981,6 +1078,7 @@ const isTaxAdv=a=>/연금|IRP|ISA|DC\b|퇴직/i.test(a);
 const COLORS=['#D9542B','#E89A6F','#8B6F47','#C4A57B','#5A6B5A','#A03D1F','#9B9387','#7A8B99'];
 
 let KR={}, US={}, FX=0, STAMP='', STAMP_US='';   // KR = 국내 ETF + 국내 개별주식
+let DIV={}, DIV_STAMP='';                        // 종목코드 → 배당·분배금
 let state={holdings:[],cash:{}};
 let ocrRows=[];
 
@@ -1034,14 +1132,30 @@ function lookup(key){
 async function loadAll(){
   const stamp=document.getElementById('price-stamp');
   try{
-    const [krT,stkT,usT,fxT,idxT]=await Promise.all([
+    const [krT,stkT,usT,fxT,idxT,divT]=await Promise.all([
       fetch(BASE+'etf_prices.csv',{cache:'no-store'}).then(r=>r.text()),
       fetch(BASE+'kr_stocks.csv',{cache:'no-store'}).then(r=>r.text()).catch(()=>''),
       fetch(BASE+'us_prices.csv',{cache:'no-store'}).then(r=>r.text()),
       fetch(BASE+'fx.csv',{cache:'no-store'}).then(r=>r.text()).catch(()=>''),
-      fetch(BASE+'indices.csv',{cache:'no-store'}).then(r=>r.text()).catch(()=>'')
+      fetch(BASE+'indices.csv',{cache:'no-store'}).then(r=>r.text()).catch(()=>''),
+      fetch(BASE+'dividends.csv',{cache:'no-store'}).then(r=>r.text()).catch(()=>'')
     ]);
     if(idxT) renderBoard(parseCSV(idxT));
+
+    // 배당·분배금. 없으면 배당 탭만 비어 보이고 나머지는 그대로 돈다.
+    if(divT){
+      parseCSV(divT).slice(1).forEach(r=>{
+        if(!r[0]) return;
+        DIV[r[0].toUpperCase()]={
+          code:r[0], kind:r[1]||'', dps:num(r[2]), yieldPct:num(r[3]),
+          cycle:r[4]||'', perYear:num(r[5]),
+          real:num(r[6]), annual:num(r[7]),
+          tax:r[8]===''?null:num(r[8]),          // null = 과표 미확인
+          months:(r[9]||'').split('|').map(v=>parseInt(v,10)).filter(v=>v>=1&&v<=12),
+          lastPaid:r[10]||'', src:r[11]||''};
+        DIV_STAMP=r[12]||DIV_STAMP;
+      });
+    }
 
     parseCSV(krT).slice(1).forEach(r=>{
       if(!r[0]) return;
@@ -1577,6 +1691,7 @@ function render(){
   renderGauge(valid,cash);
   renderAcctHoldings(valid,cash);
   renderDetail(valid,val);
+  renderDividends(valid);
   renderInsight(valid,byAsset,val,byAcct);
   snapshot(val,buy,cashSum,valid.length,byAcct);
   renderTrend();
@@ -1773,6 +1888,170 @@ function drawDonut(id,prev,data,setter,colorOf,subOf){
             return (n&&n.length>1)?'  '+n.join(' · '):'';
           }},
           bodyFont:{family:'Pretendard',weight:'700'},titleFont:{family:'Pretendard'}}}}}));
+}
+
+/* ---------- 배당 ----------
+   배당을 받는 그 시점에 실제로 떼이는 세금만 센다.
+     일반계좌  15.4% 원천징수 (과세 대상 = 과세표준액. 국내상장 해외ETF 는
+               분배금 전액이 아니라 과표증분까지만 과세된다)
+     연금계좌  과세이연 → 지급 시점 원천징수 없음. 인출할 때 연금소득세를 낸다
+     ISA      만기 정산 → 지급 시점 원천징수 없음
+   금융소득종합과세(연 2,000만원)도 일반계좌 몫만 센다. 연금·ISA 는 대상이 아니다. */
+const DIV_WHT=0.154;
+function acctTaxKind(a){
+  if(/IRP|DC형|DC\b|퇴직|연금/i.test(a)) return '연금';
+  if(/ISA/i.test(a)) return 'ISA';
+  return '일반';
+}
+function divRows(valid){
+  const out=[]; let usSkip=0, noData=0;
+  valid.forEach(r=>{
+    if(r.isUS){ usSkip++; return; }               // 미국 배당은 아직 수집 안 한다
+    const d=DIV[r.code];
+    if(!d||!(d.real>0)){ noData++; return; }
+    const real=d.real*r.qty, annual=d.annual*r.qty;
+    // 과표를 모르면 전액과세로 본다. 세금을 크게 잡는 쪽이라 안전하다.
+    const taxBase=(d.tax===null?d.real:d.tax)*r.qty;
+    out.push({r,d,real,annual,taxBase,kind:acctTaxKind(r.acct)});
+  });
+  return {list:out,usSkip,noData};
+}
+function renderDividends(valid){
+  const {list,usSkip,noData}=divRows(valid);
+  const st=document.getElementById('div-stamp');
+  if(st) st.textContent=DIV_STAMP?`배당 데이터 갱신 ${DIV_STAMP}`:'';
+
+  const pre=list.reduce((s,x)=>s+x.real,0);
+  const wht=list.reduce((s,x)=>s+(x.kind==='일반'?x.taxBase*DIV_WHT:0),0);
+  const post=pre-wht;
+  const buy=list.reduce((s,x)=>s+x.r.buy,0);
+  const val=list.reduce((s,x)=>s+x.r.val,0);
+
+  document.getElementById('div-stats').innerHTML=
+    `<div class="stat-card accent"><div class="stat-label">연 배당금 (세전)</div>
+       <div class="stat-value">${won(pre)}</div>
+       <div class="stat-sub">${list.length?list.length+'종목':'—'}</div></div>
+     <div class="stat-card"><div class="stat-label">연 배당금 (세후)</div>
+       <div class="stat-value">${won(post)}</div>
+       <div class="stat-sub">${wht>0?'원천징수 '+won(wht)+' 차감':'지급 시점 원천징수 없음'}</div></div>
+     <div class="stat-card"><div class="stat-label">월평균 (세후)</div>
+       <div class="stat-value">${won(post/12)}</div>
+       <div class="stat-sub">12개월 단순 분할</div></div>
+     <div class="stat-card"><div class="stat-label">배당률 / YOC</div>
+       <div class="stat-value">${val>0?pct(pre/val*100):'—'}</div>
+       <div class="stat-sub">${buy>0?'매입가 대비 '+pct(pre/buy*100):'—'}</div></div>`;
+
+  renderDivCal(list);
+  renderDivAcct(list,usSkip,noData);
+  renderDivGauge(list);
+  renderDivTable(list);
+}
+function renderDivCal(list){
+  const box=document.getElementById('div-cal');
+  const m=new Array(12).fill(0); let unknown=0;
+  list.forEach(x=>{
+    const ms=x.d.months;
+    if(!ms.length){ unknown+=x.real; return; }
+    const each=x.real/ms.length;
+    ms.forEach(v=>{ m[v-1]+=each; });
+  });
+  const max=Math.max(...m);
+  if(!max&&!unknown){
+    box.innerHTML='<div class="empty-note">배당 정보가 있는 종목이 없습니다.</div>'; return;
+  }
+  box.innerHTML='<div class="cal">'+m.map((v,i)=>
+    `<div class="cal-c${v>0?'':' zero'}">
+       <div class="cal-v">${v>0?wonShort(v):'—'}</div>
+       <div class="cal-b" style="height:${max>0?Math.max(3,v/max*130):3}px"></div>
+       <div class="cal-m">${i+1}월</div>
+     </div>`).join('')+'</div>'
+   +(unknown>0?`<div class="cal-legend">지급월을 알 수 없는 국내 개별주 <b>${won(unknown)}</b>은 위 막대에서 빠져 있습니다.
+      KRX 배당 데이터가 지급월을 주지 않습니다. 국내 상장사는 대부분 12월 결산 후 이듬해 4월경에 지급합니다.</div>`:'');
+}
+function renderDivAcct(list,usSkip,noData){
+  const by={};
+  list.forEach(x=>{
+    const a=x.r.acct;
+    (by[a]=by[a]||{pre:0,base:0,kind:x.kind})&&0;
+    by[a].pre+=x.real; by[a].base+=x.taxBase;
+  });
+  const names=accts().filter(a=>by[a]);
+  const row=a=>{
+    const b=by[a], w=b.kind==='일반'?b.base*DIV_WHT:0;
+    const label={'일반':'','연금':'과세이연','ISA':'만기정산'}[b.kind];
+    return `<tr>
+      <td class="tl"><span class="kind-dot" style="--kc:${kindColor(a)}"></span> ${esc(a)}
+        ${label?`<span class="dv-chip">${label}</span>`:''}</td>
+      <td>${won(b.pre)}</td><td>${b.kind==='일반'?won(b.base):'<span class="dv-none">—</span>'}</td>
+      <td>${w>0?'<span class="down">-'+won(w)+'</span>':'<span class="dv-none">0원</span>'}</td>
+      <td><b>${won(b.pre-w)}</b></td><td>${won((b.pre-w)/12)}</td></tr>`;
+  };
+  document.getElementById('div-acct-body').innerHTML=
+    names.map(row).join('')
+    ||'<tr><td colspan="6" style="text-align:center;color:#8B8276;padding:24px">배당 정보가 있는 보유 종목이 없습니다</td></tr>';
+  const pre=names.reduce((s,a)=>s+by[a].pre,0);
+  const w=names.reduce((s,a)=>s+(by[a].kind==='일반'?by[a].base*DIV_WHT:0),0);
+  document.getElementById('div-acct-foot').innerHTML= pre>0
+    ? `<td class="tl">합계</td><td>${won(pre)}</td><td></td>
+       <td class="down">-${won(w)}</td><td>${won(pre-w)}</td><td>${won((pre-w)/12)}</td>` : '';
+
+  const miss=[];
+  if(usSkip) miss.push(`미국 종목 <b>${usSkip}종</b>은 배당 데이터를 아직 수집하지 않아 빠졌습니다.`);
+  if(noData) miss.push(`국내 <b>${noData}종</b>은 배당·분배금 기록이 없습니다. 분배가 거의 없는 성장형 ETF이거나 아직 수집 범위 밖입니다.`);
+  document.getElementById('div-tax-note').innerHTML=
+    `<b>일반계좌</b>만 배당을 받는 시점에 15.4%를 뗍니다. 과세 대상은 분배금 전액이 아니라 <b>과세표준액</b>입니다
+     — 국내상장 해외ETF는 분배금과 과표증분 중 작은 쪽까지만 과세하기 때문입니다.<br>
+     <b>연금저축·IRP</b>는 과세이연이라 지금은 세금이 없고, 연금으로 받을 때 연금소득세를 냅니다.
+     <b>ISA</b>도 지금은 떼지 않고 만기에 순이익 기준으로 정산합니다(일반형 200만원·서민형 400만원 비과세, 초과분 9.9% 분리과세).`
+    +(miss.length?'<br>'+miss.join(' '):'');
+}
+function renderDivGauge(list){
+  const LIMIT=20000000;
+  const base=list.reduce((s,x)=>s+(x.kind==='일반'?x.taxBase:0),0);
+  const rate=base/LIMIT*100, over=base>LIMIT;
+  document.getElementById('div-gauge').innerHTML=
+    `<div class="dgauge">
+       <div class="dgauge-row">
+         <span class="dgauge-l">일반계좌 배당 과세표준 합계</span>
+         <span class="dgauge-v ${over?'up':''}">${won(base)} <span style="font-size:13px;color:#8B8276">/ 2,000만원</span></span>
+       </div>
+       <div class="dgauge-bar"><div class="dgauge-fill ${over?'over':''}" style="width:${Math.min(100,rate)}%"></div></div>
+       <div class="dgauge-sub">
+         ${over
+           ? `<span class="dv-warn">한도를 ${won(base-LIMIT)} 넘습니다.</span> 초과분이 다른 종합소득과 합산돼 6~45% 누진세율로 과세됩니다.`
+           : `한도까지 <b>${won(LIMIT-base)}</b> 남았습니다. 2,000만원까지는 15.4% 원천징수로 끝납니다.`}<br>
+         이 막대는 <b>일반계좌 배당만</b> 셉니다. 연금저축·IRP·ISA는 금융소득 종합과세 대상이 아닙니다.
+         실제 판정에는 예금·채권 이자와 다른 금융기관 배당까지 합산되므로, 여기 숫자만으로 단정하지 마세요.
+       </div>
+     </div>`;
+}
+function renderDivTable(list){
+  const body=document.getElementById('div-body');
+  const chip=d=>{
+    if(d.tax===null) return '<span class="dv-chip miss">미확인 · 전액과세 가정</span>';
+    if(d.tax<=0) return '<span class="dv-chip zero">과표 0 · 비과세</span>';
+    if(d.real>0&&d.tax<d.real*0.99) return `<span class="dv-chip part">일부과세 ${Math.round(d.tax/d.real*100)}%</span>`;
+    return '<span class="dv-chip">전액과세</span>';
+  };
+  const rows=list.slice().sort((a,b)=>b.real-a.real);
+  body.innerHTML=rows.map(x=>{
+    const r=x.r, d=x.d;
+    const yld=r.price>0?d.real/r.price*100:0;
+    const yoc=r.avg>0?d.real/r.avg*100:0;
+    return `<tr>
+      <td class="tl"><span class="kind-dot" style="--kc:${kindColor(r.acct)}"></span> ${esc(r.acct)}</td>
+      <td class="tl">${esc(r.name)}<br><span style="font-size:11px;color:#8B8276;font-weight:600">${esc(r.code)}</span></td>
+      <td>${d.dps>0?won(d.dps):(d.perYear>0?won(d.annual/d.perYear):'—')}</td>
+      <td>${esc(d.cycle)}${d.perYear?` <span class="th-sub">${d.perYear}회</span>`:''}</td>
+      <td><b>${won(x.real)}</b></td>
+      <td>${won(x.annual)}</td>
+      <td>${yld>0?pct(yld):'—'}</td>
+      <td class="${yoc>yld?'up':''}">${yoc>0?pct(yoc):'—'}</td>
+      <td class="tl">${chip(d)}</td>
+      <td>${esc(d.lastPaid||'—')}</td>
+    </tr>`;
+  }).join('')
+  ||'<tr><td colspan="10" style="text-align:center;color:#8B8276;padding:24px">배당 정보가 있는 보유 종목이 없습니다</td></tr>';
 }
 
 function renderGauge(valid,cash){
@@ -3718,7 +3997,7 @@ document.getElementById('btn-review-cancel').onclick=()=>{
 /* ---------- 탭 ----------
    숨은 칸에서는 캔버스 크기가 0 이라 차트가 찌그러진다.
    탭을 바꾼 뒤 render() 를 다시 불러 그 탭의 차트를 새로 그린다. */
-const TABS=['hold','shot','sum','detail','trend'];
+const TABS=['hold','shot','sum','detail','div','trend'];
 function showTab(id){
   if(!TABS.includes(id)) id='hold';
   document.querySelectorAll('.tab').forEach(b=>{
