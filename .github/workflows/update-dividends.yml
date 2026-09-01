@@ -1,0 +1,66 @@
+name: 배당 CSV 갱신
+
+# 배당은 분기·연 단위로 바뀐다. 시세처럼 자주 돌 이유가 없다.
+# 매주 토요일 06:20 KST (금요일 21:20 UTC) 한 번.
+on:
+  schedule:
+    - cron: "20 21 * * 5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-dividends
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: pykrx 설치
+        run: pip install --quiet pykrx pandas
+
+      # GitHub Actions 러너에서 KRX 가 열리는지 먼저 본다.
+      # 로컬 샌드박스에서는 빈 응답이 와서 확인이 안 됐다.
+      # 실패해도 다음 단계는 진행한다 (ETF 분만이라도 갱신).
+      - name: KRX 접속 확인
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          from datetime import date, timedelta
+          from pykrx import stock
+          for back in range(0, 8):
+              d = (date.today() - timedelta(days=back)).strftime("%Y%m%d")
+              try:
+                  df = stock.get_market_fundamental(d, market="KOSPI")
+              except Exception as e:
+                  print(f"{d}: {type(e).__name__} {e}")
+                  continue
+              if df is not None and len(df) and "DPS" in df.columns:
+                  print(f"KRX 접속 OK — 기준일 {d}, {len(df)}행, 컬럼 {list(df.columns)}")
+                  print(df[df['DPS'] > 0].head(3))
+                  raise SystemExit(0)
+          raise SystemExit("KRX 접속 실패 — 러너 IP 에서도 막힙니다")
+          PY
+
+      - name: 배당 CSV 생성
+        run: python scripts/build_dividends.py
+
+      - name: 변경분만 커밋
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data/dividends.csv; then
+            echo "변경 없음"; exit 0
+          fi
+          git add data/dividends.csv
+          git commit -m "배당 갱신: $(TZ=Asia/Seoul date '+%Y-%m-%d')"
+          git push
