@@ -838,12 +838,12 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 <div class="grid-2" style="margin-bottom:32px">
   <div class="card" style="margin-bottom:0">
     <div class="chart-title">자산군 비중</div>
-    <div class="chart-subtitle">국내 ETF는 KRX 분류, 미국 종목은 주식/ETF로 집계합니다</div>
+    <div class="chart-subtitle">국내 ETF는 KRX 자산군 분류(국내ETF·주식 / ·채권 …), 미국 종목은 주식/ETF로 집계합니다</div>
     <div class="chart-container"><canvas id="chart-asset"></canvas></div>
   </div>
   <div class="card" style="margin-bottom:0">
     <div class="chart-title">계좌별 비중</div>
-    <div class="chart-subtitle">평가금액 기준</div>
+    <div class="chart-subtitle">평가금액 기준 · 같은 종류 계좌는 합쳐서 봅니다 (연금저축펀드1·2·3 → 연금저축펀드)</div>
     <div class="chart-container"><canvas id="chart-acct"></canvas></div>
   </div>
 </div>
@@ -1045,7 +1045,9 @@ async function loadAll(){
 
     parseCSV(krT).slice(1).forEach(r=>{
       if(!r[0]) return;
-      KR[r[0].toUpperCase()]={code:r[0],name:r[1],assetClass:r[2]||'기타',expense:r[4],
+      // KRX 자산군(주식·채권·혼합자산…)은 그냥 '주식'이라고만 두면
+      // 국내 개별주식('국내 주식')과 구분이 안 된다. 접두어를 붙여 축을 분명히 한다.
+      KR[r[0].toUpperCase()]={code:r[0],name:r[1],assetClass:'국내ETF·'+(r[2]||'기타'),expense:r[4],
         safe:r[5]==='Y',price:num(r[6]),change:num(r[7]),rate:num(r[8]),cur:'KRW'};
       STAMP=r[9]||STAMP;
     });
@@ -1554,8 +1556,23 @@ function render(){
   valid.forEach(r=>{ byAsset[r.assetClass]=(byAsset[r.assetClass]||0)+r.val; });
   if(cashSum>0) byAsset['현금']=(byAsset['현금']||0)+cashSum;
   drawDonut('chart-asset',chartAsset,byAsset,c=>chartAsset=c);
-  const acctData={}; accts().forEach(a=>{ if(byAcct[a].val>0) acctData[a]=byAcct[a].val; });
-  drawDonut('chart-acct',chartAcct,acctData,c=>chartAcct=c);
+  // 계좌를 하나씩 다 그리면 일반계좌10 까지 조각이 잘게 쪼개져 읽을 수가 없다.
+  // 연금저축펀드·IRP·ISA·일반계좌처럼 계좌 종류로 묶어서 본다.
+  const kindVal={}, kindCnt={}, kindNames={};
+  accts().forEach(a=>{
+    const v=byAcct[a].val; if(!(v>0)) return;
+    const k=acctKind(a);
+    kindVal[k]=(kindVal[k]||0)+v;
+    kindCnt[k]=(kindCnt[k]||0)+1;
+    (kindNames[k]=kindNames[k]||[]).push(a);
+  });
+  const acctData={}, labelKind={}, labelNames={};
+  Object.keys(kindVal).forEach(k=>{
+    const label=kindCnt[k]>1?`${k} ${kindCnt[k]}개`:k;
+    acctData[label]=kindVal[k]; labelKind[label]=k; labelNames[label]=kindNames[k];
+  });
+  drawDonut('chart-acct',chartAcct,acctData,c=>chartAcct=c,
+    l=>kindColor(labelKind[l]), l=>labelNames[l]);
 
   renderGauge(valid,cash);
   renderAcctHoldings(valid,cash);
@@ -1734,7 +1751,9 @@ function renderTrend(){
           ticks:{maxTicksLimit:5,font:{size:10},color:'#8A7B6C',callback:v=>wonShort(v)+'원'}}}}});
 }
 
-function drawDonut(id,prev,data,setter){
+/* colorOf : 조각 색을 라벨로 정하고 싶을 때 (계좌 도넛은 칩·카드와 색을 맞춘다)
+   subOf   : 툴팁 아래에 덧붙일 줄들 (묶인 계좌 이름 같은 것) */
+function drawDonut(id,prev,data,setter,colorOf,subOf){
   const el=document.getElementById(id); if(!el) return;
   if(prev) prev.destroy();
   const keys=Object.keys(data).filter(k=>data[k]>0);
@@ -1742,11 +1761,17 @@ function drawDonut(id,prev,data,setter){
   const total=keys.reduce((s,k)=>s+data[k],0);
   setter(new Chart(el,{type:'doughnut',
     data:{labels:keys,datasets:[{data:keys.map(k=>data[k]),
-      backgroundColor:keys.map((_,i)=>COLORS[i%COLORS.length]),borderWidth:2,borderColor:'#FBF7F0'}]},
+      backgroundColor:keys.map((k,i)=>(colorOf&&colorOf(k))||COLORS[i%COLORS.length]),
+      borderWidth:2,borderColor:'#FBF7F0'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'58%',
       plugins:{legend:{position:'bottom',labels:{font:{family:'Pretendard',size:12,weight:'700'},
         color:'#4A4A4A',padding:14,boxWidth:12,boxHeight:12,usePointStyle:true,pointStyle:'circle'}},
-        tooltip:{callbacks:{label:c=>` ${c.label} ${wonShort(c.parsed)}원 (${(c.parsed/total*100).toFixed(1)}%)`},
+        tooltip:{callbacks:{
+          label:c=>` ${c.label} ${wonShort(c.parsed)}원 (${(c.parsed/total*100).toFixed(1)}%)`,
+          afterLabel:c=>{
+            const n=subOf&&subOf(c.label);
+            return (n&&n.length>1)?'  '+n.join(' · '):'';
+          }},
           bodyFont:{family:'Pretendard',weight:'700'},titleFont:{family:'Pretendard'}}}}}));
 }
 
