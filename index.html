@@ -2242,6 +2242,19 @@ function inferQtyAvg(list,price,fxMul){
           const want=Math.abs((price-a2)*q);
           if(find((pl,i)=>near(Math.abs(pl),want,0.005),qi,ai2,c.i)>=0) hit={qty:q,avg:a2};
         }
+        // 평가금액이 없고 매수금액만 주는 화면도 있다.
+        //   매수단가 80.0700 · 매도가능 83 · 매수금액 6,645.8100
+        //   83 × 80.07 = 6,645.81 로 확인된다.
+        if(!hit&&price>0) for(let ai2=0;ai2<N&&!hit;ai2++){
+          const a2=list[ai2];
+          if(a2<=0||ai2===qi||ai2===c.i) continue;
+          if(a2<price*0.3||a2>price*3) continue;      // 매입가는 현재가와 자릿수가 비슷하다
+          if(find((x,i)=>near(x,q*a2,0.005),qi,ai2,c.i)>=0) hit={qty:q,avg:a2};
+        }
+        // 곱은 순서를 가리지 않아 83 × 80.07 이나 80.07 × 83 이나 같다.
+        // 수량은 정수, 매입가는 소수인 쪽이 자연스럽다. 둘 다 같은 꼴이면 그대로 둔다.
+        if(hit&&!Number.isInteger(hit.qty)&&Number.isInteger(hit.avg))
+          hit={qty:hit.avg,avg:hit.qty};
         if(hit) return {qty:hit.qty,avg:hit.avg,sure:c.onScreen,calc:true};
         continue;
       }
@@ -2531,6 +2544,27 @@ function parseShot(src,si){
     if(lines[i+1].replace(/[^가-힣A-Za-z]/g,'').length>8) continue;
     matched[i]={m:b.m,via:b.via,nameSure:true};
     skip.add(i+1); joinN.set(i,1);
+  }
+
+  // (가-2) 이름이 길어 두 줄로 접히고 티커는 그 아래 오는 표.
+  //   State Street SPDR S&P            ← 이름 앞부분. 이것만으로는 종목을 못 가린다
+  //   500 ETF   80.0700   83           ← 이름 뒷부분 + 숫자
+  //   SPYM      90.2800   6,645.8100   ← 티커. 이게 정답이다
+  // 두 줄만 보면 앞 두 줄이 딴 종목(SIMS)으로 굳어 버린다.
+  for(let i=0;i<lines.length-2;i++){
+    if(skip.has(i)||skip.has(i+1)||skip.has(i+2)||joinN.has(i)) continue;
+    const b=matched[i+2];
+    if(!b||!isCodeLike(b.via)) continue;
+    const a=matched[i], mid=matched[i+1];
+    if(a&&a.nameSure) continue;                     // 윗줄이 확정된 딴 종목이면 손대지 않는다
+    // 가운뎃줄이 이미 종목으로 잡혔다면 그 줄은 남의 것이다.
+    //   00041 … / 인베스코 나스닥 100 ETF … / SPYM …
+    //   ← 가운데가 QQQM 이다. 셋을 묶으면 QQQM 이 통째로 사라진다
+    if(mid) continue;
+    if(!nums(lines[i+1],b.m).length) continue;      // 가운뎃줄에 숫자가 있어야 보유 행이다
+    if(lines[i+2].replace(/[^가-힣A-Za-z]/g,'').length>8) continue;
+    matched[i]={m:b.m,via:b.via,nameSure:true};
+    skip.add(i+1); skip.add(i+2); joinN.set(i,2);
   }
 
   // (나) 종목명이 두 줄로 잘린 화면 (TIME 미국나스닥100 / 채권혼합50액티브)
