@@ -571,7 +571,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <div class="drop-s">
       글자가 클수록 정확합니다. 화면을 확대해 캡처하면 인식률이 올라갑니다.<br>
       <span class="need">보유수량</span>·<span class="need">매입단가</span> 열이 보이도록 좌우로 밀어 캡처하면 훨씬 정확합니다.<br><b>보유 목록만 잘라서</b> 캡처하세요. 관심종목 같은 옆 화면이 같이 들어가면 섞여 읽힙니다.<br>
-      최초 1회 인식 데이터 약 10MB를 내려받습니다. <span style="opacity:.75">(v4)</span>
+      최초 1회 인식 데이터 약 8MB를 내려받습니다. <span style="opacity:.75">(v5)</span>
     </div>
     <input type="file" id="file-img" accept="image/*" multiple hidden>
   </div>
@@ -1873,8 +1873,17 @@ async function ensureTesseract(){
     try{
       prog(.1,`인식 엔진을 내려받고 있습니다… (${cdn.name})`);
       await loadScript(cdn.lib);
-      if(window.Tesseract){ OCR_CDN=cdn; return; }
-      errs.push(`${cdn.name}: 로드됐으나 초기화 실패`);
+      if(!window.Tesseract){ errs.push(`${cdn.name}: 로드됐으나 초기화 실패`); continue; }
+      // 엔진 본체(wasm)까지 있는지 확인한다. 작업자 안에서 받는 파일이라
+      // 없어도 오류가 안 나고 글자를 한 자도 못 읽은 채 끝나 버린다.
+      const probe=cdn.core.replace(/\/?$/,'/')+'tesseract-core-simd-lstm.wasm.js';
+      try{
+        const c=new AbortController(); const t=setTimeout(()=>c.abort(),8000);
+        const r=await fetch(probe,{method:'HEAD',signal:c.signal});
+        clearTimeout(t);
+        if(!r.ok) throw new Error('HTTP '+r.status);
+      }catch(e){ errs.push(`${cdn.name}: 엔진 본체 없음 (${e.message})`); continue; }
+      OCR_CDN=cdn; return;
     }catch(e){ errs.push(`${cdn.name}: ${e.message}`); }
   }
   throw new Error('인식 엔진을 어느 경로로도 받지 못했습니다.\n\n'+errs.join('\n')
