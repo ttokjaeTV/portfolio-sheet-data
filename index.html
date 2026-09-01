@@ -204,9 +204,12 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .kind-cell{position:relative;padding-left:16px !important}
 .kind-cell::before{content:'';position:absolute;left:6px;top:50%;transform:translateY(-50%);
   width:4px;height:22px;border-radius:2px;background:var(--kc,var(--accent))}
-.kind-sum td{background:var(--bg-alt);font-weight:800}
-.kind-sum .kind-cell{color:var(--kc,var(--accent))}
-.kind-sum .acct-note{font-weight:700;opacity:.8}
+/* 계열마다 옅게 색을 깔아 어디까지가 한 종류인지 눈에 들어오게 한다 */
+#acct-body tr td{background:var(--kcbg,transparent)}
+.kind-sum td,.kind-solo td{font-weight:800}
+.kind-sum .kind-cell,.kind-solo .kind-cell{color:var(--kc,var(--accent))}
+.kind-sum .kind-cell::before,.kind-solo .kind-cell::before{width:5px;height:26px}
+.kind-sum .acct-note,.kind-solo .acct-note{font-weight:700;opacity:.8;color:var(--ink-mute)}
 .kind-dot{display:inline-block;width:8px;height:8px;border-radius:50%;
   background:var(--kc,var(--accent));margin-right:6px;flex:none}
 .acct-hold{margin-top:14px;padding-top:12px;border-top:1px dashed var(--border)}
@@ -799,6 +802,12 @@ function sortAccts(list){
 // 계좌 성격 = 번호를 뗀 이름. 연금저축펀드1·2·3 은 모두 '연금저축펀드' 다.
 const acctKind=a=>String(a).replace(/\d+$/,'')||String(a);
 const KIND_COLORS=['#D9542B','#2C6FA8','#4E7C4A','#8A5BA6','#B8860B','#A0522D','#3A2F26'];
+// 계열 색을 옅게 깔 때 쓴다. 배경으로 쓰려면 진한 색 그대로는 글자가 죽는다.
+function hexA(hex,a){
+  const m=/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex||'');
+  if(!m) return `rgba(217,84,43,${a})`;
+  return `rgba(${parseInt(m[1],16)},${parseInt(m[2],16)},${parseInt(m[3],16)},${a})`;
+}
 function kindColor(a){
   const kinds=[...new Set(accts().map(acctKind))];
   const i=kinds.indexOf(acctKind(a));
@@ -1333,10 +1342,12 @@ function render(){
   valid.forEach(r=>{ byAcct[r.acct].buy+=r.buy; byAcct[r.acct].val+=r.val; });
   // 계좌를 성격끼리 묶어 보여준다. 연금저축펀드가 넷이면 넷을 붙여 놓고 소계를 낸다.
   const shown=accts().filter(a=>byAcct[a].val||byAcct[a].buy);
-  const arow=(a,d,color)=>{
+  const arow=(a,d,color,solo)=>{
     const p=d.val-d.buy, rr=d.buy>0?(p/d.buy*100):0, w=val>0?(d.val/val*100):0;
     const note=(state.notes||{})[a];
-    return `<tr data-arow="${esc(a)}" class="${detailFilter===a?'on':''}" style="--kc:${color}">
+    // 그 계열에 계좌가 하나뿐이면 그 줄이 곧 그 계열이다. 합계 줄과 같은 무게로 보여 준다.
+    return `<tr data-arow="${esc(a)}" class="${detailFilter===a?'on ':''}${solo?'kind-solo':''}"
+      style="--kc:${color};--kcbg:${hexA(color,solo?0.10:0.045)}">
       <td class="tl kind-cell">${esc(a)}${note?`<span class="acct-note">${esc(note)}</span>`:''}</td>
       <td>${won(d.buy)}</td><td>${won(d.val)}</td>
       <td class="${cls(p)}">${(p>=0?'+':'')+won(p)}</td><td class="${cls(rr)}">${pct(rr)}</td><td>${w.toFixed(1)}%</td></tr>`;
@@ -1345,11 +1356,11 @@ function render(){
   for(let i=0;i<shown.length;){
     const kind=acctKind(shown[i]), color=kindColor(shown[i]);
     const grp=[]; while(i<shown.length&&acctKind(shown[i])===kind) grp.push(shown[i++]);
-    grp.forEach(a=>{ body+=arow(a,byAcct[a],color); });
-    if(grp.length>1){                       // 한 종류가 여럿일 때만 소계를 낸다
+    grp.forEach(a=>{ body+=arow(a,byAcct[a],color,grp.length===1); });
+    if(grp.length>1){                       // 여럿일 때만 합계를 따로 낸다
       const gb=grp.reduce((t,a)=>t+byAcct[a].buy,0), gv=grp.reduce((t,a)=>t+byAcct[a].val,0);
       const gp=gv-gb, gr=gb>0?(gp/gb*100):0, gw=val>0?(gv/val*100):0;
-      body+=`<tr class="kind-sum" style="--kc:${color}">
+      body+=`<tr class="kind-sum" style="--kc:${color};--kcbg:${hexA(color,0.10)}">
         <td class="tl kind-cell">${esc(kind)} 합계<span class="acct-note">${grp.length}개 계좌</span></td>
         <td>${won(gb)}</td><td>${won(gv)}</td>
         <td class="${cls(gp)}">${(gp>=0?'+':'')+won(gp)}</td><td class="${cls(gr)}">${pct(gr)}</td><td>${gw.toFixed(1)}%</td></tr>`;
