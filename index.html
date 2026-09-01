@@ -136,15 +136,38 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .flag.us{background:#DCE4EE;color:var(--blue)}
 .search-none{padding:16px;text-align:center;color:var(--ink-mute);font-size:13px;font-weight:600}
 
-.holding-head,.holding-row{display:grid;grid-template-columns:148px 1fr 104px 132px 152px 40px;gap:10px;align-items:center}
-.holding-head{padding:0 0 10px;border-bottom:1.5px solid var(--border);margin-bottom:12px}
-.holding-head span{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--ink-mute);text-transform:uppercase}
-.holding-row{margin-bottom:10px}
+/* 종목칸은 코드만 들어가면 되니 좁게 잡고, 남는 폭은 금액·손익 쪽에 몰아준다.
+   눈이 가야 하는 곳은 종목명이 아니라 숫자다. */
+.holding-head,.holding-row{display:grid;
+  grid-template-columns:124px minmax(148px,220px) 74px 108px minmax(96px,1fr) minmax(158px,1.35fr) 32px;
+  gap:8px;align-items:center}
+.holding-head{padding:0 0 11px;border-bottom:1.5px solid var(--border);margin-bottom:13px}
+.holding-head span{font-size:13px;font-weight:800;letter-spacing:-.2px;color:var(--ink-soft);text-align:center}
+.holding-row{margin-bottom:8px}
+.holding-row input,.holding-row select{padding:9px 12px;font-size:14px}
 .cur-wrap{position:relative}
-.cur-wrap input{padding-left:26px}
-.cur-mark{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:800;
+.cur-wrap input{padding-left:24px}
+.cur-mark{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:800;
   color:var(--ink-mute);pointer-events:none}
-.row-calc{font-size:13px;font-weight:700;text-align:right;line-height:1.4}
+/* 종목칸이 좁아진 만큼 검색 목록은 칸보다 넓게 펼쳐 이름이 잘리지 않게 한다 */
+.holding-row .search-menu{min-width:360px}
+/* 종목명은 한 줄로 자른다. 전체 이름은 마우스를 올리면 보인다 */
+.hold-nm{font-size:11px;color:var(--ink-mute);font-weight:700;margin-top:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.hold-nm .us-tag{display:inline-block;font-size:9px;font-weight:900;padding:0 4px;border-radius:4px;
+  background:#DCE4EE;color:var(--blue);margin-right:4px;vertical-align:1px}
+
+/* 매입금액 · 평가금액 : 숫자 크기와 색으로 위계를 준다 */
+.row-buy,.row-calc{text-align:right;line-height:1.3}
+.row-buy .rb-val{font-size:13px;font-weight:700;color:var(--ink-soft);display:block;letter-spacing:-.3px}
+.row-buy .rb-sub,.row-calc .rc-sub{font-size:10.5px;font-weight:600;color:var(--ink-mute);display:block;margin-top:1px}
+.row-calc .rc-val{font-size:16.5px;font-weight:900;color:var(--ink);display:block;letter-spacing:-.5px}
+.row-calc .rc-pl{display:block;margin-top:3px;font-size:12.5px;font-weight:800;letter-spacing:-.2px;
+  color:var(--ink-mute);white-space:nowrap}
+.row-calc .rc-ror{display:inline-block;margin-left:5px;font-size:12px;font-weight:900;
+  padding:1.5px 6px;border-radius:6px;letter-spacing:-.3px;background:var(--bg-alt);color:var(--ink-mute)}
+.row-calc .rc-pl.up{color:var(--red)}      .row-calc .rc-pl.up .rc-ror{background:#FBE4DE;color:var(--red)}
+.row-calc .rc-pl.down{color:var(--blue)}   .row-calc .rc-pl.down .rc-ror{background:#DCE4EE;color:var(--blue)}
 .row-calc .sub{font-size:11px;font-weight:600;color:var(--ink-mute);display:block}
 .row-del{background:transparent;border:1.5px solid var(--border);border-radius:9px;padding:9px 0;
   cursor:pointer;color:var(--ink-mute);font-weight:800;font-size:14px;transition:all .15s ease;width:100%}
@@ -166,7 +189,7 @@ input::placeholder{color:#BFB6A6;font-weight:500}
   align-items:center;gap:7px;flex-wrap:wrap}
 .acct-card input{background:var(--white)}
 .acct-note{font-size:11px;color:var(--ink-mute);font-weight:600;display:block;margin-top:2px}
-.th-sub{font-size:10px;font-weight:700;opacity:.7}
+.th-sub{font-size:11px;font-weight:700;opacity:.72;letter-spacing:0}
 
 /* 자산 추이 */
 .trend-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
@@ -295,10 +318,10 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .table-wrap{overflow-x:auto;margin-top:16px;border-radius:12px}
 .data-table{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
 .data-table.narrow{min-width:640px}
-.data-table th{background:var(--bg-alt);padding:12px 10px;text-align:right;font-weight:700;border-left:1px solid var(--border);
-  color:var(--ink-soft);font-size:11px;border-bottom:1.5px solid var(--border);white-space:nowrap}
-.data-table th:first-child{text-align:left;border-left:none}
-.data-table th.tl{text-align:left}
+/* 헤더는 가운데 정렬 + 본문보다 살짝 큰 글자. 값은 그대로 오른쪽 정렬을 지킨다 */
+.data-table th{background:var(--bg-alt);padding:12px 10px;text-align:center;font-weight:800;border-left:1px solid var(--border);
+  color:var(--ink-soft);font-size:13px;letter-spacing:-.2px;border-bottom:1.5px solid var(--border);white-space:nowrap}
+.data-table th:first-child{border-left:none}
 .data-table td{padding:11px 10px;text-align:right;border-bottom:1px solid var(--border);
   font-weight:600;color:var(--ink);white-space:nowrap}
 .data-table td:first-child,.data-table td.tl{text-align:left}
@@ -451,6 +474,17 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   .grid-4{grid-template-columns:1fr 1fr}
   .cash-grid{grid-template-columns:1fr 1fr}
 }
+/* 태블릿 폭에서는 칸을 더 조여야 한 줄이 안 넘친다 */
+@media (max-width:960px) and (min-width:769px){
+  .holding-head,.holding-row{
+    grid-template-columns:100px minmax(112px,1fr) 60px 90px minmax(80px,1fr) minmax(132px,1.2fr) 28px;gap:6px}
+  .holding-head span{font-size:12px}
+  .holding-row input,.holding-row select{padding:9px 8px;font-size:13px}
+  .cur-wrap input{padding-left:20px}
+  .cur-mark{left:7px;font-size:12px}
+  .row-calc .rc-val{font-size:15px}
+  .holding-row .search-menu{min-width:300px}
+}
 @media (max-width:768px){
   body{padding:16px 12px}
   header{margin-bottom:20px;flex-wrap:wrap}
@@ -474,8 +508,20 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   .holding-head{display:none}
   .holding-row{grid-template-columns:1fr 1fr;gap:8px;padding:14px;background:var(--bg-alt);
     border-radius:14px;margin-bottom:12px}
+  .holding-row>div:nth-child(1),
   .holding-row>div:nth-child(2){grid-column:1/-1}
-  .holding-row .row-calc{grid-column:1/-1;text-align:left;padding-top:6px;border-top:1px dashed var(--border)}
+  .holding-row .search-menu{min-width:0}
+  /* 매입금액·평가금액은 카드 아래쪽에 좌우로 나란히. 라벨을 붙여야 뭘 보는지 안다 */
+  .holding-row .row-buy,.holding-row .row-calc{padding-top:9px;margin-top:2px;
+    border-top:1px dashed var(--border)}
+  .holding-row .row-buy{grid-column:1/2;text-align:left}
+  .holding-row .row-calc{grid-column:2/-1;text-align:right}
+  .holding-row .row-buy:empty{border-top:none;padding-top:0}
+  .holding-row .row-calc.is-err{grid-column:1/-1;text-align:left}
+  .holding-row .row-buy::before,.holding-row .row-calc::before{content:attr(data-l);display:block;
+    font-size:9.5px;font-weight:800;letter-spacing:.3px;color:var(--ink-mute);margin-bottom:4px}
+  .holding-row .row-calc .rc-val{font-size:17px}
+  .holding-row .row-calc .rc-pl{white-space:normal}
   .holding-row>div:last-child{grid-column:1/-1}
   .cash-grid{grid-template-columns:1fr}
   .acct-grid{grid-template-columns:1fr}
@@ -486,7 +532,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   .insight-cta{flex-direction:column;align-items:stretch}.cta-link{justify-content:center}
   .table-wrap{margin:16px -16px 0;padding:0 16px;-webkit-overflow-scrolling:touch}
   .data-table{font-size:11px;min-width:700px}
-  .data-table th{padding:8px 6px;font-size:10px}.data-table td{padding:8px 6px}
+  .data-table th{padding:8px 6px;font-size:12px}.data-table td{padding:8px 6px}
 
   /* 검수 표는 가로 스크롤 대신 카드로. 숫자가 잘리면 확인 자체가 안 된다 */
   #review .table-wrap{margin:16px 0 0;padding:0;overflow:visible}
@@ -564,7 +610,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   </div>
 
   <div class="holding-head">
-    <span>계좌</span><span>종목</span><span>보유수량</span><span>평균매입가</span><span>평가금액 / 손익</span><span></span>
+    <span>계좌</span><span>종목</span><span>보유수량</span><span>평균매입가</span>
+    <span>매입금액</span><span>평가금액 / 손익</span><span></span>
   </div>
   <div id="holdings"></div>
   <div id="holdings-empty" class="empty-note">아직 등록한 종목이 없습니다. 아래 버튼으로 추가해 주세요.</div>
@@ -1126,26 +1173,38 @@ function renderRows(){
   const fold=state.fold||{};
   const rowHtml=i=>{
     const h=state.holdings[i], r=rows[i];
-    let calc;
-    if(!h.code) calc='<span class="sub">종목을 입력하세요</span>';
-    else if(!r.found) calc='<span class="sub" style="color:#C0392B">찾을 수 없는 종목입니다</span>';
-    else if(r.isUS&&!FX) calc='<span class="sub" style="color:#C0392B">환율을 불러오지 못했습니다</span>';
-    else if(r.isUS) calc=`${usd(r.valC)}<span class="sub">≈ ${wonShort(r.val)}원</span>`
-      +`<span class="sub ${cls(r.pl)}">${usdSign(r.plC)} (${pct(r.ror)})</span>`;
-    else calc=`${wonShort(r.val)}원<span class="sub ${cls(r.pl)}">${r.pl>=0?'+':''}${wonShort(r.pl)} (${pct(r.ror)})</span>`;
+    // 값을 못 구하는 상황이면 평가금액 칸에 이유를 적고 매입금액 칸은 비운다
+    let err='';
+    if(!h.code) err='종목을 입력하세요';
+    else if(!r.found) err='찾을 수 없는 종목입니다';
+    else if(r.isUS&&!FX) err='환율을 불러오지 못했습니다';
+
+    let buy='', calc='';
+    if(err){
+      calc=`<span class="sub" style="color:${h.code?'#C0392B':'#8B8276'}">${err}</span>`;
+    }else if(r.isUS){
+      buy=`<span class="rb-val">${usd(r.buyC)}</span><span class="rb-sub">≈ ${wonShort(r.buy)}원</span>`;
+      calc=`<span class="rc-val">${usd(r.valC)}</span><span class="rc-sub">≈ ${wonShort(r.val)}원</span>`
+          +`<span class="rc-pl ${cls(r.pl)}">${usdSign(r.plC)}<b class="rc-ror">${pct(r.ror)}</b></span>`;
+    }else{
+      buy=`<span class="rb-val">${wonShort(r.buy)}원</span>`;
+      calc=`<span class="rc-val">${wonShort(r.val)}원</span>`
+          +`<span class="rc-pl ${cls(r.pl)}">${r.pl>=0?'+':''}${wonShort(r.pl)}<b class="rc-ror">${pct(r.ror)}</b></span>`;
+    }
     const mark=r.isUS?'$':'₩';
     return `<div class="holding-row">
       <div><select data-i="${i}" data-k="acct">${acctOptions(h.acct)}</select></div>
       <div class="search-wrap">
         <input data-i="${i}" data-k="code" value="${esc(h.code||'')}" autocomplete="off"
-          placeholder="종목명 또는 티커 (예: TIGER 미국S&P500, SCHD)">
+          placeholder="종목명 · 코드 · 티커">
         <div class="search-menu" data-menu="${i}"></div>
-        ${r.found?`<div style="font-size:11px;color:#8B8276;font-weight:600;margin-top:4px">${esc(r.name)}</div>`:''}
+        ${r.found?`<div class="hold-nm" title="${esc(r.name)}">${r.isUS?'<span class="us-tag">US</span>':''}${esc(r.name)}</div>`:''}
       </div>
       <div><input type="number" data-i="${i}" data-k="qty" value="${esc(h.qty??'')}" placeholder="0" min="0" step="any"></div>
       <div class="cur-wrap"><span class="cur-mark">${mark}</span>
         <input type="number" data-i="${i}" data-k="avg" value="${esc(h.avg??'')}" placeholder="0" min="0" step="any"></div>
-      <div class="row-calc">${calc}</div>
+      <div class="row-buy"${buy?' data-l="매입금액"':''}>${buy}</div>
+      <div class="row-calc${err?' is-err':''}"${err?'':' data-l="평가금액 / 손익"'}>${calc}</div>
       <div><button class="row-del" data-del="${i}" title="삭제">×</button></div>
     </div>`;
   };
