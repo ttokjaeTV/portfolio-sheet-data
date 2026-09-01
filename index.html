@@ -98,10 +98,31 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
   background:#03C75A;color:#fff;font-weight:900;font-size:11px;border-radius:3px;line-height:1;
   letter-spacing:-.5px;flex-shrink:0}
 
+/* 엑셀 시트 탭처럼 화면을 나눈다. 한 화면에 다 쌓아 두면 스크롤이 너무 길다.
+   위에 붙여 두어 어느 위치에서든 바로 옮겨 갈 수 있게 한다. */
+.tabs{position:sticky;top:0;z-index:55;display:flex;gap:6px;flex-wrap:wrap;
+  background:var(--bg);padding:14px 0 12px;margin-bottom:22px;border-bottom:2px solid var(--border)}
+.tab{font-family:inherit;font-size:14px;font-weight:800;letter-spacing:-.3px;padding:11px 17px;
+  cursor:pointer;background:var(--bg-alt);color:var(--ink-mute);border:1.5px solid var(--border);
+  border-radius:11px 11px 4px 4px;transition:all .15s ease;display:inline-flex;align-items:center;gap:7px}
+.tab:hover{color:var(--accent);border-color:var(--accent)}
+.tab.on{background:var(--dark-warm);border-color:var(--dark-warm);color:var(--white)}
+.tab .tab-n{font-size:11px;font-weight:900;padding:1px 6px;border-radius:20px;
+  background:var(--border);color:var(--ink-soft);line-height:1.5}
+.tab.on .tab-n{background:var(--accent);color:var(--white)}
+.tabpane{display:none}
+.tabpane.on{display:block}
+@media (max-width:768px){
+  .tabs{gap:5px;padding:10px 0 9px;margin-bottom:16px;overflow-x:auto;flex-wrap:nowrap;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{font-size:13px;padding:9px 13px;flex:none;white-space:nowrap}
+}
+
 .card{background:var(--white);border:1px solid var(--border);border-radius:20px;padding:28px;margin-bottom:32px}
 .step-label{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .step-line{width:28px;height:2px;background:var(--accent)}
-.step-text{font-size:12px;font-weight:800;letter-spacing:1.5px;color:var(--accent)}
+.step-text{font-size:13.5px;font-weight:900;letter-spacing:-.2px;color:var(--accent)}
 .card-desc{font-size:13px;color:var(--ink-mute);font-weight:600;margin-bottom:22px;line-height:1.75}
 .label{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--ink-mute);
   text-transform:uppercase;display:block;margin-bottom:6px}
@@ -139,7 +160,7 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 /* 종목칸은 코드만 들어가면 되니 좁게 잡고, 남는 폭은 금액·손익 쪽에 몰아준다.
    눈이 가야 하는 곳은 종목명이 아니라 숫자다. */
 .holding-head,.holding-row{display:grid;
-  grid-template-columns:124px minmax(148px,220px) 74px 108px minmax(96px,1fr) minmax(158px,1.35fr) 32px;
+  grid-template-columns:126px minmax(190px,1fr) 78px 116px 126px 196px 32px;
   gap:8px;align-items:center}
 .holding-head{padding:0 0 11px;border-bottom:1.5px solid var(--border);margin-bottom:13px}
 .holding-head span{font-size:13px;font-weight:800;letter-spacing:-.2px;color:var(--ink-soft);text-align:center}
@@ -174,6 +195,42 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .row-del:hover{border-color:var(--red);color:var(--red)}
 .empty-note{padding:28px;text-align:center;color:var(--ink-mute);font-size:14px;font-weight:600;
   background:var(--bg-alt);border-radius:14px}
+
+/* 추가매수 입력판 : 계좌 묶음 바깥에 떠 있다는 인상을 주려고
+   점선 테두리 + 흰 바탕 + 아래로 꽂히는 화살표를 쓴다 */
+.buy-panel{position:relative;margin:18px 0 26px;padding:18px 20px 20px;background:var(--white);
+  border:2px dashed var(--accent);border-radius:16px;box-shadow:0 10px 26px rgba(58,47,38,.09)}
+.buy-panel[hidden]{display:none}
+.buy-arrow{position:absolute;left:50%;bottom:-19px;transform:translateX(-50%);color:var(--accent);
+  font-size:17px;line-height:1;font-weight:900}
+.buy-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding-right:26px}
+.buy-title{font-size:15px;font-weight:900;color:var(--accent);letter-spacing:-.3px;flex:none}
+.buy-hint{font-size:12px;font-weight:600;color:var(--ink-mute);line-height:1.6}
+.buy-x{position:absolute;top:12px;right:14px;background:transparent;border:none;cursor:pointer;
+  font-size:20px;font-weight:800;color:var(--ink-mute);line-height:1;padding:2px 6px;font-family:inherit}
+.buy-x:hover{color:var(--accent)}
+.buy-step{margin-bottom:14px}
+.buy-l{display:block;font-size:12px;font-weight:800;color:var(--ink-soft);margin-bottom:8px}
+.buy-accts{display:flex;flex-wrap:wrap;gap:8px}
+.buy-a{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border-radius:10px;cursor:pointer;
+  background:var(--bg-alt);border:1.5px solid var(--border);font-size:13.5px;font-weight:700;
+  color:var(--ink-soft);font-family:inherit;transition:all .15s ease}
+.buy-a .kind-dot{width:8px;height:8px;border-radius:50%;background:var(--kc,var(--accent));flex:none}
+.buy-a:hover{border-color:var(--accent)}
+.buy-a.on{background:var(--dark-warm);border-color:var(--dark-warm);color:var(--white)}
+.buy-grid{display:grid;grid-template-columns:1fr 140px 170px;gap:10px;align-items:start}
+.buy-grid .hold-nm{margin-top:5px}
+.buy-prev{font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.7;
+  background:var(--bg-alt);border-radius:11px;padding:12px 14px;margin:4px 0 14px}
+.buy-prev.err{background:#FBE4DE;color:var(--red)}
+.buy-prev b{color:var(--accent);font-weight:900}
+.buy-prev .arw{color:var(--ink-mute);margin:0 6px;font-weight:800}
+.buy-btns{display:flex;gap:9px;flex-wrap:wrap}
+@media (max-width:768px){
+  .buy-grid{grid-template-columns:1fr}
+  .buy-head{padding-right:22px}
+  .buy-btns .btn{flex:1;justify-content:center}
+}
 .cash-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
 .acct-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
 .acct-card{background:var(--bg-alt);border:1px solid var(--border);border-radius:14px;padding:16px;
@@ -477,7 +534,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 /* 태블릿 폭에서는 칸을 더 조여야 한 줄이 안 넘친다 */
 @media (max-width:960px) and (min-width:769px){
   .holding-head,.holding-row{
-    grid-template-columns:100px minmax(112px,1fr) 60px 90px minmax(80px,1fr) minmax(132px,1.2fr) 28px;gap:6px}
+    grid-template-columns:96px minmax(110px,1fr) 56px 88px 92px 144px 26px;gap:6px}
   .holding-head span{font-size:12px}
   .holding-row input,.holding-row select{padding:9px 8px;font-size:13px}
   .cur-wrap input{padding-left:20px}
@@ -598,9 +655,18 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   </div>
 </div>
 
-<!-- STEP 01 -->
+<nav class="tabs" id="tabs" role="tablist">
+  <button class="tab on" type="button" data-tab="hold" role="tab"><span class="tab-n">1</span>보유 종목</button>
+  <button class="tab" type="button" data-tab="shot" role="tab"><span class="tab-n">2</span>캡처로 불러오기</button>
+  <button class="tab" type="button" data-tab="sum" role="tab"><span class="tab-n">3</span>전체 현황</button>
+  <button class="tab" type="button" data-tab="detail" role="tab"><span class="tab-n">4</span>종목 상세</button>
+  <button class="tab" type="button" data-tab="trend" role="tab"><span class="tab-n">5</span>자산 추이</button>
+</nav>
+
+<section class="tabpane on" data-pane="hold">
+<!-- 탭 1 : 보유 종목 -->
 <div class="card">
-  <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 01 / 보유 종목</span></div>
+  <div class="step-label"><div class="step-line"></div><span class="step-text">보유 종목 입력</span></div>
   <div class="card-desc">
     종목명이나 티커를 입력하면 목록에서 고를 수 있습니다.
     국내 ETF <b id="kr-count">—</b>종목, 국내 주식 <b id="stk-count">—</b>종목,
@@ -609,19 +675,51 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     입력한 내용은 이 브라우저에만 저장되며 서버로 전송되지 않습니다.
   </div>
 
+  <div class="btn-row" style="margin-top:0">
+    <button class="btn" id="btn-add">+ 추가매수 (종목 추가)</button>
+    <button class="btn ghost" id="btn-fold">모두 접기</button>
+    <button class="btn ghost" id="btn-clear">전체 지우기</button>
+  </div>
+
+  <!-- 계좌 묶음 바깥에 따로 떠 있는 입력판.
+       어느 계좌로든 들어갈 수 있다는 걸 위치와 모양으로 보여준다. -->
+  <div id="buy-panel" class="buy-panel" hidden>
+    <div class="buy-head">
+      <span class="buy-title">추가매수</span>
+      <span class="buy-hint">고른 계좌로 들어갑니다. 이미 가진 종목이면 수량과 평균단가를 합쳐 계산합니다.</span>
+      <button class="buy-x" id="buy-close" aria-label="닫기">×</button>
+    </div>
+    <div class="buy-step">
+      <span class="buy-l">1. 어느 계좌에 담을까요?</span>
+      <div class="buy-accts" id="buy-accts"></div>
+    </div>
+    <div class="buy-step">
+      <span class="buy-l">2. 무엇을 얼마에 샀나요?</span>
+      <div class="buy-grid">
+        <div class="search-wrap">
+          <input id="buy-code" autocomplete="off" placeholder="종목명 · 코드 · 티커">
+          <div class="search-menu" data-buymenu="1"></div>
+          <div class="hold-nm" id="buy-nm"></div>
+        </div>
+        <div><input type="number" id="buy-qty" placeholder="매수 수량" min="0" step="any"></div>
+        <div class="cur-wrap"><span class="cur-mark" id="buy-mark">₩</span>
+          <input type="number" id="buy-avg" placeholder="매수 단가" min="0" step="any"></div>
+      </div>
+    </div>
+    <div class="buy-prev" id="buy-prev"></div>
+    <div class="buy-btns">
+      <button class="btn" id="buy-ok">이 계좌에 담기</button>
+      <button class="btn ghost" id="buy-cancel">취소</button>
+    </div>
+    <div class="buy-arrow" aria-hidden="true">▼</div>
+  </div>
+
   <div class="holding-head">
     <span>계좌</span><span>종목</span><span>보유수량</span><span>평균매입가</span>
     <span>매입금액</span><span>평가금액 / 손익</span><span></span>
   </div>
   <div id="holdings"></div>
-  <div id="holdings-empty" class="empty-note">아직 등록한 종목이 없습니다. 아래 버튼으로 추가해 주세요.</div>
-
-  <div class="btn-row">
-    <button class="btn" id="btn-add">+ 종목 추가</button>
-    <button class="btn ghost" id="btn-sample">예시 채우기</button>
-    <button class="btn ghost" id="btn-fold">모두 접기</button>
-    <button class="btn ghost" id="btn-clear">전체 지우기</button>
-  </div>
+  <div id="holdings-empty" class="empty-note">아직 등록한 종목이 없습니다. 위쪽 <b>추가매수</b> 버튼으로 담아 주세요.</div>
 
   <div class="acct-mgr">
     <div class="acct-mgr-head">
@@ -636,14 +734,28 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   </div>
 </div>
 
-<!-- STEP 02 : 캡처 인식 -->
+<!-- 계좌 정보 : 보유 종목과 같은 탭에 둔다. 계좌를 만들고 예수금을 넣는 일은 종목 입력과 한 묶음이다 -->
 <div class="card">
-  <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 02 / 캡처로 불러오기 (선택)</span></div>
+  <div class="step-label"><div class="step-line"></div><span class="step-text">계좌 정보 · 예수금</span></div>
+  <div class="card-desc">
+    계좌마다 어느 증권사인지, 계좌번호 뒷자리가 무엇인지 적어두면 나중에 헷갈리지 않습니다.
+    예수금은 계좌에 남아 있는 현금(원화)이며 자산 비중과 IRP 안전자산 계산에 반영됩니다.
+  </div>
+  <div class="acct-grid" id="cash-grid"></div>
+</div>
+</section>
+
+<section class="tabpane" data-pane="shot">
+<!-- 탭 2 : 캡처 인식 -->
+<div class="card">
+  <div class="step-label"><div class="step-line"></div><span class="step-text">캡처로 불러오기 (선택)</span></div>
   <div class="card-desc">
     증권사 앱 잔고 화면을 캡처해 올리면 종목과 수량을 자동으로 읽어옵니다.
     <b>캡처를 여러 장 한 번에 올릴 수 있고</b>, 캡처마다 계좌가 자동으로 나뉩니다. 같은 종류 계좌가 겹치면 일반계좌2·연금저축펀드2 처럼 번호를 붙여 만들어 드립니다.<br>
     표가 옆으로 잘려 <b>수량과 매입가가 한 화면에 안 나오면</b> 좌우로 나눠 두 장을 올리세요. 같은 계좌·같은 종목이면 빈칸끼리 채워 한 건으로 합칩니다.
-    읽은 결과는 바로 반영하지 않고 <b>검수 화면에서 확인한 뒤</b> 추가합니다.<br>캡처에 <span class="need">보유수량</span>·<span class="need">매입단가</span> 열이 함께 나오게 찍으시면 수량과 단가까지 자동으로 채워집니다.
+    읽은 결과는 바로 반영하지 않고 <b>검수 화면에서 확인한 뒤</b> 추가합니다.<br>캡처에 <span class="need">보유수량</span>·<span class="need">매입단가</span> 열이 함께 나오게 찍으시면 수량과 단가까지 자동으로 채워집니다.<br>
+    <b>미국 주식·ETF는 증권사 앱에서 표시 통화를 달러($)로 바꾼 뒤 캡처해 주세요.</b>
+    환산 원화로 캡처하면 매입단가가 잘못 들어갑니다. 이 도구는 미국 종목을 달러 기준으로 통일해 계산합니다.
   </div>
 
   <div class="drop" id="drop">
@@ -652,7 +764,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <div class="drop-s">
       글자가 클수록 정확합니다. 화면을 확대해 캡처하면 인식률이 올라갑니다.<br>
       <span class="need">보유수량</span>·<span class="need">매입단가</span> 열이 보이도록 좌우로 밀어 캡처하면 훨씬 정확합니다.<br><b>보유 목록만 잘라서</b> 캡처하세요. 관심종목 같은 옆 화면이 같이 들어가면 섞여 읽힙니다.<br>
-      최초 1회 인식 데이터 약 8MB를 내려받습니다. <span style="opacity:.75">(v8)</span>
+      <span class="need">미국 주식·ETF는 반드시 달러 표시로 바꿔서 캡처</span>하세요. 원화로 캡처하면 매입단가가 엉뚱하게 들어갑니다.<br>
+      최초 1회 인식 데이터 약 8MB를 내려받습니다.
     </div>
     <input type="file" id="file-img" accept="image/*" multiple hidden>
   </div>
@@ -696,19 +809,12 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   </div>
 </div>
 
-<!-- STEP 03 : 예수금 -->
-<div class="card">
-  <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 03 / 계좌 정보</span></div>
-  <div class="card-desc">
-    계좌마다 어느 증권사인지, 계좌번호 뒷자리가 무엇인지 적어두면 나중에 헷갈리지 않습니다.
-    예수금은 계좌에 남아 있는 현금(원화)이며 자산 비중과 IRP 안전자산 계산에 반영됩니다.
-  </div>
-  <div class="acct-grid" id="cash-grid"></div>
-</div>
+</section>
 
-<!-- STEP 04 : 전체 현황 -->
+<section class="tabpane" data-pane="sum">
+<!-- 탭 3 : 전체 현황 -->
 <div class="card">
-  <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 04 / 전체 현황</span></div>
+  <div class="step-label"><div class="step-line"></div><span class="step-text">전체 현황</span></div>
   <div class="card-desc">모든 계좌를 원화 기준으로 합친 결과입니다.</div>
   <div class="grid-4">
     <div class="stat-card"><div class="stat-label">총 매입금액</div>
@@ -743,7 +849,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 </div>
 
 <div class="card">
-  <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 05 / IRP 위험자산 한도</span></div>
+  <div class="step-label"><div class="step-line"></div><span class="step-text">IRP 위험자산 한도</span></div>
   <div class="card-desc">
     IRP와 DC형 퇴직연금은 위험자산을 전체의 70%까지만 담을 수 있습니다. 나머지 30% 이상은 안전자산이어야 합니다.<br>
     <b>연금저축펀드는 이 규제를 받지 않습니다.</b> 그래서 아래는 IRP만 계산합니다.
@@ -751,12 +857,34 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div id="gauge-wrap"></div>
 </div>
 
+<div class="insight-box">
+  <div class="insight-label">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D9542B" stroke-width="2"><path d="M12 3l1.9 5.8L20 10l-4.5 3.3L17 20l-5-3.5L7 20l1.5-6.7L4 10l6.1-1.2L12 3z"/></svg>
+    <span class="insight-label-text">KEY INSIGHT</span>
+  </div>
+  <h3 class="insight-title" id="insight-title">종목을 입력하면 포트폴리오를 진단해 드립니다</h3>
+  <p class="insight-desc" id="insight-desc">
+    계좌가 여러 개로 흩어져 있으면 전체 자산 배분이 어떻게 되어 있는지 감이 잘 안 옵니다.
+    한 화면에 모아 놓고 보면 특정 자산군에 쏠려 있는지, 절세계좌를 제대로 쓰고 있는지가 바로 보입니다.
+  </p>
+  <div class="insight-cta">
+    <div class="insight-cta-text">📊 연금계좌 자산배분과 ETF 선택 기준, 더 알고 싶다면?</div>
+    <a href="https://www.youtube.com/@ttok_jae" target="_blank" rel="noopener" class="cta-link primary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+      똑재TV 구독하기</a>
+    <a href="https://cafe.naver.com/ttokjae" target="_blank" rel="noopener" class="cta-link secondary">
+      <span class="naver-mark">N</span>평생 ETF 투자 카페 가입</a>
+  </div>
+</div>
+</section>
+
+<section class="tabpane" data-pane="detail">
 <div class="card">
-  <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 06 / 보유 종목 상세</span></div>
+  <div class="step-label"><div class="step-line"></div><span class="step-text">보유 종목 상세</span></div>
   <div class="detail-head">
     <div class="card-desc" style="margin-bottom:0">
       국내 시세는 장중 약 10분 주기, 미국 시세는 전 거래일 종가 기준으로 갱신됩니다.<br>
-      계좌 이름을 누르면 그 계좌 종목만 볼 수 있습니다. 위쪽 계좌별 표의 행을 눌러도 됩니다.
+      계좌 이름을 누르면 그 계좌 종목만 볼 수 있습니다. ‘전체 현황’ 탭의 계좌별 표에서 행을 눌러도 같은 계좌만 볼 수 있습니다.
     </div>
     <label class="merge-toggle">
       <span class="merge-label">같은 종목 합쳐 보기<span class="merge-sub">계좌 구분 없이</span></span>
@@ -780,13 +908,16 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   </div>
 </div>
 
+</section>
+
+<section class="tabpane" data-pane="trend">
 <div class="card">
-  <div class="step-label"><div class="step-line"></div><span class="step-text">STEP 07 / 자산 추이</span></div>
+  <div class="step-label"><div class="step-line"></div><span class="step-text">자산 추이</span></div>
   <div class="card-desc">
     도구를 열 때마다 그날의 원금(매입금액)과 평가금액을 계좌별로 하루 한 번 기록합니다.
     둘을 겹쳐 그리므로 그 사이 간격이 곧 수익금입니다.
     자산이 늘어난 게 시장 덕인지 새로 넣은 돈 덕인지는 <b>추가 입금</b> 칸으로 구분할 수 있습니다.<br>
-    <b>기록은 이 브라우저에만 쌓입니다.</b> 다른 기기에서도 이어 보려면 STEP 01 위의 저장 파일을 옮겨 주세요.
+    <b>기록은 이 브라우저에만 쌓입니다.</b> 다른 기기에서도 이어 보려면 화면 맨 위의 저장 파일을 옮겨 주세요.
   </div>
   <div class="trend-head">
     <div class="trend-stats" id="trend-stats"></div>
@@ -799,26 +930,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="table-wrap" id="trend-table"></div>
   <div class="trend-log" id="trend-log"></div>
 </div>
-
-<div class="insight-box">
-  <div class="insight-label">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D9542B" stroke-width="2"><path d="M12 3l1.9 5.8L20 10l-4.5 3.3L17 20l-5-3.5L7 20l1.5-6.7L4 10l6.1-1.2L12 3z"/></svg>
-    <span class="insight-label-text">KEY INSIGHT</span>
-  </div>
-  <h3 class="insight-title" id="insight-title">종목을 입력하면 포트폴리오를 진단해 드립니다</h3>
-  <p class="insight-desc" id="insight-desc">
-    계좌가 여러 개로 흩어져 있으면 전체 자산 배분이 어떻게 되어 있는지 감이 잘 안 옵니다.
-    한 화면에 모아 놓고 보면 특정 자산군에 쏠려 있는지, 절세계좌를 제대로 쓰고 있는지가 바로 보입니다.
-  </p>
-  <div class="insight-cta">
-    <div class="insight-cta-text">📊 연금계좌 자산배분과 ETF 선택 기준, 더 알고 싶다면?</div>
-    <a href="https://www.youtube.com/@ttok_jae" target="_blank" rel="noopener" class="cta-link primary">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-      똑재TV 구독하기</a>
-    <a href="https://cafe.naver.com/ttokjae" target="_blank" rel="noopener" class="cta-link secondary">
-      <span class="naver-mark">N</span>평생 ETF 투자 카페 가입</a>
-  </div>
-</div>
+</section>
 
 <footer>
   ※ 국내 시세는 장중 약 10분 지연될 수 있고, 미국 시세는 전 거래일 종가 기준입니다. 실시간 체결가와 다릅니다.<br>
@@ -1261,6 +1373,7 @@ function renderAccts(){
       <span class="cnt">${used[a]||0}종목</span>
       <button class="acct-x" data-adel="${i}" title="${esc(a)} 계좌 지우기" aria-label="${esc(a)} 계좌 지우기">×</button></span>`;
   }).join('');
+  renderBuyAccts();   // 추가매수 판의 계좌 칩도 같이 맞춘다
 }
 function addAccount(){
   const base=accts();
@@ -1703,7 +1816,7 @@ function renderDetail(all,total){
   if(fbox){
     if(used.length>1){
       if(detailFilter&&!used.includes(detailFilter)) detailFilter='';
-      // STEP 03 에 적어 둔 증권사·계좌번호를 여기서도 같이 보여준다.
+      // 계좌 정보에 적어 둔 증권사·계좌번호를 여기서도 같이 보여준다.
       // 연금저축펀드1·2 처럼 이름만으로는 어느 증권사인지 알 수 없기 때문이다.
       const chip=(key,label,cnt,val)=>{
         const nt=(state.notes||{})[key];
@@ -1869,6 +1982,12 @@ document.addEventListener('click',e=>{
       }
       closeMenus(); renderReview(); return;
     }
+    if(menu.dataset.buymenu!==undefined){
+      document.getElementById('buy-code').value=pick.dataset.pick;
+      closeMenus(); renderBuyPreview();
+      document.getElementById('buy-qty').focus();
+      return;
+    }
     const input=menu.parentElement.querySelector('input[data-k="code"]');
     state.holdings[+input.dataset.i].code=pick.dataset.pick;
     save(); closeMenus(); render(); return;
@@ -1912,26 +2031,126 @@ document.addEventListener('focusout',e=>{
 document.getElementById('chk-merge').onchange=e=>{
   state.merge=e.target.checked; save(); render();
 };
+/* ---------- 추가매수 입력판 ----------
+   계좌 안에 빈 줄을 만드는 대신, 계좌 바깥에서 종목·수량·단가를 받아
+   고른 계좌로 넣는다. 이미 있는 종목이면 평균단가를 다시 계산해 합친다. */
+var buyAcct='';   // renderAccts() 가 스크립트 위쪽에서 먼저 부를 수 있어 var 로 둔다
+function findHolding(acct,code){
+  const c=String(code||'').toUpperCase();
+  return state.holdings.findIndex(h=>(h.acct||accts()[0])===acct
+    && String(h.code||'').toUpperCase()===c);
+}
+/* 원화는 소수 둘째, 달러는 넷째 자리까지. 뒤에 붙는 0 은 떼어낸다 */
+const roundAvg=(v,isUS)=>Number(v.toFixed(isUS?4:2));
+function buyEls(){
+  return {code:document.getElementById('buy-code'), qty:document.getElementById('buy-qty'),
+          avg:document.getElementById('buy-avg'), prev:document.getElementById('buy-prev'),
+          nm:document.getElementById('buy-nm'), mark:document.getElementById('buy-mark')};
+}
+function renderBuyAccts(){
+  const box=document.getElementById('buy-accts');
+  if(!box) return;
+  const list=accts();
+  if(!list.includes(buyAcct)) buyAcct=list[0];
+  box.innerHTML=list.map(a=>`<button type="button" class="buy-a${a===buyAcct?' on':''}"
+      data-buya="${esc(a)}" style="--kc:${kindColor(a)}"><span class="kind-dot"></span>${esc(a)}</button>`).join('')
+    +`<button type="button" class="buy-a" id="buy-newacct">+ 새 계좌</button>`;
+}
+/* 담기 전에 무슨 일이 벌어지는지 미리 보여준다. 합쳐지는 경우가 특히 그렇다. */
+function renderBuyPreview(){
+  const e=buyEls(); if(!e.prev) return;
+  const m=lookup((e.code.value||'').trim());
+  const isUS=!!(m&&m.cur==='USD');
+  e.mark.textContent=isUS?'$':'₩';
+  e.nm.innerHTML=m?`${isUS?'<span class="us-tag">US</span>':''}${esc(m.name)}`:'';
+  e.nm.title=m?m.name:'';
+  const qty=num(e.qty.value), avg=num(e.avg.value);
+  const unit=isUS?(v=>usd(v)):(v=>Math.round(v).toLocaleString('ko-KR')+'원');
+  if(!(e.code.value||'').trim()){ e.prev.className='buy-prev'; e.prev.textContent='종목을 먼저 고르세요.'; return; }
+  if(!m){ e.prev.className='buy-prev err'; e.prev.textContent='찾을 수 없는 종목입니다. 목록에서 골라 주세요.'; return; }
+  if(!(qty>0)||!(avg>0)){ e.prev.className='buy-prev'; e.prev.textContent='매수 수량과 단가를 넣으면 합쳐진 결과를 미리 보여드립니다.'; return; }
+
+  const i=findHolding(buyAcct,m.code);
+  e.prev.className='buy-prev';
+  if(i<0){
+    e.prev.innerHTML=`<b>${esc(buyAcct)}</b>에 <b>${esc(m.name)}</b>를 새로 담습니다.`
+      +`<br>${qty.toLocaleString('ko-KR')}주 · 평균 ${unit(avg)} · 매입금액 ${unit(qty*avg)}`;
+  }else{
+    const h=state.holdings[i], q0=num(h.qty), a0=num(h.avg);
+    const q1=q0+qty, a1=q1>0?roundAvg((q0*a0+qty*avg)/q1,isUS):avg;
+    e.prev.innerHTML=`<b>${esc(buyAcct)}</b>에 이미 있는 <b>${esc(m.name)}</b>와 합칩니다.`
+      +`<br>${q0.toLocaleString('ko-KR')}주 · ${unit(a0)}<span class="arw">→</span>`
+      +`<b>${q1.toLocaleString('ko-KR')}주 · ${unit(a1)}</b>`;
+  }
+}
+function openBuy(){
+  const p=document.getElementById('buy-panel');
+  renderBuyAccts(); p.hidden=false; renderBuyPreview();
+  p.scrollIntoView({behavior:'smooth',block:'nearest'});
+  document.getElementById('buy-code').focus();
+}
+function closeBuy(){
+  const e=buyEls();
+  e.code.value=''; e.qty.value=''; e.avg.value='';
+  closeMenus();
+  document.getElementById('buy-panel').hidden=true;
+}
+function commitBuy(){
+  const e=buyEls();
+  const m=lookup((e.code.value||'').trim());
+  const qty=num(e.qty.value), avg=num(e.avg.value);
+  if(!m||!(qty>0)||!(avg>0)){
+    e.prev.className='buy-prev err';
+    e.prev.textContent=!m?'종목을 목록에서 골라 주세요.':'매수 수량과 단가를 0보다 크게 넣어 주세요.';
+    return;
+  }
+  const isUS=m.cur==='USD';
+  const i=findHolding(buyAcct,m.code);
+  if(i<0){
+    state.holdings.push({acct:buyAcct,code:m.code,qty,avg});
+  }else{
+    const h=state.holdings[i], q0=num(h.qty), a0=num(h.avg);
+    const q1=q0+qty;
+    h.avg=q1>0?roundAvg((q0*a0+qty*avg)/q1,isUS):avg;
+    h.qty=Number(q1.toFixed(8));
+  }
+  if(state.fold) delete state.fold[buyAcct];   // 담은 종목이 접힌 채로 숨지 않게
+  save(); closeBuy(); render();
+}
 document.getElementById('btn-add').onclick=()=>{
-  if(state.fold) delete state.fold[accts()[0]];    // 새 종목이 접힌 채로 숨지 않게
-  state.holdings.push({acct:accts()[0],code:'',qty:'',avg:''}); save(); render();
+  const p=document.getElementById('buy-panel');
+  if(p.hidden) openBuy(); else closeBuy();
 };
+document.getElementById('buy-close').onclick=closeBuy;
+document.getElementById('buy-cancel').onclick=closeBuy;
+document.getElementById('buy-ok').onclick=commitBuy;
+['buy-code','buy-qty','buy-avg'].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener('input',()=>{ if(id==='buy-code') openMenu(el); renderBuyPreview(); });
+  el.addEventListener('keydown',ev=>{
+    if(ev.key!=='Enter') return;
+    ev.preventDefault();
+    // 검색 목록이 떠 있으면 엔터는 '담기'가 아니라 첫 항목 고르기다
+    if(id==='buy-code'){
+      const first=document.querySelector('[data-buymenu].on .search-item[data-pick]');
+      if(first){ first.click(); return; }
+    }
+    commitBuy();
+  });
+});
+document.addEventListener('click',e=>{
+  const a=e.target.closest('[data-buya]');
+  if(a){ buyAcct=a.dataset.buya; renderBuyAccts(); renderBuyPreview(); return; }
+  if(e.target.id==='buy-newacct'){
+    const n=addAccount();            // render() 안에서 계좌 칩이 다시 그려진다
+    if(n){ buyAcct=n; renderBuyAccts(); renderBuyPreview(); }
+  }
+});
+
 document.getElementById('btn-clear').onclick=()=>{
   if(!confirm('입력한 내용을 모두 지웁니다. 계속할까요?')) return;
   state={holdings:[],cash:{},notes:{},accounts:state.accounts,merge:state.merge,
          hist:state.hist,events:state.events};   // 추이 기록은 남긴다
-  save(); renderCash(); render();
-};
-document.getElementById('btn-sample').onclick=()=>{
-  state={holdings:[
-    {acct:'연금저축펀드1',code:'360750',qty:550,avg:15200},
-    {acct:'연금저축펀드1',code:'453850',qty:600,avg:8500},
-    {acct:'IRP',code:'459580',qty:2,avg:1040000},
-    {acct:'IRP',code:'489250',qty:30,avg:10000},
-    {acct:'ISA',code:'0052D0',qty:100,avg:15000},
-    {acct:'일반계좌',code:'SCHD',qty:120,avg:28.5},
-    {acct:'일반계좌',code:'QQQM',qty:20,avg:210}
-  ],cash:{'연금저축펀드1':1200,'IRP':50000}};
   save(); renderCash(); render();
 };
 
@@ -2220,7 +2439,7 @@ async function runOCR(files){
   }catch(e){
     document.getElementById('ocr-prog').classList.remove('on');
     alert('캡처를 읽지 못했습니다.\n\n'+e.message
-      +'\n\n아래 STEP 01 에서 직접 입력하셔도 됩니다.');
+      +'\n\n\u2018보유 종목\u2019 탭에서 직접 입력하셔도 됩니다.');
   }
 }
 
@@ -3444,9 +3663,11 @@ document.getElementById('btn-apply').onclick=()=>{
     alert('추가할 항목이 없습니다.\n수량이 비어 있으면 넣을 수 없습니다.'); return;
   }
   add.forEach(r=>state.holdings.push({acct:r.acct||accts()[0],code:r.code,qty:r.qty,avg:r.avg}));
-  save(); render();
+  save();
   document.getElementById('review').classList.remove('on');
   freeShots();
+  showTab('hold');            // 결과를 바로 확인하도록 보유 종목 탭으로 옮겨 준다
+  window.scrollTo({top:0,behavior:'smooth'});
   alert([add.length?`${add.length}건을 추가했습니다.`:'',
          filled?`${filled}건은 이미 있는 종목의 빈칸을 채웠습니다.`:'',
          '계좌 구분과 매입가를 확인해 주세요.'].filter(Boolean).join('\n'));
@@ -3469,13 +3690,35 @@ document.getElementById('btn-review-cancel').onclick=()=>{
   document.getElementById('review').classList.remove('on'); ocrRows=[]; freeShots();
 };
 
+/* ---------- 탭 ----------
+   숨은 칸에서는 캔버스 크기가 0 이라 차트가 찌그러진다.
+   탭을 바꾼 뒤 render() 를 다시 불러 그 탭의 차트를 새로 그린다. */
+const TABS=['hold','shot','sum','detail','trend'];
+function showTab(id){
+  if(!TABS.includes(id)) id='hold';
+  document.querySelectorAll('.tab').forEach(b=>{
+    const on=b.dataset.tab===id;
+    b.classList.toggle('on',on);
+    b.setAttribute('aria-selected',on?'true':'false');
+  });
+  document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('on',p.dataset.pane===id));
+  state.tab=id; save();
+  render();
+}
+document.getElementById('tabs').addEventListener('click',e=>{
+  const b=e.target.closest('[data-tab]');
+  if(!b) return;
+  showTab(b.dataset.tab);
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+
 /* ---------- 시작 ---------- */
 load();
 if(!state.holdings.length) state.holdings.push({acct:accts()[0],code:'',qty:'',avg:''});
 document.getElementById('chk-merge').checked=!!state.merge;
 renderAccts();
 renderCash();
-render();
+showTab(state.tab||'hold');   // 안에서 render() 까지 부른다
 loadAll();
 </script>
 </body>
