@@ -373,7 +373,10 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .hgrp[open]>summary::after{transform:rotate(180deg)}
 .hgrp>summary:hover{background:var(--border)}
 .hg-nm{color:var(--ink)}
+.hg-note{font-size:11px;font-weight:600;color:var(--ink-mute);opacity:.85}
 .hg-cnt{font-size:11px;font-weight:700;color:var(--ink-mute)}
+.chip-note{font-size:10px;font-weight:600;color:var(--ink-mute);opacity:.85}
+.merge-sub{display:block;font-size:10px;font-weight:600;color:var(--ink-mute);opacity:.8}
 .hg-val{font-size:12px;font-weight:800;color:var(--ink-mute)}
 .hg-body{padding:4px 0}
 .acct-x{background:none;border:none;padding:0 2px;margin-left:2px;cursor:pointer;
@@ -709,7 +712,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
       계좌 이름을 누르면 그 계좌 종목만 볼 수 있습니다. 위쪽 계좌별 표의 행을 눌러도 됩니다.
     </div>
     <label class="merge-toggle">
-      <span class="merge-label">같은 종목 합쳐 보기</span>
+      <span class="merge-label">같은 종목 합쳐 보기<span class="merge-sub">계좌 구분 없이</span></span>
       <span class="toggle-switch">
         <input type="checkbox" id="chk-merge">
         <span class="toggle-slider"></span>
@@ -1153,6 +1156,7 @@ function renderRows(){
     const open=order.length<2||!fold[a];
     return `<details class="hgrp" data-fold="${esc(a)}" ${open?'open':''} style="--kc:${kindColor(a)}">
       <summary><span class="kind-dot"></span><span class="hg-nm">${esc(a)}</span>
+        ${(state.notes||{})[a]?`<span class="hg-note">${esc(state.notes[a])}</span>`:''}
         <span class="hg-cnt">${list.length}종목</span>
         <span class="hg-val">${wonShort(val)}원</span></summary>
       <div class="hg-body">${list.map(rowHtml).join('')}</div>
@@ -1192,7 +1196,9 @@ function renderAccts(){
   box.innerHTML=accts().map((a,i)=>{
     const tag = isIRP(a) ? '<span class="tagline">70% 한도</span>'
               : (isTaxAdv(a) ? '<span class="tagline">절세</span>' : '');
+    const note=(state.notes||{})[a];
     return `<span class="acct-chip" data-acct="${i}" style="--kc:${kindColor(a)}"><span class="kind-dot"></span>${esc(a)}${tag}
+      ${note?`<span class="chip-note">${esc(note)}</span>`:''}
       <span class="cnt">${used[a]||0}종목</span>
       <button class="acct-x" data-adel="${i}" title="${esc(a)} 계좌 지우기" aria-label="${esc(a)} 계좌 지우기">×</button></span>`;
   }).join('');
@@ -1606,14 +1612,18 @@ function renderGauge(valid,cash){
 /* 같은 계좌·같은 종목의 로트를 하나로 합친다.
    평균매입가는 가중평균 = Σ(수량×단가) ÷ Σ수량.
    계좌가 다르면 과세·한도가 달라 합치지 않는다. */
+/* 같은 종목을 한 줄로 묶는다.
+   계좌를 가리지 않는다. 연금저축펀드1·2·IRP 에 흩어 둔 KODEX 미국S&P500 이
+   결국 몇 주인지 보려면 계좌 경계가 오히려 방해가 된다.
+   어느 계좌에 있는지는 계좌 칸에 적어 준다. */
 function mergeLots(rows){
   const map=new Map();
   rows.forEach(r=>{
-    const k=r.acct+' '+r.code;
+    const k=r.code;
     const g=map.get(k);
-    if(!g){ map.set(k,{...r,lots:1}); return; }
+    if(!g){ map.set(k,{...r,lots:1,accts:new Set([r.acct])}); return; }
     g.qty+=r.qty; g.buyC+=r.buyC; g.valC+=r.valC;
-    g.buy+=r.buy; g.val+=r.val; g.lots++;
+    g.buy+=r.buy; g.val+=r.val; g.lots++; g.accts.add(r.acct);
   });
   return [...map.values()].map(g=>{
     g.avg = g.qty>0 ? g.buyC/g.qty : 0;      // 가중평균 매입단가
@@ -1661,7 +1671,7 @@ function renderDetail(all,total){
   const fnote = detailFilter
     ? `<b>${esc(detailFilter)}</b>${dnote?` (${esc(dnote)})`:''} 계좌만 보고 있습니다. ` : '';
   note.innerHTML = fnote + (state.merge
-    ? (multi ? `같은 계좌 안에서 같은 종목 <b>${multi}건</b>을 합쳤습니다. 매입단가는 수량 가중평균입니다.`
+    ? (multi ? `같은 종목 <b>${multi}건</b>을 한 줄로 묶었습니다. 계좌가 달라도 묶습니다. 매입단가는 수량 가중평균입니다.`
              : '합칠 종목이 없습니다. 모두 한 건씩만 보유 중입니다.')
     : '정수주와 소수점주처럼 매입단가가 다른 로트를 따로 보여줍니다.');
 
@@ -1672,8 +1682,12 @@ function renderDetail(all,total){
     // 숫자만 있으면 달러인지 원인지 알 수 없다.
     const chg=(r.change>=0?'+':'-')+(r.isUS?usd(Math.abs(r.change)):won(Math.abs(r.change)));
     return `<tr>
-      <td class="tl"><span class="chip">${r.acct}</span>${
-        (state.notes||{})[r.acct]?`<span class="acct-note">${esc(state.notes[r.acct])}</span>`:''}</td>
+      <td class="tl">${
+        r.accts&&r.accts.size>1
+          ? `<span class="chip">${r.accts.size}개 계좌</span>`
+            +`<span class="acct-note">${esc([...r.accts].join(' · '))}</span>`
+          : `<span class="chip">${esc(r.acct)}</span>`
+            +((state.notes||{})[r.acct]?`<span class="acct-note">${esc(state.notes[r.acct])}</span>`:'')}</td>
       <td class="tl">${esc(r.name)}<br><span style="font-size:11px;color:#8B8276">
         ${r.isUS?'<span class="flag us">미국</span>':''}${esc(r.code)}
         ${r.lots>1?`<span class="chip lot">${r.lots}건 합산</span>`:''}</span></td>
