@@ -1,1 +1,3 @@
 tessdata/*.gz -diff -text
+vendor/**/*.wasm -diff -text
+vendor/**/*.js -diff -text
