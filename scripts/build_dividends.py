@@ -141,6 +141,7 @@ def seibro(frm, to):
             out.append({"code": isin[3:9].upper(), "date": date, "amt": amt,
                         "name": html_unescape(d.get("KOR_SECN_NM", "")),
                         "amc": d.get("REP_SECN_NM", ""),
+                        "kind": d.get("RGT_RSN_DTAIL_NM", ""),
                         "pay": d.get("TH1_PAY_TERM_BEGIN_DT", "")})
         if not fresh:
             break
@@ -197,12 +198,20 @@ def build_etf(today):
     taxmap = tracker_tax(today)
     print(f"  트래커 과표 {len(taxmap)}종", file=sys.stderr)
 
+    # ★ 상장폐지 종목의 '청산분배' 를 반드시 뺀다.
+    #   전액 상환이라 한 회차가 주가만큼 크다. 정상 분배와 섞으면 연배당이 수백 배로 뛴다.
+    #   (예: TIME 미국배당다우존스액티브 0036D0 — 월 52원짜리가 청산 12,998원으로 잡혔다)
     cut = (today - timedelta(days=365)).strftime("%Y%m%d")
-    by = {}
+    by, dropped = {}, 0
     for r in recs:
         if r["date"] < cut or r["amt"] <= 0:
             continue
+        if r.get("kind") and r["kind"] != "이익분배":
+            dropped += 1
+            continue
         by.setdefault(r["code"], []).append(r)
+    if dropped:
+        print(f"  이익분배가 아닌 회차 {dropped}건 제외 (청산분배 등)", file=sys.stderr)
 
     out = {}
     for code, rows in by.items():
