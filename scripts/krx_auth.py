@@ -116,20 +116,40 @@ def login(verbose=True):
     처리한다. 성공하면 True."""
     if not ensure(verbose):
         return False
+
+    # pykrx 는 로그인 과정에서 아이디를 stdout 에 그대로 찍는다.
+    # ★ import 시점에도 자동 로그인이 한 번 돌아 또 찍히므로,
+    #   import 까지 통째로 리다이렉트 안에 넣어야 계정이 새지 않는다.
+    import io
+    import contextlib
+    buf = io.StringIO()
     try:
-        from pykrx.website.comm.auth import login_krx
+        with contextlib.redirect_stdout(buf):
+            from pykrx.website.comm.auth import login_krx
+            ok = login_krx(os.environ["KRX_ID"], os.environ["KRX_PW"])
     except ImportError:
         if verbose:
             print("pykrx 가 없습니다. pip install pykrx", file=sys.stderr)
         return False
-    try:
-        ok = login_krx(os.environ["KRX_ID"], os.environ["KRX_PW"])
     except Exception as e:
         if verbose:
             print(f"KRX 로그인 중 오류: {type(e).__name__}", file=sys.stderr)
         return False
+
+    out = buf.getvalue()
     if verbose:
-        print(f"KRX 로그인: {'성공' if ok else '실패'}", file=sys.stderr)
+        # 아이디·비밀번호가 섞인 줄은 버리고, 조치가 필요한 안내만 남긴다
+        for line in out.splitlines():
+            if any(k in line for k in ("로그인 ID", "ID:", "PW", "패스워드 변경 필요")):
+                continue
+            if line.strip() and ("변경" in line or "http" in line or "오류" in line):
+                print("  " + line.strip(), file=sys.stderr)
+        if not ok and "비밀번호 변경" in out:
+            print("KRX 로그인 실패: 비밀번호 변경이 필요합니다 (CD010).", file=sys.stderr)
+            print("  https://data.krx.co.kr 에서 비밀번호를 바꾼 뒤 krx.env 도 같이 고쳐 주세요.",
+                  file=sys.stderr)
+        else:
+            print(f"KRX 로그인: {'성공' if ok else '실패'}", file=sys.stderr)
     return ok
 
 
