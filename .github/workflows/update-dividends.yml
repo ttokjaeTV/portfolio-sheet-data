@@ -17,7 +17,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # KRX 가 막히면 네이버로 떨어지는데 종목당 1회씩이라 15분쯤 걸린다
+    timeout-minutes: 35
 
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +53,11 @@ jobs:
           PY
 
       - name: 배당 CSV 생성
+        # KRX 계정이 Secrets 에 있으면 개별주를 시장당 1회 호출로 끝내고,
+        # 없거나 로그인이 막히면 네이버로 자동 전환한다.
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
         run: python scripts/build_dividends.py
 
       - name: 변경분만 커밋

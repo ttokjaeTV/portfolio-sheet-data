@@ -37,6 +37,7 @@ from datetime import datetime, timedelta, timezone
 
 OUT_PATH = os.environ.get("DIVIDENDS_PATH", "data/dividends.csv")
 ETF_PATH = os.environ.get("OUT_PATH", "data/etf_prices.csv")
+STOCK_PATH = os.environ.get("KR_STOCKS_PATH", "data/kr_stocks.csv")
 
 # 월배당 트래커가 매월 갱신하는 분배금 이력 (분배금·과세표준액)
 TRACKER = "https://ttokjaetv.github.io/montly-div/data/"
@@ -287,8 +288,73 @@ def build_stocks(today):
             print(f"  KRX 기준일 {d} · 배당 있는 종목 {len(out)}건", file=sys.stderr)
             break
     if not ok:
-        print("  KRX 접속 실패 — 빈 응답만 돌아왔습니다.", file=sys.stderr)
+        print("  KRX 접속 실패 — 네이버로 넘어갑니다.", file=sys.stderr)
     return out, ok
+
+
+DVR_RE = re.compile(r'id="_dvr"[^>]*>\s*([\d.,]+)')
+
+
+def build_stocks_naver(today):
+    """KRX 가 막혔을 때의 대안. 네이버 종목 페이지에서 배당수익률을 읽는다.
+
+    ★ 네이버 종목 페이지는 이제 UTF-8 이다. EUC-KR 로 디코딩하면 전부 깨진다.
+      (예전 문서에 EUC-KR 이라고 적혀 있는데 낡은 정보다.)
+
+    한계
+      - 종목당 1회 요청이라 2,700종에 15분쯤 걸린다. 주 1회면 감당된다.
+      - 주당배당금을 직접 주지 않아 `현재가 × 배당수익률` 로 역산한다.
+        시가배당률은 배당기준일 주가 기준이라 오차가 있다. 참고값으로만 쓴다.
+    """
+    if not os.path.isfile(STOCK_PATH):
+        print(f"  {STOCK_PATH} 가 없습니다. build_kr_stocks.py 를 먼저 돌리세요.",
+              file=sys.stderr)
+        return {}, False
+
+    rows = []
+    with open(STOCK_PATH, encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            code = (r.get("종목코드") or "").strip().upper()
+            if code:
+                rows.append((code, num(r.get("현재가"))))
+    limit = int(os.environ.get("STOCK_LIMIT") or 0)
+    if limit:
+        rows = rows[:limit]
+
+    out, got, fail = {}, 0, 0
+    for i, (code, price) in enumerate(rows):
+        url = f"https://finance.naver.com/item/main.naver?code={code}"
+        try:
+            req = urllib.request.Request(url, headers=UA)
+            html = urllib.request.urlopen(req, timeout=12).read().decode("utf-8", "replace")
+        except Exception:
+            fail += 1
+            continue
+        m = DVR_RE.search(html)
+        if not m:
+            continue
+        try:
+            div = float(m.group(1).replace(",", ""))
+        except ValueError:
+            continue
+        if div <= 0:
+            continue
+        dps = round(price * div / 100, 2) if price > 0 else 0
+        got += 1
+        out[code] = [code, "국내주식", dps, div, "연", 1, dps, dps, "", "", "", "네이버", ""]
+        if i % 200 == 0 and i:
+            print(f"    {i}/{len(rows)} · 배당 있는 종목 {got}건", file=sys.stderr)
+        time.sleep(0.25)
+
+    print(f"  네이버: {got}종 확보 (요청 {len(rows)}건, 실패 {fail}건)", file=sys.stderr)
+    return out, got > 0
+
+
+def num(v):
+    try:
+        return float(str(v).replace(",", "").strip() or 0)
+    except ValueError:
+        return 0.0
 
 
 def main():
@@ -299,8 +365,11 @@ def main():
     etf = build_etf(today)
     print(f"  ETF {len(etf)}종", file=sys.stderr)
 
-    print("[2/2] 국내 개별주 배당 (pykrx / KRX)", file=sys.stderr)
+    print("[2/2] 국내 개별주 배당", file=sys.stderr)
+    # 1순위 KRX(시장당 1회로 끝나고 DPS 가 정확하다) → 막히면 네이버로 떨어진다
     stk, krx_ok = build_stocks(today)
+    if not krx_ok:
+        stk, krx_ok = build_stocks_naver(today)
     print(f"  개별주 {len(stk)}종", file=sys.stderr)
 
     # ETF 코드가 개별주 쪽에 섞여 들어오면 ETF 를 우선한다
