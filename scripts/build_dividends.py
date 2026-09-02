@@ -38,6 +38,7 @@ from datetime import datetime, timedelta, timezone
 OUT_PATH = os.environ.get("DIVIDENDS_PATH", "data/dividends.csv")
 ETF_PATH = os.environ.get("OUT_PATH", "data/etf_prices.csv")
 STOCK_PATH = os.environ.get("KR_STOCKS_PATH", "data/kr_stocks.csv")
+HISTORY_PATH = os.environ.get("DIV_HISTORY_PATH", "data/dividend_history.csv")
 
 # 월배당 트래커가 매월 갱신하는 분배금 이력 (분배금·과세표준액)
 TRACKER = "https://ttokjaetv.github.io/montly-div/data/"
@@ -190,12 +191,148 @@ def tracker_tax(today):
     return out
 
 
+def seibro_stock(frm, to):
+    """세이브로 주식 배당내역 → [{code, date, pay, amt, kind, name}, ...]
+
+    ETF 와 같은 게이트웨이인데 task/action 이 다르다.
+      주식 : divStatInfoPList / ksd.safe.bip.cnts.Company.process.EntrFnafInfoPTask
+      ETF  : exerInfoDtramtPayStatPlist / ...etf.process.EtfExerInfoPTask
+
+    KRX 의 DPS 보다 이쪽이 낫다. KRX 는 연간 누계만 주는데
+    여기는 **회차별**이라 분기배당사도 구분되고 실지급일까지 나온다."""
+    hdr = {"User-Agent": UA["User-Agent"],
+           "Referer": ("https://seibro.or.kr/websquare/control.jsp"
+                       "?w2xPath=/IPORTAL/user/company/BIP_CNTS01041V.xml&menuNo=285"),
+           "Content-Type": "application/xml; charset=UTF-8"}
+    out, seen, off = [], set(), 1
+    while off < 20000:
+        xml = ("<reqParam action='divStatInfoPList'"
+               " task='ksd.safe.bip.cnts.Company.process.EntrFnafInfoPTask'>"
+               "<MENU_NO value='285'/><CMM_BTN_ABBR_NM value='조회'/>"
+               "<W2XPATH value='/IPORTAL/user/company/BIP_CNTS01041V.xml'/>"
+               f"<RGT_STD_DT_FROM value='{frm}'/><RGT_STD_DT_TO value='{to}'/>"
+               "<ISSUCO_CUSTNO value=''/><KOR_SECN_NM value=''/><SECN_KACD value=''/>"
+               "<RGT_RSN_DTAIL_SORT_CD value=''/><LIST_TPCD value=''/>"
+               f"<START_PAGE value='{off}'/><END_PAGE value='{off + SEIBRO_PAGE - 1}'/></reqParam>")
+        try:
+            req = urllib.request.Request(SEIBRO, data=xml.encode("utf-8"), headers=hdr)
+            body = urllib.request.urlopen(req, timeout=40).read().decode("utf-8", "replace")
+        except Exception as e:
+            print(f"  세이브로(주식) off={off}: {e}", file=sys.stderr)
+            break
+        rows = re.findall(r"<result>(.*?)</result>", body, re.S)
+        if not rows:
+            break
+        fresh = 0
+        for blk in rows:
+            d = dict(re.findall(r'<(\w+)\s+value="([^"]*)"', blk))
+            code = (d.get("SHOTN_ISIN") or "").strip().upper()
+            date = d.get("RGT_STD_DT", "")
+            if len(code) != 6 or len(date) != 8:
+                continue
+            key = (code, date)
+            if key in seen:
+                continue
+            seen.add(key)
+            fresh += 1
+            try:
+                amt = float(d.get("CASH_ALOC_AMT") or 0)
+            except ValueError:
+                amt = 0.0
+            out.append({"code": code, "date": date, "amt": amt,
+                        "pay": d.get("TH1_PAY_TERM_BEGIN_DT", ""),
+                        "kind": d.get("RGT_RSN_DTAIL_SORT_NM", ""),
+                        "name": html_unescape(d.get("KOR_SECN_NM", "")),
+                        "amc": d.get("LIST_TPNM", "")})
+        if not fresh:
+            break
+        off += SEIBRO_PAGE
+        time.sleep(0.2)
+    return out
+
+
+def build_stocks_seibro(today, krx):
+    """세이브로 회차별 배당 → {코드: 행}. 배당수익률은 KRX 값이 있으면 쓴다."""
+    frm = (today - timedelta(days=372)).strftime("%Y%m%d")
+    recs = seibro_stock(frm, today.strftime("%Y%m%d"))
+    print(f"  세이브로(주식) {len(recs)}건 · 종목 {len({r['code'] for r in recs})}개",
+          file=sys.stderr)
+    if not recs:
+        return {}, False
+
+    cut = (today - timedelta(days=365)).strftime("%Y%m%d")
+    by = {}
+    for r in recs:
+        if r["date"] < cut or r["amt"] <= 0:
+            continue
+        if r.get("kind") and "현금" not in r["kind"]:
+            continue                       # 주식배당(무상)은 현금이 아니라 뺀다
+        by.setdefault(r["code"], []).append(r)
+
+    out = {}
+    for code, rows in by.items():
+        rows.sort(key=lambda x: x["date"])
+        n = len(rows)
+        real = round(sum(x["amt"] for x in rows), 4)
+        last = rows[-1]
+        annual = round(last["amt"] * n, 4)
+        # 지급월은 실지급일 기준. 없으면 기준일 월로 대신한다.
+        months = sorted({int((x["pay"] or x["date"])[4:6]) for x in rows})
+        k = krx.get(code)
+        div = k[3] if k else ""
+        out[code] = [code, "국내주식", last["amt"], div, cycle_name(n), n,
+                     real, annual, "",
+                     "|".join(str(m) for m in months),
+                     f"{last['date'][:4]}-{last['date'][4:6]}-{last['date'][6:]}",
+                     "seibro" + ("+KRX" if k else ""), ""]
+    return out, bool(out)
+
+
+def append_history(recs):
+    """받아온 회차를 이력 파일에 덧붙인다. 지우지 않는다.
+
+    dividends.csv 는 '최근 1년' 롤링이라 오래된 회차가 밀려 사라진다.
+    분배금 성장 추이 같은 걸 나중에 보려면 원본이 남아 있어야 한다.
+    세이브로가 과거를 계속 갖고 있긴 하지만(KODEX 200 은 2003년부터),
+    전 종목 10년치를 다시 긁으면 한 시간이 걸린다. 매주 몇 건씩 쌓아두는 편이 싸다.
+
+    (종목코드, 지급기준일) 로 중복을 거른다."""
+    old = {}
+    if os.path.isfile(HISTORY_PATH):
+        with open(HISTORY_PATH, encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                key = (r.get("종목코드", ""), r.get("지급기준일", ""))
+                if key[0] and key[1]:
+                    old[key] = r
+
+    before = len(old)
+    for x in recs:
+        key = (x["code"], x["date"])
+        if key in old:
+            continue
+        old[key] = {"종목코드": x["code"], "지급기준일": x["date"],
+                    "실지급일": x.get("pay", ""), "주당분배금": x["amt"],
+                    "배당구분": x.get("kind", ""), "종목명": x.get("name", ""),
+                    "운용사": x.get("amc", "")}
+
+    cols = ["종목코드", "지급기준일", "실지급일", "주당분배금", "배당구분", "종목명", "운용사"]
+    os.makedirs(os.path.dirname(HISTORY_PATH) or ".", exist_ok=True)
+    with open(HISTORY_PATH, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        for key in sorted(old, key=lambda k: (k[0], k[1])):
+            w.writerow({c: old[key].get(c, "") for c in cols})
+    print(f"  이력 누적: {len(old)}건 (신규 {len(old) - before}건) → {HISTORY_PATH}",
+          file=sys.stderr)
+
+
 def build_etf(today):
     """세이브로 분배금(전 종목) + 트래커 과표(189종) → {코드: 행}."""
     frm = (today - timedelta(days=372)).strftime("%Y%m%d")
     to = today.strftime("%Y%m%d")
     recs = seibro(frm, to)
     print(f"  세이브로 {len(recs)}건 · 종목 {len({r['code'] for r in recs})}개", file=sys.stderr)
+    append_history(recs)
     taxmap = tracker_tax(today)
     print(f"  트래커 과표 {len(taxmap)}종", file=sys.stderr)
 
@@ -361,16 +498,22 @@ def main():
     today = datetime.now(KST).date()
     stamp = now_kst()
 
-    print("[1/2] 국내 ETF 분배금 (월배당 트래커)", file=sys.stderr)
+    print("[1/2] 국내 ETF 분배금 (세이브로 전 종목 + 트래커 과표)", file=sys.stderr)
     etf = build_etf(today)
     print(f"  ETF {len(etf)}종", file=sys.stderr)
 
     print("[2/2] 국내 개별주 배당", file=sys.stderr)
-    # 1순위 KRX(시장당 1회로 끝나고 DPS 가 정확하다) → 막히면 네이버로 떨어진다
-    stk, krx_ok = build_stocks(today)
-    if not krx_ok:
-        stk, krx_ok = build_stocks_naver(today)
+    # KRX 는 배당수익률(DIV)을 주고, 세이브로는 회차별 금액·지급월을 준다.
+    # 둘을 합치는 게 가장 정확하다. 세이브로가 실패하면 KRX 만으로,
+    # 그것도 안 되면 네이버로 내려간다.
+    krx, krx_ok = build_stocks(today)
+    stk, ok = build_stocks_seibro(today, krx)
+    if not ok:
+        stk, ok = krx, krx_ok
+    if not ok:
+        stk, ok = build_stocks_naver(today)
     print(f"  개별주 {len(stk)}종", file=sys.stderr)
+    krx_ok = ok
 
     # ETF 코드가 개별주 쪽에 섞여 들어오면 ETF 를 우선한다
     merged = {}
