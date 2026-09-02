@@ -252,6 +252,9 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .mcell{width:15px;height:17px;border-radius:3px;background:var(--bg-alt);color:#B9AF9F;
   font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1}
 .mcell.on{background:var(--accent);color:var(--white)}
+/* 평소의 2배 넘는 회차가 있던 달 — 결산·특별배당이 몰린 달이다 */
+.mcell.big{background:var(--dark-warm);color:var(--white)}
+.mtip{display:none}
 .mnone{font-size:11px;font-weight:700;color:var(--ink-mute)}
 @media (max-width:768px){ .mcell{width:13px;height:15px;font-size:8px} }
 @media (max-width:768px){
@@ -1015,7 +1018,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 
   <div class="div-block">
     <div class="chart-title">종목별 배당</div>
-    <div class="chart-subtitle">실지급 = 최근 12개월 합계 · 연환산 = 최근 1회 × 연 지급횟수</div>
+    <div class="chart-subtitle">실지급 = 최근 12개월 합계 · 연환산 = 최근 1회 × 연 지급횟수<br>지급월 띠에서 <b style="color:#3A2F26">진한 칸</b>은 평소보다 2배 넘게 나온 달입니다 — 결산배당이거나 특별배당입니다. 칸에 마우스를 올리면 그달 금액이 보입니다.</div>
     <div class="table-wrap">
       <table class="data-table">
         <thead><tr>
@@ -1188,8 +1191,13 @@ async function loadAll(){
           real:num(r[6]), annual:num(r[7]),
           tax:r[8]===''?null:num(r[8]),          // null = 과표 미확인
           months:(r[9]||'').split('|').map(v=>parseInt(v,10)).filter(v=>v>=1&&v<=12),
-          lastPaid:r[10]||'', src:r[11]||''};
-        DIV_STAMP=r[12]||DIV_STAMP;
+          // 회차내역 '월:금액;월:금액' → {월: 금액}. 큰 회차를 짚어 주는 데 쓴다.
+          byMonth:(()=>{ const o={};
+            (r[10]||'').split(';').forEach(p=>{ const [m,v]=p.split(':');
+              const mm=parseInt(m,10); if(mm>=1&&mm<=12) o[mm]=(o[mm]||0)+num(v); });
+            return o; })(),
+          lastPaid:r[11]||'', src:r[12]||''};
+        DIV_STAMP=r[13]||DIV_STAMP;
       });
     }
 
@@ -2085,13 +2093,24 @@ function renderDivGauge(list){
        </div>
      </div>`;
 }
-/* 12칸 띠. 어느 달에 들어오는지 한눈에 보라고 숫자 대신 칸으로 그린다 */
-function monthStrip(ms){
+/* 12칸 띠. 어느 달에 들어오는지 한눈에 보라고 숫자 대신 칸으로 그린다.
+   평소보다 큰 회차가 있던 달은 색을 달리해 짚어 준다 — 결산배당이든
+   특별배당이든 '이 달에 몰아서 나왔다' 는 건 보여야 하기 때문이다.
+   (정기·특별 구분은 세이브로·DART 어디에도 없어 우리가 못 가른다) */
+function monthStrip(ms,by,qty){
   if(!ms||!ms.length) return '<span class="mnone">지급월 미상</span>';
   const on=new Set(ms);
-  let s='<span class="mrow" title="'+ms.join('·')+'월 지급">';
-  for(let m=1;m<=12;m++) s+=`<span class="mcell${on.has(m)?' on':''}">${m}</span>`;
-  return s+'</span>';
+  const vals=Object.values(by||{}).filter(v=>v>0).sort((a,b)=>a-b);
+  const med=vals.length?vals[Math.floor(vals.length/2)]:0;
+  const big=v=>med>0&&vals.length>1&&v>med*2;
+  let tip=[], s='<span class="mrow">';
+  for(let m=1;m<=12;m++){
+    const v=(by||{})[m]||0;
+    if(on.has(m)) tip.push(`${m}월 ${won(v*(qty||1))}${big(v)?' ←':''}`);
+    s+=`<span class="mcell${on.has(m)?(big(v)?' big':' on'):''}"`
+      +`${v>0?` title="${m}월 ${won(v*(qty||1))}"`:''}>${m}</span>`;
+  }
+  return s+'</span>'+(tip.length?`<span class="mtip" title="${esc(tip.join(' · '))}"></span>`:'');
 }
 function renderDivTable(list){
   const body=document.getElementById('div-body');
@@ -2111,7 +2130,7 @@ function renderDivTable(list){
       <td class="tl">${esc(r.name)}<br><span style="font-size:11px;color:#8B8276;font-weight:600">${esc(r.code)}</span></td>
       <td>${d.dps>0?won(d.dps):(d.perYear>0?won(d.annual/d.perYear):'—')}</td>
       <td>${esc(d.cycle)}${d.perYear?` <span class="th-sub">${d.perYear}회</span>`:''}</td>
-      <td class="tl">${monthStrip(d.months)}</td>
+      <td class="tl">${monthStrip(d.months,d.byMonth,r.qty)}</td>
       <td><b>${won(x.real)}</b></td>
       <td>${won(x.annual)}${Math.abs(x.annual-x.real)<1&&d.perYear>1
         ?'<span class="th-sub" style="display:block">회차 편차 커서 실지급 사용</span>':''}</td>

@@ -55,7 +55,7 @@ KST = timezone(timedelta(hours=9))
 UA = {"User-Agent": "Mozilla/5.0"}
 
 HEADER = ["종목코드", "구분", "주당배당금", "배당수익률", "지급주기", "연지급횟수",
-          "연배당_실지급", "연배당_연환산", "과표_실지급", "지급월",
+          "연배당_실지급", "연배당_연환산", "과표_실지급", "지급월", "회차내역",
           "최근지급일", "출처", "갱신시각"]
 
 
@@ -284,9 +284,18 @@ def build_stocks_seibro(today, krx):
         out[code] = [code, "국내주식", last["amt"], div,
                      cycle_name(n), n, real, annual, "",
                      "|".join(str(m) for m in months),
+                     detail_str(rows, lambda r: int((r["pay"] or r["date"])[4:6])),
                      f"{last['date'][:4]}-{last['date'][4:6]}-{last['date'][6:]}",
                      "seibro" + ("+KRX" if k else ""), ""]
     return out, bool(out)
+
+
+def detail_str(rows, month_of):
+    """회차 내역을 '월:금액' 으로 잇는다. 화면에서 큰 회차를 짚어 주려고 쓴다.
+
+    특별배당인지 결산배당인지는 못 가린다(세이브로·DART 어디에도 구분이 없다).
+    대신 회차를 그대로 보여줘서 보는 사람이 판단하게 한다."""
+    return ";".join(f"{month_of(r)}:{r['amt']:g}" for r in rows)
 
 
 def even_enough(amts):
@@ -388,6 +397,7 @@ def build_etf(today):
         out[code] = [code, "국내ETF", "", "", cycle_name(n), n,
                      real, annual, tax,
                      "|".join(str(m) for m in months),
+                     detail_str(rows, lambda r: int(r["date"][4:6])),
                      f"{last['date'][:4]}-{last['date'][4:6]}-{last['date'][6:]}", src, ""]
     return out
 
@@ -438,7 +448,7 @@ def build_stocks(today):
                 # 추측해 넣지 않고 '지급월 미상'으로 따로 센다.
                 out[str(code).upper()] = [str(code).upper(), "국내주식",
                                           dps, div, "연", 1,
-                                          dps, dps, "", "", "", "KRX", ""]
+                                          dps, dps, "", "", "", "", "KRX", ""]
         if got_any:
             ok = True
             print(f"  KRX 기준일 {d} · 배당 있는 종목 {len(out)}건", file=sys.stderr)
@@ -497,7 +507,7 @@ def build_stocks_naver(today):
             continue
         dps = round(price * div / 100, 2) if price > 0 else 0
         got += 1
-        out[code] = [code, "국내주식", dps, div, "연", 1, dps, dps, "", "", "", "네이버", ""]
+        out[code] = [code, "국내주식", dps, div, "연", 1, dps, dps, "", "", "", "", "네이버", ""]
         if i % 200 == 0 and i:
             print(f"    {i}/{len(rows)} · 배당 있는 종목 {got}건", file=sys.stderr)
         time.sleep(0.25)
