@@ -213,6 +213,15 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .ask-b-t{display:block;font-size:14px;font-weight:800;color:var(--ink)}
 .ask-b-d{display:block;font-size:12px;font-weight:600;color:var(--ink-mute);margin-top:3px;line-height:1.5}
 
+/* 3지선다 세그먼트 버튼 (안 묶음 / 성격별 / 전부) */
+.seg{display:inline-flex;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;flex:none}
+.seg-b{font-family:inherit;font-size:12.5px;font-weight:800;padding:8px 13px;cursor:pointer;
+  background:var(--white);color:var(--ink-mute);border:none;border-left:1.5px solid var(--border);
+  transition:all .15s ease;white-space:nowrap}
+.seg-b:first-child{border-left:none}
+.seg-b:hover{color:var(--accent)}
+.seg-b.on{background:var(--dark-warm);color:var(--white)}
+
 /* ---------- 배당 탭 ---------- */
 .div-block{margin-top:30px;padding-top:24px;border-top:1px solid var(--border)}
 .div-stamp{display:block;margin-top:6px;font-size:11px;font-weight:700;color:var(--ink-mute)}
@@ -954,13 +963,14 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
       국내 시세는 장중 약 10분 주기, 미국 시세는 전 거래일 종가 기준으로 갱신됩니다.<br>
       계좌 이름을 누르면 그 계좌 종목만 볼 수 있습니다. ‘전체 현황’ 탭의 계좌별 표에서 행을 눌러도 같은 계좌만 볼 수 있습니다.
     </div>
-    <label class="merge-toggle">
-      <span class="merge-label">같은 종목 합쳐 보기<span class="merge-sub">계좌 구분 없이</span></span>
-      <span class="toggle-switch">
-        <input type="checkbox" id="chk-merge">
-        <span class="toggle-slider"></span>
-      </span>
-    </label>
+    <div class="merge-toggle">
+      <span class="merge-label">같은 종목 합쳐 보기<span class="merge-sub">매입단가는 수량 가중평균</span></span>
+      <div class="seg" id="seg-merge">
+        <button type="button" class="seg-b" data-merge="0">안 묶음</button>
+        <button type="button" class="seg-b" data-merge="1">성격별</button>
+        <button type="button" class="seg-b" data-merge="2">전부</button>
+      </div>
+    </div>
   </div>
   <div class="merge-note" id="merge-note"></div>
   <div class="acct-filter" id="acct-filter"></div>
@@ -2208,12 +2218,16 @@ function renderGauge(valid,cash){
    계좌를 가리지 않는다. 연금저축펀드1·2·IRP 에 흩어 둔 KODEX 미국S&P500 이
    결국 몇 주인지 보려면 계좌 경계가 오히려 방해가 된다.
    어느 계좌에 있는지는 계좌 칸에 적어 준다. */
-function mergeLots(rows){
+/* byKind 면 같은 성격 계좌끼리만 합친다(연금저축펀드1·2 → 연금저축펀드).
+   연금·ISA·일반은 세금이 달라 섞으면 안 되기 때문이다.
+   아니면 계좌 구분 없이 전부 합친다 — 총 몇 주 들고 있나를 볼 때 쓴다. */
+function mergeLots(rows,byKind){
   const map=new Map();
   rows.forEach(r=>{
-    const k=r.code;
+    const k=byKind ? acctKind(r.acct)+'|'+r.code : r.code;
     const g=map.get(k);
-    if(!g){ map.set(k,{...r,lots:1,accts:new Set([r.acct])}); return; }
+    if(!g){ map.set(k,{...r,acct:byKind?acctKind(r.acct):r.acct,
+                       lots:1,accts:new Set([r.acct])}); return; }
     g.qty+=r.qty; g.buyC+=r.buyC; g.valC+=r.valC;
     g.buy+=r.buy; g.val+=r.val; g.lots++; g.accts.add(r.acct);
   });
@@ -2257,14 +2271,20 @@ function renderDetail(all,total){
     note.textContent=''; return;
   }
 
-  const rows = state.merge ? mergeLots(valid) : valid;
-  const multi = state.merge ? rows.filter(r=>r.lots>1).length : 0;
+  // merge : 0=안 묶음 · 1=같은 성격 계좌끼리 · 2=계좌 구분 없이 전부
+  const mode = state.merge===true ? 2 : (+state.merge||0);
+  const rows = mode ? mergeLots(valid,mode===1) : valid;
+  const multi = mode ? rows.filter(r=>r.lots>1).length : 0;
   const dnote = detailFilter ? (state.notes||{})[detailFilter] : '';
   const fnote = detailFilter
     ? `<b>${esc(detailFilter)}</b>${dnote?` (${esc(dnote)})`:''} 계좌만 보고 있습니다. ` : '';
-  note.innerHTML = fnote + (state.merge
-    ? (multi ? `같은 종목 <b>${multi}건</b>을 한 줄로 묶었습니다. 계좌가 달라도 묶습니다. 매입단가는 수량 가중평균입니다.`
-             : '합칠 종목이 없습니다. 모두 한 건씩만 보유 중입니다.')
+  note.innerHTML = fnote + (mode
+    ? (multi
+        ? `같은 종목 <b>${multi}건</b>을 한 줄로 묶었습니다. 매입단가는 수량 가중평균입니다. `
+          +(mode===1
+            ? '<b>성격이 같은 계좌끼리만</b> 묶습니다 — 연금저축펀드1·2 는 합치고, 연금·ISA·일반은 세금이 달라 따로 둡니다.'
+            : '계좌 성격을 가리지 않고 전부 묶습니다. 총 보유량을 볼 때 쓰세요.')
+        : '합칠 종목이 없습니다. 모두 한 건씩만 보유 중입니다.')
     : '정수주와 소수점주처럼 매입단가가 다른 로트를 따로 보여줍니다.');
 
   body.innerHTML=rows.slice().sort((a,b)=>b.val-a.val).map(r=>{
@@ -2276,7 +2296,9 @@ function renderDetail(all,total){
     return `<tr>
       <td class="tl">${
         r.accts&&r.accts.size>1
-          ? `<span class="chip">${r.accts.size}개 계좌</span>`
+          // 성격별로 묶었으면 성격 이름을 쓴다. 전부 묶었으면 개수만 쓴다.
+          ? `<span class="chip">${mode===1?esc(r.acct):r.accts.size+'개 계좌'}</span>`
+            +(mode===1?`<span class="chip">${r.accts.size}개</span>`:'')
             +`<span class="acct-note">${esc([...r.accts].join(' · '))}</span>`
           : `<span class="chip">${esc(r.acct)}</span>`
             +((state.notes||{})[r.acct]?`<span class="acct-note">${esc(state.notes[r.acct])}</span>`:'')}</td>
@@ -2467,9 +2489,15 @@ document.addEventListener('focusout',e=>{
   }
 });
 
-document.getElementById('chk-merge').onchange=e=>{
-  state.merge=e.target.checked; save(); render();
-};
+function paintSegMerge(){
+  const m=state.merge===true?2:(+state.merge||0);
+  document.querySelectorAll('#seg-merge .seg-b').forEach(b=>
+    b.classList.toggle('on',+b.dataset.merge===m));
+}
+document.getElementById('seg-merge').addEventListener('click',e=>{
+  const b=e.target.closest('[data-merge]'); if(!b) return;
+  state.merge=+b.dataset.merge; save(); paintSegMerge(); render();
+});
 document.getElementById('chk-div-merge').onchange=e=>{
   state.divMerge=e.target.checked; save(); render();
 };
@@ -2666,7 +2694,7 @@ document.getElementById('file-json').onchange=e=>{
 
       state={holdings:d.holdings,cash:d.cash||{},notes:d.notes||{},
              accounts:d.accounts,merge:!!d.merge,divMerge:!!d.divMerge,tab:state.tab,hist,events};
-      document.getElementById('chk-merge').checked=!!state.merge;
+      paintSegMerge();
       document.getElementById('chk-div-merge').checked=!!state.divMerge;
       save(); renderCash(); render();
       alert(`불러왔습니다. 종목 ${state.holdings.length}건 · 추이 기록 ${(state.hist||[]).length}일치`);
@@ -4217,7 +4245,7 @@ document.getElementById('tabs').addEventListener('click',e=>{
 /* ---------- 시작 ---------- */
 load();
 if(!state.holdings.length) state.holdings.push({acct:accts()[0],code:'',qty:'',avg:''});
-document.getElementById('chk-merge').checked=!!state.merge;
+paintSegMerge();
 document.getElementById('chk-div-merge').checked=!!state.divMerge;
 renderAccts();
 renderCash();
