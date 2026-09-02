@@ -28,6 +28,8 @@
 import csv
 import json
 import os
+import re
+import time
 import sys
 import urllib.request
 from collections import defaultdict
@@ -39,6 +41,13 @@ ETF_PATH = os.environ.get("OUT_PATH", "data/etf_prices.csv")
 # 월배당 트래커가 매월 갱신하는 분배금 이력 (분배금·과세표준액)
 TRACKER = "https://ttokjaetv.github.io/montly-div/data/"
 TRACKER_FILES = ["tax-base.json", "tax-base-extra.json"]
+
+# 한국예탁결제원 세이브로 — 전 운용사 ETF 분배금 지급현황.
+# 자세한 함정은 docs/과세기준가_수집.md 참고.
+SEIBRO = "https://seibro.or.kr/websquare/engine/proworks/callServletService.jsp"
+SEIBRO_REF = ("https://seibro.or.kr/websquare/control.jsp"
+              "?w2xPath=/IPORTAL/user/etf/BIP_CNTS06030V.xml&menuNo=179")
+SEIBRO_PAGE = 30          # 한 번에 30건 고정. START_PAGE 는 행 오프셋이다.
 
 KST = timezone(timedelta(hours=9))
 UA = {"User-Agent": "Mozilla/5.0"}
@@ -82,6 +91,68 @@ def norm_date(v):
     if len(p) != 3 or not all(x.isdigit() for x in p):
         return ""
     return f"{int(p[0]):04d}-{int(p[1]):02d}-{int(p[2]):02d}"
+
+
+def seibro(frm, to):
+    """세이브로 분배금 지급현황 → [{code, date, amt, name, amc}, ...]
+
+    ★ Content-Type 은 반드시 application/xml. form-urlencoded 로 보내면
+      에러 코드 없이 '서버오류2' 만 돌아온다.
+    ★ START_PAGE 는 페이지 번호가 아니라 행 오프셋(1, 31, 61 …)이다.
+    ★ 필드명이 값과 어긋난다. ESTM_STDPRC 가 분배금, TAXSTD 가 과표기준가다."""
+    hdr = {"User-Agent": UA["User-Agent"], "Referer": SEIBRO_REF,
+           "Content-Type": "application/xml; charset=UTF-8"}
+    out, seen, off = [], set(), 1
+    while off < 6000:
+        xml = ("<reqParam action='exerInfoDtramtPayStatPlist'"
+               " task='ksd.safe.bip.cnts.etf.process.EtfExerInfoPTask'>"
+               "<MENU_NO value='179'/><CMM_BTN_ABBR_NM value='조회'/>"
+               "<W2XPATH value='/IPORTAL/user/etf/BIP_CNTS06030V.xml'/>"
+               "<etf_sort_level_cd value=''/><etf_big_sort_cd value=''/>"
+               "<etf_sort_cd value=''/><isin value=''/><mngco_custno value=''/>"
+               "<RGT_RSN_DTAIL_SORT_CD value=''/>"
+               f"<START_PAGE value='{off}'/><END_PAGE value='{off + SEIBRO_PAGE - 1}'/>"
+               f"<fromRGT_STD_DT value='{frm}'/><toRGT_STD_DT value='{to}'/></reqParam>")
+        try:
+            req = urllib.request.Request(SEIBRO, data=xml.encode("utf-8"), headers=hdr)
+            body = urllib.request.urlopen(req, timeout=40).read().decode("utf-8", "replace")
+        except Exception as e:
+            print(f"  세이브로 off={off}: {e}", file=sys.stderr)
+            break
+        rows = re.findall(r"<result>(.*?)</result>", body, re.S)
+        if not rows:
+            break
+        fresh = 0
+        for blk in rows:
+            d = dict(re.findall(r'<(\w+)\s+value="([^"]*)"', blk))
+            isin = d.get("ISIN", "")
+            date = d.get("RGT_STD_DT", "")
+            if len(isin) < 9 or len(date) != 8:
+                continue
+            key = (isin, date)
+            if key in seen:
+                continue
+            seen.add(key)
+            fresh += 1
+            try:
+                amt = float(d.get("ESTM_STDPRC") or 0)
+            except ValueError:
+                amt = 0.0
+            out.append({"code": isin[3:9].upper(), "date": date, "amt": amt,
+                        "name": html_unescape(d.get("KOR_SECN_NM", "")),
+                        "amc": d.get("REP_SECN_NM", ""),
+                        "pay": d.get("TH1_PAY_TERM_BEGIN_DT", "")})
+        if not fresh:
+            break
+        off += SEIBRO_PAGE
+        time.sleep(0.25)
+    return out
+
+
+def html_unescape(s):
+    for a, b in (("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"')):
+        s = s.replace(a, b)
+    return s
 
 
 def build_etf(today):
