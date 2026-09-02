@@ -28,6 +28,9 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 .price-stamp{font-size:11px;font-weight:700;color:var(--ink-mute);text-align:right;line-height:1.7}
 .price-stamp b{color:var(--accent);font-weight:800}
 .price-stamp .stamp-t{font-size:10px;font-weight:800;letter-spacing:.5px;opacity:.75}
+.price-stamp .stamp-ago{font-size:10px;font-weight:700;color:var(--ink-mute);
+  background:var(--bg-alt);border-radius:5px;padding:1px 5px;margin-left:3px}
+.price-stamp .stamp-ago.old{background:#F6D9D4;color:var(--red);font-weight:800}
 
 /* 지수 상황판 */
 .board{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);
@@ -1245,13 +1248,45 @@ async function loadAll(){
     buildNameIndex();
     // 환율은 위 지수 상황판에 이미 있으므로 여기서는 뺀다.
     // 여기는 '시세를 언제 받아왔나' 만 보여주는 자리다.
-    stamp.innerHTML=`<span class="stamp-t">시세 기준</span>`
-      +`<br>국내 <b>${STAMP||'—'}</b><br>미국 <b>${STAMP_US||'—'}</b>`;
+    renderStamp();
   }catch(e){
     stamp.innerHTML='<span style="color:#C0392B">시세를 불러오지 못했습니다</span><br>네트워크를 확인해 주세요';
   }
   render();
 }
+
+/* 시세를 언제 받아왔는지, 그리고 얼마나 지났는지.
+   12:31 이든 15:31 이든 똑같이 보이면 3시간 전 가격을 현재가로 착각한다.
+   GitHub 예약 실행이 자주 밀리므로 이 표시가 특히 필요하다. */
+function agoText(s){
+  if(!s) return null;
+  // 'YYYY-MM-DD HH:MM' (KST 기록). 브라우저 시간대와 무관하게 KST 로 읽는다.
+  const m=/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(s);
+  if(!m) return null;
+  const t=Date.UTC(+m[1],+m[2]-1,+m[3],+m[4]-9,+m[5]);   // KST → UTC
+  const min=Math.floor((Date.now()-t)/60000);
+  if(min<0) return {min:0,txt:'방금'};
+  if(min<60) return {min,txt:`${min}분 전`};
+  const h=Math.floor(min/60);
+  if(h<24) return {min,txt:`${h}시간 ${min%60}분 전`};
+  return {min,txt:`${Math.floor(h/24)}일 전`};
+}
+function renderStamp(){
+  const el=document.getElementById('price-stamp');
+  if(!el) return;
+  const line=(label,s)=>{
+    const a=agoText(s);
+    if(!s) return `${label} <b>—</b>`;
+    // 60분 넘게 벌어지면 눈에 띄게 해 오래된 값을 현재가로 착각하지 않게 한다
+    const old=a&&a.min>=60;
+    return `${label} <b>${esc(s)}</b>`
+      +(a?` <span class="stamp-ago${old?' old':''}">${a.txt}</span>`:'');
+  };
+  el.innerHTML=`<span class="stamp-t">시세 기준</span><br>`
+    +line('국내',STAMP)+'<br>'+line('미국',STAMP_US);
+}
+// 화면을 켜 둔 채 시간이 흐르면 '몇 분 전' 이 틀어진다. 1분마다 다시 그린다.
+setInterval(renderStamp,60000);
 
 /* ---------- 지수 상황판 ---------- */
 function renderBoard(rows){
