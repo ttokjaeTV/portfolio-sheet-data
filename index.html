@@ -1017,7 +1017,16 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   </div>
 
   <div class="div-block">
-    <div class="chart-title">종목별 배당</div>
+    <div class="detail-head">
+      <div class="chart-title" style="margin:0">종목별 배당</div>
+      <label class="merge-toggle">
+        <span class="merge-label">같은 성격 계좌 묶어 보기<span class="merge-sub">연금저축펀드1·2 → 연금저축펀드</span></span>
+        <span class="toggle-switch">
+          <input type="checkbox" id="chk-div-merge">
+          <span class="toggle-slider"></span>
+        </span>
+      </label>
+    </div>
     <div class="chart-subtitle">실지급 = 최근 12개월 합계 · 연환산 = 최근 1회 × 연 지급횟수<br>지급월 띠에서 <b style="color:#3A2F26">진한 칸</b>은 평소보다 2배 넘게 나온 달입니다 — 결산배당이거나 특별배당입니다. 칸에 마우스를 올리면 그달 금액이 보입니다.</div>
     <div class="table-wrap">
       <table class="data-table">
@@ -2120,13 +2129,31 @@ function renderDivTable(list){
     if(d.real>0&&d.tax<d.real*0.99) return `<span class="dv-chip part">일부과세 ${Math.round(d.tax/d.real*100)}%</span>`;
     return '<span class="dv-chip">전액과세</span>';
   };
-  const rows=list.slice().sort((a,b)=>b.real-a.real);
-  body.innerHTML=rows.map(x=>{
-    const r=x.r, d=x.d;
+  // 켜면 같은 성격 계좌(연금저축펀드1·2 …)의 같은 종목을 한 줄로 합친다.
+  // 성격이 다르면 세후가 달라지므로 어떤 경우에도 합치지 않는다.
+  const on=!!state.divMerge;
+  const g={};
+  list.forEach(x=>{
+    const nm=on?acctKind(x.r.acct):x.r.acct;
+    const k=nm+'|'+x.r.code;
+    const t=g[k]||(g[k]={kindNm:nm,accts:new Set(),d:x.d,
+      code:x.r.code,name:x.r.name,real:0,annual:0,qty:0,buy:0,val:0,kc:kindColor(x.r.acct)});
+    t.accts.add(x.r.acct);
+    t.real+=x.real; t.annual+=x.annual;
+    t.qty+=x.r.qty; t.buy+=x.r.buy; t.val+=x.r.val;
+  });
+  const rows=Object.values(g).sort((a,b)=>b.real-a.real);
+  body.innerHTML=rows.map(t=>{
+    const d=t.d, r={acct:t.kindNm,code:t.code,name:t.name,qty:t.qty,
+      // 배당률·YOC 는 합친 금액끼리 나눠야 맞다. 계좌마다 매입가가 다르기 때문이다.
+      price:t.qty>0?t.val/t.qty:0, avg:t.qty>0?t.buy/t.qty:0};
+    const x={real:t.real,annual:t.annual};
     const yld=r.price>0?d.real/r.price*100:0;
     const yoc=r.avg>0?d.real/r.avg*100:0;
+    const n=t.accts.size;
     return `<tr>
-      <td class="tl"><span class="kind-dot" style="--kc:${kindColor(r.acct)}"></span> ${esc(r.acct)}</td>
+      <td class="tl"><span class="kind-dot" style="--kc:${t.kc}"></span> ${esc(t.kindNm)}
+        ${n>1?`<span class="dv-chip">${n}개 계좌</span>`:''}</td>
       <td class="tl">${esc(r.name)}<br><span style="font-size:11px;color:#8B8276;font-weight:600">${esc(r.code)}</span></td>
       <td>${d.dps>0?won(d.dps):(d.perYear>0?won(d.annual/d.perYear):'—')}</td>
       <td>${esc(d.cycle)}${d.perYear?` <span class="th-sub">${d.perYear}회</span>`:''}</td>
@@ -2443,6 +2470,9 @@ document.addEventListener('focusout',e=>{
 document.getElementById('chk-merge').onchange=e=>{
   state.merge=e.target.checked; save(); render();
 };
+document.getElementById('chk-div-merge').onchange=e=>{
+  state.divMerge=e.target.checked; save(); render();
+};
 /* ---------- 추가매수 입력판 ----------
    계좌 안에 빈 줄을 만드는 대신, 계좌 바깥에서 종목·수량·단가를 받아
    고른 계좌로 넣는다. 이미 있는 종목이면 평균단가를 다시 계산해 합친다. */
@@ -2561,7 +2591,7 @@ document.addEventListener('click',e=>{
 
 document.getElementById('btn-clear').onclick=()=>{
   if(!confirm('입력한 내용을 모두 지웁니다. 계속할까요?')) return;
-  state={holdings:[],cash:{},notes:{},accounts:state.accounts,merge:state.merge,
+  state={holdings:[],cash:{},notes:{},accounts:state.accounts,merge:state.merge,divMerge:state.divMerge,
          hist:state.hist,events:state.events};   // 추이 기록은 남긴다
   save(); renderCash(); render();
 };
@@ -2635,8 +2665,9 @@ document.getElementById('file-json').onchange=e=>{
       }else if(!confirm('현재 입력 내용을 파일 내용으로 바꿉니다. 계속할까요?')) return;
 
       state={holdings:d.holdings,cash:d.cash||{},notes:d.notes||{},
-             accounts:d.accounts,merge:!!d.merge,tab:state.tab,hist,events};
+             accounts:d.accounts,merge:!!d.merge,divMerge:!!d.divMerge,tab:state.tab,hist,events};
       document.getElementById('chk-merge').checked=!!state.merge;
+      document.getElementById('chk-div-merge').checked=!!state.divMerge;
       save(); renderCash(); render();
       alert(`불러왔습니다. 종목 ${state.holdings.length}건 · 추이 기록 ${(state.hist||[]).length}일치`);
     }catch(err){ alert('불러오지 못했습니다: '+err.message); }
@@ -4187,6 +4218,7 @@ document.getElementById('tabs').addEventListener('click',e=>{
 load();
 if(!state.holdings.length) state.holdings.push({acct:accts()[0],code:'',qty:'',avg:''});
 document.getElementById('chk-merge').checked=!!state.merge;
+document.getElementById('chk-div-merge').checked=!!state.divMerge;
 renderAccts();
 renderCash();
 showTab(state.tab||'hold');   // 안에서 render() 까지 부른다
