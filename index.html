@@ -247,6 +247,13 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .dv-chip.part{background:#DCE4EE;color:var(--blue)}
 .dv-chip.zero{background:#DCE8DC;color:var(--green)}
 .dv-chip.miss{background:#F6D9D4;color:var(--red)}
+/* 종목별 지급월 띠 — 12칸 중 실제로 받은 달만 채운다 */
+.mrow{display:inline-flex;gap:2px}
+.mcell{width:15px;height:17px;border-radius:3px;background:var(--bg-alt);color:#B9AF9F;
+  font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1}
+.mcell.on{background:var(--accent);color:var(--white)}
+.mnone{font-size:11px;font-weight:700;color:var(--ink-mute)}
+@media (max-width:768px){ .mcell{width:13px;height:15px;font-size:8px} }
 @media (max-width:768px){
   .cal{grid-template-columns:repeat(6,1fr);height:auto;row-gap:14px}
   .cal-c{height:120px}
@@ -1013,7 +1020,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
       <table class="data-table">
         <thead><tr>
           <th class="tl">계좌</th><th class="tl">종목</th><th>주당 배당금<br><span class="th-sub">최근 1회</span></th>
-          <th>지급주기</th><th>연 배당금<br><span class="th-sub">실지급</span></th>
+          <th>지급주기</th><th class="tl">지급월<br><span class="th-sub">최근 1년 실지급</span></th>
+          <th>연 배당금<br><span class="th-sub">실지급</span></th>
           <th>연 배당금<br><span class="th-sub">연환산</span></th>
           <th>배당률<br><span class="th-sub">현재가 대비</span></th>
           <th>YOC<br><span class="th-sub">내 매입가 대비</span></th>
@@ -2077,6 +2085,14 @@ function renderDivGauge(list){
        </div>
      </div>`;
 }
+/* 12칸 띠. 어느 달에 들어오는지 한눈에 보라고 숫자 대신 칸으로 그린다 */
+function monthStrip(ms){
+  if(!ms||!ms.length) return '<span class="mnone">지급월 미상</span>';
+  const on=new Set(ms);
+  let s='<span class="mrow" title="'+ms.join('·')+'월 지급">';
+  for(let m=1;m<=12;m++) s+=`<span class="mcell${on.has(m)?' on':''}">${m}</span>`;
+  return s+'</span>';
+}
 function renderDivTable(list){
   const body=document.getElementById('div-body');
   const chip=d=>{
@@ -2095,6 +2111,7 @@ function renderDivTable(list){
       <td class="tl">${esc(r.name)}<br><span style="font-size:11px;color:#8B8276;font-weight:600">${esc(r.code)}</span></td>
       <td>${d.dps>0?won(d.dps):(d.perYear>0?won(d.annual/d.perYear):'—')}</td>
       <td>${esc(d.cycle)}${d.perYear?` <span class="th-sub">${d.perYear}회</span>`:''}</td>
+      <td class="tl">${monthStrip(d.months)}</td>
       <td><b>${won(x.real)}</b></td>
       <td>${won(x.annual)}</td>
       <td>${yld>0?pct(yld):'—'}</td>
@@ -2103,7 +2120,7 @@ function renderDivTable(list){
       <td>${esc(d.lastPaid||'—')}</td>
     </tr>`;
   }).join('')
-  ||'<tr><td colspan="10" style="text-align:center;color:#8B8276;padding:24px">배당 정보가 있는 보유 종목이 없습니다</td></tr>';
+  ||'<tr><td colspan="11" style="text-align:center;color:#8B8276;padding:24px">배당 정보가 있는 보유 종목이 없습니다</td></tr>';
 }
 
 function renderGauge(valid,cash){
