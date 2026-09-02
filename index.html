@@ -1802,10 +1802,31 @@ function renderTrendTable(hist){
     <thead><tr><th class="tl">계좌</th><th>원금</th><th>평가금액</th><th>수익금</th><th>수익률</th>
       <th>추가 입금<br><span class="th-sub">${esc(first.d)} 이후</span></th>
       <th>평가금액 변화<br><span class="th-sub">${esc(first.d)} 이후</span></th></tr></thead>
-    <tbody>${names.map(a=>{
-      const t=last.acc[a], t0=(first.acc||{})[a];
-      return row(a,t[0],t[1],t0&&t0[0],t0&&t0[1],kindColor(a));
-    }).join('')}</tbody>
+    <tbody>${(()=>{
+      // 성격이 같은 계좌가 여럿이면 소계를 붙인다 (전체 현황 탭과 같은 방식)
+      let out='', i=0;
+      while(i<names.length){
+        const kind=acctKind(names[i]), color=kindColor(names[i]);
+        const grp=[]; while(i<names.length&&acctKind(names[i])===kind) grp.push(names[i++]);
+        grp.forEach(a=>{ const t=last.acc[a], t0=(first.acc||{})[a];
+          out+=row(a,t[0],t[1],t0&&t0[0],t0&&t0[1],color); });
+        if(grp.length>1){
+          const b=grp.reduce((s,a)=>s+last.acc[a][0],0);
+          const v=grp.reduce((s,a)=>s+last.acc[a][1],0);
+          const b0=grp.reduce((s,a)=>s+(((first.acc||{})[a]||[0,0])[0]),0);
+          const v0=grp.reduce((s,a)=>s+(((first.acc||{})[a]||[0,0])[1]),0);
+          const pl=v-b, rr=b>0?pl/b*100:0, dIn=b-b0, dVal=v-v0;
+          out+=`<tr class="kind-sum" style="--kc:${color};--kcbg:${hexA(color,0.10)}">
+            <td class="tl kind-cell">${esc(kind)} 합계<span class="acct-note">${grp.length}개 계좌</span></td>
+            <td>${won(b)}</td><td>${won(v)}</td>
+            <td class="${cls(pl)}">${(pl>=0?'+':'')+won(pl)}</td>
+            <td class="${cls(rr)}">${pct(rr)}</td>
+            <td>${dIn>0?'+'+wonShort(dIn)+'원':'—'}</td>
+            <td class="${cls(dVal)}">${(dVal>=0?'+':'')+wonShort(dVal)}원</td></tr>`;
+        }
+      }
+      return out;
+    })()}</tbody>
     <tfoot><tr><td class="tl">합계</td><td>${won(last.buy)}</td><td>${won(last.val)}</td>
       <td class="${cls(last.val-last.buy)}">${(last.val-last.buy>=0?'+':'')+won(last.val-last.buy)}</td>
       <td class="${cls(last.val-last.buy)}">${pct(last.buy>0?(last.val-last.buy)/last.buy*100:0)}</td>
@@ -2046,8 +2067,26 @@ function renderDivAcct(list,usSkip,noData){
       <td>${w>0?'<span class="down">-'+won(w)+'</span>':'<span class="dv-none">0원</span>'}</td>
       <td><b>${won(b.pre-w)}</b></td><td>${won((b.pre-w)/12)}</td></tr>`;
   };
-  document.getElementById('div-acct-body').innerHTML=
-    names.map(row).join('')
+  // 전체 현황 탭 계좌별 표와 같이, 성격이 같은 계좌가 여럿이면 소계를 붙인다
+  let body='', i=0;
+  while(i<names.length){
+    const kind=acctKind(names[i]), color=kindColor(names[i]);
+    const grp=[]; while(i<names.length&&acctKind(names[i])===kind) grp.push(names[i++]);
+    grp.forEach(a=>{ body+=row(a); });
+    if(grp.length>1){
+      const gp=grp.reduce((t,a)=>t+by[a].pre,0);
+      const gb=grp.reduce((t,a)=>t+by[a].base,0);
+      const gu=grp.reduce((t,a)=>t+by[a].unk,0);
+      const gw=by[grp[0]].kind==='일반'?(gb+gu)*DIV_WHT:0;
+      body+=`<tr class="kind-sum" style="--kc:${color};--kcbg:${hexA(color,0.10)}">
+        <td class="tl kind-cell">${esc(kind)} 합계<span class="acct-note">${grp.length}개 계좌</span></td>
+        <td>${won(gp)}</td>
+        <td>${by[grp[0]].kind==='일반'?won(gb+gu):'<span class="dv-none">—</span>'}</td>
+        <td>${gw>0?'<span class="down">-'+won(gw)+'</span>':'<span class="dv-none">0원</span>'}</td>
+        <td>${won(gp-gw)}</td><td>${won((gp-gw)/12)}</td></tr>`;
+    }
+  }
+  document.getElementById('div-acct-body').innerHTML=body
     ||'<tr><td colspan="6" style="text-align:center;color:#8B8276;padding:24px">배당 정보가 있는 보유 종목이 없습니다</td></tr>';
   const pre=names.reduce((s,a)=>s+by[a].pre,0);
   const w=names.reduce((s,a)=>s+(by[a].kind==='일반'?(by[a].base+by[a].unk)*DIV_WHT:0),0);
