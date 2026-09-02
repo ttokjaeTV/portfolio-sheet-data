@@ -214,9 +214,11 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .cal-legend b{color:var(--accent);font-weight:900}
 /* 종합과세 한도 막대 */
 .dgauge{margin-top:16px}
-.dgauge-bar{position:relative;height:30px;background:var(--bg-alt);border-radius:9px;overflow:hidden}
+.dgauge-bar{position:relative;height:30px;background:var(--bg-alt);border-radius:9px;overflow:hidden;display:flex}
 .dgauge-fill{height:100%;background:var(--green);transition:width .3s ease}
 .dgauge-fill.over{background:var(--red)}
+/* 과표 미확인분 : 확정분과 확실히 구분되게 빗금 */
+.dgauge-fill.unk{background:repeating-linear-gradient(45deg,#B8C4B8,#B8C4B8 5px,#D3DAD3 5px,#D3DAD3 10px)}
 .dgauge-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:9px;flex-wrap:wrap}
 .dgauge-l{font-size:13.5px;font-weight:800}
 .dgauge-v{font-size:19px;font-weight:900;letter-spacing:-.5px}
@@ -1910,9 +1912,13 @@ function divRows(valid){
     const d=DIV[r.code];
     if(!d||!(d.real>0)){ noData++; return; }
     const real=d.real*r.qty, annual=d.annual*r.qty;
-    // 과표를 모르면 전액과세로 본다. 세금을 크게 잡는 쪽이라 안전하다.
-    const taxBase=(d.tax===null?d.real:d.tax)*r.qty;
-    out.push({r,d,real,annual,taxBase,kind:acctTaxKind(r.acct)});
+    // 과표를 아는 것과 모르는 것을 섞지 않는다.
+    // 세후 배당금은 전액과세로 잡아도 '덜 받는 쪽' 이라 안전하지만,
+    // 종합과세 2,000만원 게이지는 과대추정이 곧 잘못된 경고가 되기 때문이다.
+    const known=d.tax!==null;
+    out.push({r,d,real,annual,kind:acctTaxKind(r.acct),
+      taxBase: known?d.tax*r.qty:0,      // 확인된 과세표준액
+      taxUnknown: known?0:real});        // 미확인분 (최대 이만큼 더 잡힐 수 있다)
   });
   return {list:out,usSkip,noData};
 }
@@ -1922,7 +1928,8 @@ function renderDividends(valid){
   if(st) st.textContent=DIV_STAMP?`배당 데이터 갱신 ${DIV_STAMP}`:'';
 
   const pre=list.reduce((s,x)=>s+x.real,0);
-  const wht=list.reduce((s,x)=>s+(x.kind==='일반'?x.taxBase*DIV_WHT:0),0);
+  // 세후는 보수적으로 — 미확인 과표도 전액과세로 보고 세금을 최대로 잡는다
+  const wht=list.reduce((s,x)=>s+(x.kind==='일반'?(x.taxBase+x.taxUnknown)*DIV_WHT:0),0);
   const post=pre-wht;
   const buy=list.reduce((s,x)=>s+x.r.buy,0);
   const val=list.reduce((s,x)=>s+x.r.val,0);
@@ -1972,17 +1979,19 @@ function renderDivAcct(list,usSkip,noData){
   const by={};
   list.forEach(x=>{
     const a=x.r.acct;
-    (by[a]=by[a]||{pre:0,base:0,kind:x.kind})&&0;
-    by[a].pre+=x.real; by[a].base+=x.taxBase;
+    (by[a]=by[a]||{pre:0,base:0,unk:0,kind:x.kind})&&0;
+    by[a].pre+=x.real; by[a].base+=x.taxBase; by[a].unk+=x.taxUnknown;
   });
   const names=accts().filter(a=>by[a]);
   const row=a=>{
-    const b=by[a], w=b.kind==='일반'?b.base*DIV_WHT:0;
+    const b=by[a], w=b.kind==='일반'?(b.base+b.unk)*DIV_WHT:0;
     const label={'일반':'','연금':'과세이연','ISA':'만기정산'}[b.kind];
+    const baseCell=b.kind!=='일반' ? '<span class="dv-none">—</span>'
+      : won(b.base+b.unk)+(b.unk>0?`<span class="th-sub" style="display:block">미확인 ${wonShort(b.unk)} 포함</span>`:'');
     return `<tr>
       <td class="tl"><span class="kind-dot" style="--kc:${kindColor(a)}"></span> ${esc(a)}
         ${label?`<span class="dv-chip">${label}</span>`:''}</td>
-      <td>${won(b.pre)}</td><td>${b.kind==='일반'?won(b.base):'<span class="dv-none">—</span>'}</td>
+      <td>${won(b.pre)}</td><td>${baseCell}</td>
       <td>${w>0?'<span class="down">-'+won(w)+'</span>':'<span class="dv-none">0원</span>'}</td>
       <td><b>${won(b.pre-w)}</b></td><td>${won((b.pre-w)/12)}</td></tr>`;
   };
@@ -1990,7 +1999,7 @@ function renderDivAcct(list,usSkip,noData){
     names.map(row).join('')
     ||'<tr><td colspan="6" style="text-align:center;color:#8B8276;padding:24px">배당 정보가 있는 보유 종목이 없습니다</td></tr>';
   const pre=names.reduce((s,a)=>s+by[a].pre,0);
-  const w=names.reduce((s,a)=>s+(by[a].kind==='일반'?by[a].base*DIV_WHT:0),0);
+  const w=names.reduce((s,a)=>s+(by[a].kind==='일반'?(by[a].base+by[a].unk)*DIV_WHT:0),0);
   document.getElementById('div-acct-foot').innerHTML= pre>0
     ? `<td class="tl">합계</td><td>${won(pre)}</td><td></td>
        <td class="down">-${won(w)}</td><td>${won(pre-w)}</td><td>${won((pre-w)/12)}</td>` : '';
@@ -2005,21 +2014,38 @@ function renderDivAcct(list,usSkip,noData){
      <b>ISA</b>도 지금은 떼지 않고 만기에 순이익 기준으로 정산합니다(일반형 200만원·서민형 400만원 비과세, 초과분 9.9% 분리과세).`
     +(miss.length?'<br>'+miss.join(' '):'');
 }
+/* 과표를 모르는 종목이 있으면 한 점이 아니라 구간으로 보여준다.
+   여기서 과대추정은 '안전' 이 아니라 잘못된 경고이고, 그걸 보고
+   멀쩡한 계좌를 옮기거나 파는 결정을 하게 되기 때문이다. */
 function renderDivGauge(list){
   const LIMIT=20000000;
-  const base=list.reduce((s,x)=>s+(x.kind==='일반'?x.taxBase:0),0);
-  const rate=base/LIMIT*100, over=base>LIMIT;
+  const gen=list.filter(x=>x.kind==='일반');
+  const base=gen.reduce((s,x)=>s+x.taxBase,0);          // 확정
+  const unk=gen.reduce((s,x)=>s+x.taxUnknown,0);        // 미확인 (최대 이만큼 더)
+  const nUnk=gen.filter(x=>x.taxUnknown>0).length;
+  const max=base+unk;
+  const w1=Math.min(100,base/LIMIT*100), w2=Math.min(100-w1,unk/LIMIT*100);
+  const over=base>LIMIT, mayOver=!over&&max>LIMIT;
   document.getElementById('div-gauge').innerHTML=
     `<div class="dgauge">
        <div class="dgauge-row">
-         <span class="dgauge-l">일반계좌 배당 과세표준 합계</span>
-         <span class="dgauge-v ${over?'up':''}">${won(base)} <span style="font-size:13px;color:#8B8276">/ 2,000만원</span></span>
+         <span class="dgauge-l">일반계좌 배당 과세표준</span>
+         <span class="dgauge-v ${over?'up':''}">${won(base)}${unk>0?`<span style="font-size:13px;color:#8B8276"> ~ ${won(max)}</span>`:''}
+           <span style="font-size:13px;color:#8B8276">/ 2,000만원</span></span>
        </div>
-       <div class="dgauge-bar"><div class="dgauge-fill ${over?'over':''}" style="width:${Math.min(100,rate)}%"></div></div>
+       <div class="dgauge-bar">
+         <div class="dgauge-fill ${over?'over':''}" style="width:${w1}%"></div>
+         ${unk>0?`<div class="dgauge-fill unk" style="width:${w2}%"></div>`:''}
+       </div>
        <div class="dgauge-sub">
          ${over
            ? `<span class="dv-warn">한도를 ${won(base-LIMIT)} 넘습니다.</span> 초과분이 다른 종합소득과 합산돼 6~45% 누진세율로 과세됩니다.`
-           : `한도까지 <b>${won(LIMIT-base)}</b> 남았습니다. 2,000만원까지는 15.4% 원천징수로 끝납니다.`}<br>
+           : mayOver
+             ? `확인된 과표로는 한도까지 <b>${won(LIMIT-base)}</b> 남았습니다.
+                다만 <b>과표 미확인 ${nUnk}종</b>을 전액과세로 보면 한도를 넘을 수 있습니다.`
+             : `한도까지 <b>${won(LIMIT-base)}</b> 남았습니다. 2,000만원까지는 15.4% 원천징수로 끝납니다.`}<br>
+         ${unk>0?`옅은 칸은 <b>과표를 아직 모르는 ${nUnk}종</b>입니다. 분배금 전액이 과세된다고 가정한 상한이라,
+                  실제로는 이보다 낮습니다 — 커버드콜·채권형은 과표가 분배금보다 훨씬 작습니다.<br>`:''}
          이 막대는 <b>일반계좌 배당만</b> 셉니다. 연금저축·IRP·ISA는 금융소득 종합과세 대상이 아닙니다.
          실제 판정에는 예금·채권 이자와 다른 금융기관 배당까지 합산되므로, 여기 숫자만으로 단정하지 마세요.
        </div>

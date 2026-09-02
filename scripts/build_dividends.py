@@ -155,55 +155,74 @@ def html_unescape(s):
     return s
 
 
-def build_etf(today):
-    """트래커 JSON → {코드: 행}. 최근 12개월 지급분만 센다."""
-    cutoff = (today - timedelta(days=365)).strftime("%Y-%m-%d")
-    out = {}
-    got = 0
+def tracker_tax(today):
+    """트래커 JSON → {코드: {YYYY-MM: 과세표준액}}.
+
+    분배금은 세이브로가 전 종목을 주므로 여기서는 과표만 쓴다.
+    세이브로 지급기준일(8/31)과 ETF CHECK 배당락일(8/28)이 1영업일 어긋나므로
+    날짜가 아니라 **월 단위**로 맞춘다. 한 달에 두 번 분배한 경우는 합산한다."""
+    cutoff = (today - timedelta(days=400)).strftime("%Y-%m-%d")
+    out, got = {}, 0
     for fn in TRACKER_FILES:
         try:
             doc = fetch_json(TRACKER + fn)
         except Exception as e:
             print(f"  트래커 {fn} 실패: {e}", file=sys.stderr)
             continue
-        data = doc.get("data") or {}
         got += 1
-        for code, recs in data.items():
-            # recs = [[날짜, 분배금, 과세표준액], ...]
-            rows = []
-            for r in recs:
-                if not r or len(r) < 2:
+        for code, recs in (doc.get("data") or {}).items():
+            by = out.setdefault(code.upper(), {})
+            for r in recs or []:
+                if not r or len(r) < 3:
                     continue
                 d = norm_date(r[0])
-                if not d:
+                if not d or d < cutoff:
                     continue
                 try:
-                    amt = float(r[1] or 0)
+                    tax = float(r[2] or 0)
                 except (TypeError, ValueError):
                     continue
-                try:
-                    tax = float(r[2] or 0) if len(r) > 2 else 0.0
-                except (TypeError, ValueError):
-                    tax = 0.0
-                rows.append((d, amt, tax))
-            if not rows:
-                continue
-            rows.sort(key=lambda x: x[0])
-            recent = [x for x in rows if x[0] >= cutoff]
-            # 분배금 0원(미지급) 회차는 지급 횟수에서 뺀다
-            paid = [x for x in recent if x[1] > 0]
-            n = len(paid)
-            real = round(sum(x[1] for x in paid), 4)
-            tax_sum = round(sum(x[2] for x in paid), 4)
-            last_d, last_amt = (paid[-1][0], paid[-1][1]) if paid else (rows[-1][0], 0.0)
-            annual = round(last_amt * n, 4) if n else 0.0
-            # 실제로 지급이 있었던 달. 캘린더는 추정이 아니라 이 값으로 그린다.
-            months = sorted({int(x[0][5:7]) for x in paid})
-            out[code.upper()] = [code.upper(), "국내ETF", "", "", cycle_name(n), n,
-                                 real, annual, tax_sum,
-                                 "|".join(str(m) for m in months), last_d, "montly-div", ""]
+                by[d[:7]] = by.get(d[:7], 0.0) + max(0.0, tax)
     if not got:
         print("  트래커 JSON 을 한 건도 못 받았습니다.", file=sys.stderr)
+    return out
+
+
+def build_etf(today):
+    """세이브로 분배금(전 종목) + 트래커 과표(189종) → {코드: 행}."""
+    frm = (today - timedelta(days=372)).strftime("%Y%m%d")
+    to = today.strftime("%Y%m%d")
+    recs = seibro(frm, to)
+    print(f"  세이브로 {len(recs)}건 · 종목 {len({r['code'] for r in recs})}개", file=sys.stderr)
+    taxmap = tracker_tax(today)
+    print(f"  트래커 과표 {len(taxmap)}종", file=sys.stderr)
+
+    cut = (today - timedelta(days=365)).strftime("%Y%m%d")
+    by = {}
+    for r in recs:
+        if r["date"] < cut or r["amt"] <= 0:
+            continue
+        by.setdefault(r["code"], []).append(r)
+
+    out = {}
+    for code, rows in by.items():
+        rows.sort(key=lambda x: x["date"])
+        n = len(rows)
+        real = round(sum(x["amt"] for x in rows), 4)
+        last = rows[-1]
+        annual = round(last["amt"] * n, 4)
+        months = sorted({int(x["date"][4:6]) for x in rows})
+        # 과표는 아는 종목만. 모르면 빈칸으로 두고 화면에서 '미확인'으로 표시한다.
+        tm = taxmap.get(code)
+        if tm:
+            tax = round(sum(tm.get(x["date"][:4] + "-" + x["date"][4:6], 0.0) for x in rows), 4)
+            src = "seibro+etfcheck"
+        else:
+            tax, src = "", "seibro"
+        out[code] = [code, "국내ETF", "", "", cycle_name(n), n,
+                     real, annual, tax,
+                     "|".join(str(m) for m in months),
+                     f"{last['date'][:4]}-{last['date'][4:6]}-{last['date'][6:]}", src, ""]
     return out
 
 
