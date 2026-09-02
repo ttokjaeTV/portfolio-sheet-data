@@ -196,6 +196,23 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .empty-note{padding:28px;text-align:center;color:var(--ink-mute);font-size:14px;font-weight:600;
   background:var(--bg-alt);border-radius:14px}
 
+/* 3지선다 물음창. confirm 은 예/아니오뿐이라 '유지·합치기·교체' 를 못 묻는다 */
+.ask-back{position:fixed;inset:0;background:rgba(26,20,14,.5);z-index:90;
+  display:flex;align-items:center;justify-content:center;padding:20px}
+.ask-back[hidden]{display:none}
+.ask-box{background:var(--white);border-radius:18px;padding:24px;max-width:460px;width:100%;
+  box-shadow:0 20px 50px rgba(58,47,38,.28)}
+.ask-title{font-size:17px;font-weight:900;margin-bottom:8px;letter-spacing:-.3px}
+.ask-desc{font-size:13px;font-weight:600;color:var(--ink-mute);line-height:1.75;margin-bottom:18px}
+.ask-btns{display:flex;flex-direction:column;gap:9px}
+.ask-b{text-align:left;padding:13px 15px;border-radius:12px;border:1.5px solid var(--border);
+  background:var(--white);cursor:pointer;font-family:inherit;transition:all .15s ease}
+.ask-b:hover{border-color:var(--accent);background:var(--accent-soft)}
+.ask-b.on{background:var(--dark-warm);border-color:var(--dark-warm)}
+.ask-b.on .ask-b-t{color:var(--white)} .ask-b.on .ask-b-d{color:#D9CFC2}
+.ask-b-t{display:block;font-size:14px;font-weight:800;color:var(--ink)}
+.ask-b-d{display:block;font-size:12px;font-weight:600;color:var(--ink-mute);margin-top:3px;line-height:1.5}
+
 /* ---------- 배당 탭 ---------- */
 .div-block{margin-top:30px;padding-top:24px;border-top:1px solid var(--border)}
 .div-stamp{display:block;margin-top:6px;font-size:11px;font-weight:700;color:var(--ink-mute)}
@@ -1022,6 +1039,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <div class="trend-stats" id="trend-stats"></div>
     <div class="trend-tools">
       <span id="trend-acct"></span>
+      <button class="btn-ghost" id="btn-trend-snap" type="button">지금 값으로 기록</button>
       <button class="btn-ghost" id="btn-trend-clear" type="button">기록 지우기</button>
     </div>
   </div>
@@ -1030,6 +1048,14 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="trend-log" id="trend-log"></div>
 </div>
 </section>
+
+<div class="ask-back" id="ask-back" hidden>
+  <div class="ask-box">
+    <div class="ask-title" id="ask-title"></div>
+    <div class="ask-desc" id="ask-desc"></div>
+    <div class="ask-btns" id="ask-btns"></div>
+  </div>
+</div>
 
 <footer>
   ※ 국내 시세는 장중 약 10분 지연될 수 있고, 미국 시세는 전 거래일 종가 기준입니다. 실시간 체결가와 다릅니다.<br>
@@ -2260,6 +2286,25 @@ document.addEventListener('change',e=>{
 });
 document.addEventListener('click',e=>{
   // 자산 추이 기록 지우기
+  // 지금 값으로 오늘치를 남긴다. 도구를 열 때 하루 한 번 자동으로 남지만,
+  // 종목을 고친 뒤 그 값으로 다시 남기고 싶을 때가 있다.
+  if(e.target.id==='btn-trend-snap'){
+    const {rows,cash,cashSum}=compute();
+    const valid=rows.filter(r=>r.found&&r.qty>0&&(!r.isUS||FX>0));
+    if(!valid.length){ alert('기록할 종목이 없습니다.'); return; }
+    const byAcct={};
+    accts().forEach(a=>{ byAcct[a]={buy:cash[a]||0,val:cash[a]||0}; });
+    valid.forEach(r=>{ const t=byAcct[r.acct]||(byAcct[r.acct]={buy:0,val:0});
+      t.buy+=r.buy; t.val+=r.val; });
+    const buy=valid.reduce((s,r)=>s+r.buy,0)+cashSum;
+    const val=valid.reduce((s,r)=>s+r.val,0)+cashSum;
+    const had=(state.hist||[]).some(x=>x.d===today());
+    snapshot(val,buy,cashSum,valid.length,byAcct);
+    render();
+    alert(had ? `오늘(${today()}) 기록을 지금 값으로 바꿨습니다.`
+              : `오늘(${today()}) 기록을 남겼습니다. 총 ${(state.hist||[]).length}일치.`);
+    return;
+  }
   if(e.target.id==='btn-trend-clear'){
     const n=(state.hist||[]).length;
     if(!n){ alert('아직 기록이 없습니다.'); return; }
@@ -2494,25 +2539,84 @@ document.getElementById('btn-export').onclick=()=>{
   a.download=`포트폴리오_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}.json`;
   a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 };
+/* 여러 갈래 중 하나를 고르게 한다. 고른 값을 Promise 로 준다 (취소는 null) */
+function askChoice(title,desc,opts){
+  return new Promise(res=>{
+    const back=document.getElementById('ask-back');
+    document.getElementById('ask-title').textContent=title;
+    document.getElementById('ask-desc').innerHTML=desc;
+    const box=document.getElementById('ask-btns');
+    box.innerHTML=opts.map((o,i)=>
+      `<button type="button" class="ask-b${o.primary?' on':''}" data-i="${i}">
+         <span class="ask-b-t">${esc(o.label)}</span>
+         ${o.desc?`<span class="ask-b-d">${esc(o.desc)}</span>`:''}
+       </button>`).join('')
+      +`<button type="button" class="ask-b" data-i="-1"><span class="ask-b-t">취소</span></button>`;
+    const done=v=>{ back.hidden=true; box.onclick=null; back.onclick=null; res(v); };
+    box.onclick=ev=>{ const b=ev.target.closest('[data-i]'); if(!b) return;
+      const i=+b.dataset.i; done(i<0?null:opts[i].value); };
+    back.onclick=ev=>{ if(ev.target===back) done(null); };
+    back.hidden=false;
+  });
+}
+
+/* 두 추이 기록을 날짜로 합친다. 같은 날은 불러온 쪽을 쓴다 */
+function mergeHist(mine,theirs){
+  const by={};
+  (mine||[]).forEach(r=>{ if(r&&r.d) by[r.d]=r; });
+  (theirs||[]).forEach(r=>{ if(r&&r.d) by[r.d]=r; });
+  return Object.keys(by).sort().map(d=>by[d]).slice(-1200);
+}
+
 document.getElementById('btn-import').onclick=()=>document.getElementById('file-json').click();
 document.getElementById('file-json').onchange=e=>{
   const f=e.target.files[0]; if(!f) return;
   const rd=new FileReader();
-  rd.onload=()=>{
+  rd.onload=async()=>{
     try{
       const j=JSON.parse(rd.result);
       const d=j.data||j;
       if(!d||!Array.isArray(d.holdings)) throw new Error('형식이 맞지 않습니다');
-      if(!confirm('현재 입력 내용을 파일 내용으로 바꿉니다. 계속할까요?')) return;
-      state={holdings:d.holdings,cash:d.cash||{},notes:d.notes||{},accounts:d.accounts,merge:!!d.merge};
+
+      const mine=(state.hist||[]).length, theirs=(d.hist||[]).length;
+      // 예전에는 여기서 hist 를 안 넘겨 누적 추이가 통째로 날아갔다.
+      // 이제는 어떻게 할지 반드시 고르게 한다.
+      let hist=state.hist||[], events=state.events||[];
+      if(mine||theirs){
+        const v=await askChoice('자산 추이 기록을 어떻게 할까요?',
+          `지금 브라우저에 <b>${mine}일치</b>, 불러올 파일에 <b>${theirs}일치</b> 기록이 있습니다.<br>`
+          +'보유 종목·계좌·예수금은 어느 쪽을 고르든 파일 내용으로 바뀝니다.',
+          [{label:'둘 다 합치기', value:'merge', primary:true,
+            desc:'날짜별로 합칩니다. 같은 날은 파일 쪽을 씁니다. 기기를 옮길 때 이걸 쓰세요.'},
+           {label:'지금 기록 유지', value:'keep',
+            desc:'이 브라우저에 쌓인 기록을 그대로 둡니다. 파일의 기록은 버립니다.'},
+           {label:'파일 기록으로 교체', value:'take',
+            desc:'지금 기록을 지우고 파일 것만 남깁니다.'}]);
+        if(v===null) return;
+        if(v==='merge'){ hist=mergeHist(state.hist,d.hist); events=mergeEvents(state.events,d.events); }
+        else if(v==='take'){ hist=d.hist||[]; events=d.events||[]; }
+      }else if(!confirm('현재 입력 내용을 파일 내용으로 바꿉니다. 계속할까요?')) return;
+
+      state={holdings:d.holdings,cash:d.cash||{},notes:d.notes||{},
+             accounts:d.accounts,merge:!!d.merge,tab:state.tab,hist,events};
       document.getElementById('chk-merge').checked=!!state.merge;
       save(); renderCash(); render();
-      alert(`불러왔습니다. 종목 ${state.holdings.length}건`);
+      alert(`불러왔습니다. 종목 ${state.holdings.length}건 · 추이 기록 ${(state.hist||[]).length}일치`);
     }catch(err){ alert('불러오지 못했습니다: '+err.message); }
   };
   rd.readAsText(f);
   e.target.value='';
 };
+function mergeEvents(a,b){
+  const seen=new Set(), out=[];
+  [...(a||[]),...(b||[])].forEach(x=>{
+    if(!x||!x.d) return;
+    const k=x.d+'|'+x.k+'|'+x.a+'|'+(x.b||'');
+    if(seen.has(k)) return;
+    seen.add(k); out.push(x);
+  });
+  return out.sort((x,y)=>x.d<y.d?-1:1).slice(-500);
+}
 
 /* ---------- 캡처 OCR ---------- */
 const drop=document.getElementById('drop'), fileImg=document.getElementById('file-img');
