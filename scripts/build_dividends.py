@@ -238,6 +238,14 @@ def build_etf(today):
 # ---------------------------------------------------------------- 개별주
 def build_stocks(today):
     """pykrx 시장 펀더멘털에서 DPS·DIV 를 뽑는다. 시장당 1회 호출."""
+    # data.krx.co.kr 은 로그인해야 통계가 열린다. 자격증명이 없으면 빈 응답만 온다.
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import krx_auth
+        krx_auth.ensure()
+    except Exception as e:
+        print(f"  krx_auth 로드 실패: {type(e).__name__}", file=sys.stderr)
+
     try:
         from pykrx import stock
     except ImportError:

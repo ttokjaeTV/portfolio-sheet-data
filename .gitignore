@@ -1,5 +1,10 @@
 __pycache__/
 *.pyc
+
+# 자격증명은 절대 커밋하지 않는다 (KRX 로그인 등)
+.secrets/
+*.env
+!.env.example
 .DS_Store
 Thumbs.db
 .venv/
