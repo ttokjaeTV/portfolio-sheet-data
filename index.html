@@ -360,8 +360,11 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .kind-cell{position:relative;padding-left:16px !important}
 .kind-cell::before{content:'';position:absolute;left:6px;top:50%;transform:translateY(-50%);
   width:4px;height:22px;border-radius:2px;background:var(--kc,var(--accent))}
-/* 계열마다 옅게 색을 깔아 어디까지가 한 종류인지 눈에 들어오게 한다 */
-#acct-body tr td{background:var(--kcbg,transparent)}
+/* 계열마다 옅게 색을 깔아 어디까지가 한 종류인지 눈에 들어오게 한다.
+   전체 현황·배당·자산 추이 세 표가 같은 모양이라 셋 다 잡는다. */
+#acct-body tr td,
+#div-acct-body tr td,
+#trend-table tbody tr td{background:var(--kcbg,transparent)}
 .kind-sum td,.kind-solo td{font-weight:800}
 .kind-sum .kind-cell,.kind-solo .kind-cell{color:var(--kc,var(--accent))}
 .kind-sum .kind-cell::before,.kind-solo .kind-cell::before{width:5px;height:26px}
@@ -1787,10 +1790,10 @@ function renderTrendTable(hist){
   const last=hist[hist.length-1], first=hist[0];
   const names=accts().filter(a=>(last.acc||{})[a]);
   if(!names.length){ box.innerHTML=''; return; }
-  const row=(nm,b,v,b0,v0,color)=>{
+  const row=(nm,b,v,b0,v0,color,solo)=>{
     const pl=v-b, rr=b>0?pl/b*100:0;
     const dIn=b-(b0??b), dVal=v-(v0??v);
-    return `<tr style="--kc:${color}">
+    return `<tr class="${solo?'kind-solo':''}" style="--kc:${color};--kcbg:${hexA(color,solo?0.10:0.045)}">
       <td class="tl kind-cell">${esc(nm)}</td>
       <td>${won(b)}</td><td>${won(v)}</td>
       <td class="${cls(pl)}">${(pl>=0?'+':'')+won(pl)}</td>
@@ -1809,7 +1812,7 @@ function renderTrendTable(hist){
         const kind=acctKind(names[i]), color=kindColor(names[i]);
         const grp=[]; while(i<names.length&&acctKind(names[i])===kind) grp.push(names[i++]);
         grp.forEach(a=>{ const t=last.acc[a], t0=(first.acc||{})[a];
-          out+=row(a,t[0],t[1],t0&&t0[0],t0&&t0[1],color); });
+          out+=row(a,t[0],t[1],t0&&t0[0],t0&&t0[1],color,grp.length===1); });
         if(grp.length>1){
           const b=grp.reduce((s,a)=>s+last.acc[a][0],0);
           const v=grp.reduce((s,a)=>s+last.acc[a][1],0);
@@ -2060,8 +2063,10 @@ function renderDivAcct(list,usSkip,noData){
     const label={'일반':'','연금':'과세이연','ISA':'만기정산'}[b.kind];
     const baseCell=b.kind!=='일반' ? '<span class="dv-none">—</span>'
       : won(b.base+b.unk)+(b.unk>0?`<span class="th-sub" style="display:block">미확인 ${wonShort(b.unk)} 포함</span>`:'');
-    return `<tr>
-      <td class="tl"><span class="kind-dot" style="--kc:${kindColor(a)}"></span> ${esc(a)}
+    const solo=names.filter(x=>acctKind(x)===acctKind(a)).length===1;
+    return `<tr class="${solo?'kind-solo':''}"
+      style="--kc:${kindColor(a)};--kcbg:${hexA(kindColor(a),solo?0.10:0.045)}">
+      <td class="tl kind-cell">${esc(a)}
         ${label?`<span class="dv-chip">${label}</span>`:''}</td>
       <td>${won(b.pre)}</td><td>${baseCell}</td>
       <td>${w>0?'<span class="down">-'+won(w)+'</span>':'<span class="dv-none">0원</span>'}</td>
