@@ -958,19 +958,9 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 <section class="tabpane" data-pane="detail">
 <div class="card">
   <div class="step-label"><div class="step-line"></div><span class="step-text">보유 종목 상세</span></div>
-  <div class="detail-head">
-    <div class="card-desc" style="margin-bottom:0">
-      국내 시세는 장중 약 10분 주기, 미국 시세는 전 거래일 종가 기준으로 갱신됩니다.<br>
-      계좌 이름을 누르면 그 계좌 종목만 볼 수 있습니다. ‘전체 현황’ 탭의 계좌별 표에서 행을 눌러도 같은 계좌만 볼 수 있습니다.
-    </div>
-    <div class="merge-toggle">
-      <span class="merge-label">같은 종목 합쳐 보기<span class="merge-sub">매입단가는 수량 가중평균</span></span>
-      <div class="seg" id="seg-merge">
-        <button type="button" class="seg-b" data-merge="0">안 묶음</button>
-        <button type="button" class="seg-b" data-merge="1">성격별</button>
-        <button type="button" class="seg-b" data-merge="2">전부</button>
-      </div>
-    </div>
+  <div class="card-desc">
+    국내 시세는 장중 약 10분 주기, 미국 시세는 전 거래일 종가 기준으로 갱신됩니다.<br>
+    계좌 이름을 누르면 그 계좌 종목만 볼 수 있습니다. ‘전체 현황’ 탭의 계좌별 표에서 행을 눌러도 같은 계좌만 볼 수 있습니다.
   </div>
   <div class="merge-note" id="merge-note"></div>
   <div class="acct-filter" id="acct-filter"></div>
@@ -2271,21 +2261,17 @@ function renderDetail(all,total){
     note.textContent=''; return;
   }
 
-  // merge : 0=안 묶음 · 1=같은 성격 계좌끼리 · 2=계좌 구분 없이 전부
-  const mode = state.merge===true ? 2 : (+state.merge||0);
-  const rows = mode ? mergeLots(valid,mode===1) : valid;
-  const multi = mode ? rows.filter(r=>r.lots>1).length : 0;
+  // 항상 같은 성격 계좌끼리 묶는다. 연금·ISA·일반은 세금이 달라 섞지 않는다.
+  const mode = 1;
+  const rows = mergeLots(valid,true);
+  const multi = rows.filter(r=>r.lots>1).length;
   const dnote = detailFilter ? (state.notes||{})[detailFilter] : '';
   const fnote = detailFilter
     ? `<b>${esc(detailFilter)}</b>${dnote?` (${esc(dnote)})`:''} 계좌만 보고 있습니다. ` : '';
-  note.innerHTML = fnote + (mode
-    ? (multi
-        ? `같은 종목 <b>${multi}건</b>을 한 줄로 묶었습니다. 매입단가는 수량 가중평균입니다. `
-          +(mode===1
-            ? '<b>성격이 같은 계좌끼리만</b> 묶습니다 — 연금저축펀드1·2 는 합치고, 연금·ISA·일반은 세금이 달라 따로 둡니다.'
-            : '계좌 성격을 가리지 않고 전부 묶습니다. 총 보유량을 볼 때 쓰세요.')
-        : '합칠 종목이 없습니다. 모두 한 건씩만 보유 중입니다.')
-    : '정수주와 소수점주처럼 매입단가가 다른 로트를 따로 보여줍니다.');
+  note.innerHTML = fnote
+    + '<b>성격이 같은 계좌끼리</b> 같은 종목을 묶어 보여줍니다 — 연금저축펀드1·2 는 합치고, '
+    + '연금·ISA·일반은 세금이 달라 따로 둡니다. 매입단가는 수량 가중평균입니다.'
+    + (multi ? ` 이번에 <b>${multi}건</b>이 묶였습니다.` : '');
 
   body.innerHTML=rows.slice().sort((a,b)=>b.val-a.val).map(r=>{
     const price=r.isUS?usd(r.price):won(r.price);
@@ -2489,15 +2475,6 @@ document.addEventListener('focusout',e=>{
   }
 });
 
-function paintSegMerge(){
-  const m=state.merge===true?2:(+state.merge||0);
-  document.querySelectorAll('#seg-merge .seg-b').forEach(b=>
-    b.classList.toggle('on',+b.dataset.merge===m));
-}
-document.getElementById('seg-merge').addEventListener('click',e=>{
-  const b=e.target.closest('[data-merge]'); if(!b) return;
-  state.merge=+b.dataset.merge; save(); paintSegMerge(); render();
-});
 document.getElementById('chk-div-merge').onchange=e=>{
   state.divMerge=e.target.checked; save(); render();
 };
@@ -2694,7 +2671,6 @@ document.getElementById('file-json').onchange=e=>{
 
       state={holdings:d.holdings,cash:d.cash||{},notes:d.notes||{},
              accounts:d.accounts,merge:!!d.merge,divMerge:!!d.divMerge,tab:state.tab,hist,events};
-      paintSegMerge();
       document.getElementById('chk-div-merge').checked=!!state.divMerge;
       save(); renderCash(); render();
       alert(`불러왔습니다. 종목 ${state.holdings.length}건 · 추이 기록 ${(state.hist||[]).length}일치`);
@@ -4245,7 +4221,6 @@ document.getElementById('tabs').addEventListener('click',e=>{
 /* ---------- 시작 ---------- */
 load();
 if(!state.holdings.length) state.holdings.push({acct:accts()[0],code:'',qty:'',avg:''});
-paintSegMerge();
 document.getElementById('chk-div-merge').checked=!!state.divMerge;
 renderAccts();
 renderCash();
