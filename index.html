@@ -2113,7 +2113,8 @@ function renderDivTable(list){
       <td>${esc(d.cycle)}${d.perYear?` <span class="th-sub">${d.perYear}회</span>`:''}</td>
       <td class="tl">${monthStrip(d.months)}</td>
       <td><b>${won(x.real)}</b></td>
-      <td>${won(x.annual)}</td>
+      <td>${won(x.annual)}${Math.abs(x.annual-x.real)<1&&d.perYear>1
+        ?'<span class="th-sub" style="display:block">회차 편차 커서 실지급 사용</span>':''}</td>
       <td>${yld>0?pct(yld):'—'}</td>
       <td class="${yoc>yld?'up':''}">${yoc>0?pct(yoc):'—'}</td>
       <td class="tl">${chip(d)}</td>

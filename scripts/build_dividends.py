@@ -55,7 +55,8 @@ KST = timezone(timedelta(hours=9))
 UA = {"User-Agent": "Mozilla/5.0"}
 
 HEADER = ["종목코드", "구분", "주당배당금", "배당수익률", "지급주기", "연지급횟수",
-          "연배당_실지급", "연배당_연환산", "과표_실지급", "지급월", "최근지급일", "출처", "갱신시각"]
+          "연배당_실지급", "연배당_연환산", "과표_실지급", "지급월",
+          "최근지급일", "출처", "갱신시각"]
 
 
 def now_kst():
@@ -263,29 +264,45 @@ def build_stocks_seibro(today, krx):
     cut = (today - timedelta(days=365)).strftime("%Y%m%d")
     by = {}
     for r in recs:
+        # 무배당·주식배당·현물배당은 현금이 0 이라 여기서 자연히 빠진다.
+        # 반대로 '동시배당'(현금+주식 동시)은 현금 부분이 있으니 세야 한다.
         if r["date"] < cut or r["amt"] <= 0:
             continue
-        if r.get("kind") and "현금" not in r["kind"]:
-            continue                       # 주식배당(무상)은 현금이 아니라 뺀다
         by.setdefault(r["code"], []).append(r)
 
     out = {}
     for code, rows in by.items():
         rows.sort(key=lambda x: x["date"])
-        n = len(rows)
-        real = round(sum(x["amt"] for x in rows), 4)
+        amts = [x["amt"] for x in rows]
+        n = len(amts)
+        real = round(sum(amts), 4)                      # 실제로 받은 돈 전부
+        annual = round(amts[-1] * n, 4) if even_enough(amts) else real
         last = rows[-1]
-        annual = round(last["amt"] * n, 4)
-        # 지급월은 실지급일 기준. 없으면 기준일 월로 대신한다.
         months = sorted({int((x["pay"] or x["date"])[4:6]) for x in rows})
         k = krx.get(code)
         div = k[3] if k else ""
-        out[code] = [code, "국내주식", last["amt"], div, cycle_name(n), n,
-                     real, annual, "",
+        out[code] = [code, "국내주식", last["amt"], div,
+                     cycle_name(n), n, real, annual, "",
                      "|".join(str(m) for m in months),
                      f"{last['date'][:4]}-{last['date'][4:6]}-{last['date'][6:]}",
                      "seibro" + ("+KRX" if k else ""), ""]
     return out, bool(out)
+
+
+def even_enough(amts):
+    """회차 금액이 고른가? 연환산(최근 1회 × 횟수)을 쓸 수 있는지 판단한다.
+
+    '최근 1회 × 횟수' 는 균등 지급일 때만 맞다. 불균등하면 엉터리가 된다.
+      현대엘리베이터 1,000×4 + 결산 12,010 → 12,010×5 = 60,050원
+      TIGER 배당성장 소액 여러 번 + 연 1회 큰 결산분배 → 같은 식으로 튄다
+
+    특별배당인지 결산배당인지는 구분할 방법이 없다. 세이브로가 배당구분을
+    '현금배당' 으로만 주기 때문이다. 그래서 '무엇인지' 를 맞히려 들지 않고
+    '연환산을 믿을 수 있는가' 만 본다. 최대가 최소의 3배를 넘으면 못 믿는다."""
+    a = [x for x in amts if x > 0]
+    if len(a) < 2:
+        return True
+    return max(a) <= min(a) * 3
 
 
 def append_history(recs):
@@ -354,10 +371,12 @@ def build_etf(today):
     out = {}
     for code, rows in by.items():
         rows.sort(key=lambda x: x["date"])
-        n = len(rows)
-        real = round(sum(x["amt"] for x in rows), 4)
+        amts = [x["amt"] for x in rows]
+        n = len(amts)
+        real = round(sum(amts), 4)
+        # 회차가 고르지 않으면 연환산은 못 믿는다. 실지급을 그대로 쓴다.
+        annual = round(amts[-1] * n, 4) if even_enough(amts) else real
         last = rows[-1]
-        annual = round(last["amt"] * n, 4)
         months = sorted({int(x["date"][4:6]) for x in rows})
         # 과표는 아는 종목만. 모르면 빈칸으로 두고 화면에서 '미확인'으로 표시한다.
         tm = taxmap.get(code)
