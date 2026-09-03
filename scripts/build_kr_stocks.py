@@ -20,6 +20,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 KIND_URL = ("https://kind.krx.co.kr/corpgeneral/corpList.do"
@@ -31,6 +32,7 @@ ETF_PATH = os.environ.get("OUT_PATH", "data/etf_prices.csv")
 BATCH_SIZE = 50
 RETRY = 3
 SLEEP = 0.35
+WORKERS = int(os.environ.get("FETCH_WORKERS", "6"))   # 동시 조회 수. 올리면 차단 위험
 KST = timezone(timedelta(hours=9))
 UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://kind.krx.co.kr/"}
 
@@ -97,32 +99,43 @@ def num(v):
     return "" if v in (None, "") else str(v).replace(",", "")
 
 
+def _fetch_batch(args):
+    """배치 1개 조회. 병렬 워커에서 호출된다."""
+    idx, chunk = args
+    url = PRICE_URL + ",".join(chunk)
+    for attempt in range(RETRY):
+        try:
+            out = {}
+            for d in get(url, timeout=25).get("datas", []):
+                c = d.get("itemCode")
+                if c:
+                    out[c] = {
+                        "name": (d.get("stockName") or "").strip(),
+                        "price": num(d.get("closePriceRaw", d.get("closePrice"))),
+                        "change": num(d.get("compareToPreviousClosePriceRaw",
+                                            d.get("compareToPreviousClosePrice"))),
+                        "rate": num(d.get("fluctuationsRatio")),
+                    }
+            return out
+        except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as exc:
+            if attempt == RETRY - 1:
+                print(f"  [warn] batch {idx} 실패: {exc}", file=sys.stderr)
+                return {}
+            time.sleep(1.5 * (attempt + 1))
+    return {}
+
+
 def fetch_prices(codes):
+    """배치를 WORKERS 개씩 동시에 조회한다. (총 요청 수는 순차 방식과 동일)"""
+    chunks = [codes[i:i + BATCH_SIZE] for i in range(0, len(codes), BATCH_SIZE)]
     prices = {}
-    total = len(codes)
-    for i in range(0, total, BATCH_SIZE):
-        url = PRICE_URL + ",".join(codes[i:i + BATCH_SIZE])
-        for attempt in range(RETRY):
-            try:
-                for d in get(url, timeout=25).get("datas", []):
-                    c = d.get("itemCode")
-                    if c:
-                        prices[c] = {
-                            "name": (d.get("stockName") or "").strip(),
-                            "price": num(d.get("closePriceRaw", d.get("closePrice"))),
-                            "change": num(d.get("compareToPreviousClosePriceRaw",
-                                                d.get("compareToPreviousClosePrice"))),
-                            "rate": num(d.get("fluctuationsRatio")),
-                        }
-                break
-            except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as exc:
-                if attempt == RETRY - 1:
-                    print(f"  [warn] batch {i // BATCH_SIZE} 실패: {exc}", file=sys.stderr)
-                else:
-                    time.sleep(1.5 * (attempt + 1))
-        if (i // BATCH_SIZE) % 10 == 0:
-            print(f"  {min(i + BATCH_SIZE, total)}/{total}", file=sys.stderr)
-        time.sleep(SLEEP)
+    done = 0
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        for res in ex.map(_fetch_batch, enumerate(chunks)):
+            prices.update(res)
+            done += 1
+            if done % 20 == 0 or done == len(chunks):
+                print(f"  {done}/{len(chunks)} 배치", file=sys.stderr)
     return prices
 
 

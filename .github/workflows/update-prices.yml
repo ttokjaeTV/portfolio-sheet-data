@@ -63,4 +63,11 @@ jobs:
           fi
           git add data/
           git commit -m "시세 갱신: $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')"
-          git push
+          # 실행이 10분쯤 걸려 그 사이 다른 커밋이 올라오면 push 가 거절된다.
+          # (2026-09-03 #14 실패 원인) rebase 로 얹은 뒤 재시도한다.
+          for i in 1 2 3; do
+            git push && exit 0
+            echo "push 거절 — pull --rebase 후 재시도 ($i/3)"
+            git pull --rebase origin master || exit 1
+          done
+          exit 1

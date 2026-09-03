@@ -18,6 +18,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 SYMBOLS_PATH = os.environ.get("US_SYMBOLS_PATH", "data/us_symbols.json")
@@ -30,6 +31,7 @@ FX_URL = "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW"
 BATCH_SIZE = 50
 RETRY = 3
 SLEEP = 0.3
+WORKERS = int(os.environ.get("FETCH_WORKERS", "6"))   # 동시 조회 수. 올리면 차단 위험
 KST = timezone(timedelta(hours=9))
 UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://m.stock.naver.com/"}
 
@@ -67,34 +69,46 @@ def fetch_fx(now):
     return True
 
 
+def _fetch_batch(args):
+    """배치 1개 조회. 병렬 워커에서 호출된다."""
+    idx, chunk = args
+    url = PRICE_URL + ",".join(chunk)
+    for attempt in range(RETRY):
+        try:
+            out = {}
+            for d in get_json(url).get("datas", []):
+                rc = d.get("reutersCode")
+                if not rc:
+                    continue
+                out[rc] = {
+                    "price": num(d.get("closePrice")),
+                    "change": num(d.get("compareToPreviousClosePrice")),
+                    "rate": num(d.get("fluctuationsRatio")),
+                }
+            return out
+        except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as exc:
+            if attempt == RETRY - 1:
+                print(f"  [warn] batch {idx} 실패: {exc}", file=sys.stderr)
+                return {}
+            time.sleep(1.5 * (attempt + 1))
+    return {}
+
+
 def fetch_prices(codes):
+    """배치를 WORKERS 개씩 동시에 조회한다.
+
+    순차로 돌면 13,000종에 5분 넘게 걸려 15분 주기 스케줄과 겹친다.
+    총 요청 수는 그대로고 동시성만 올린다. 과하면 차단당하니 6을 넘기지 말 것.
+    """
+    chunks = [codes[i:i + BATCH_SIZE] for i in range(0, len(codes), BATCH_SIZE)]
     prices = {}
-    total = len(codes)
-    for i in range(0, total, BATCH_SIZE):
-        chunk = codes[i:i + BATCH_SIZE]
-        url = PRICE_URL + ",".join(chunk)
-
-        for attempt in range(RETRY):
-            try:
-                for d in get_json(url).get("datas", []):
-                    rc = d.get("reutersCode")
-                    if not rc:
-                        continue
-                    prices[rc] = {
-                        "price": num(d.get("closePrice")),
-                        "change": num(d.get("compareToPreviousClosePrice")),
-                        "rate": num(d.get("fluctuationsRatio")),
-                    }
-                break
-            except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as exc:
-                if attempt == RETRY - 1:
-                    print(f"  [warn] batch {i // BATCH_SIZE} 실패: {exc}", file=sys.stderr)
-                else:
-                    time.sleep(1.5 * (attempt + 1))
-
-        if (i // BATCH_SIZE) % 20 == 0:
-            print(f"  {min(i + BATCH_SIZE, total)}/{total}", file=sys.stderr)
-        time.sleep(SLEEP)
+    done = 0
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        for res in ex.map(_fetch_batch, enumerate(chunks)):
+            prices.update(res)
+            done += 1
+            if done % 50 == 0 or done == len(chunks):
+                print(f"  {done}/{len(chunks)} 배치", file=sys.stderr)
     return prices
 
 
