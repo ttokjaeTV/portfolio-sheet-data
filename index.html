@@ -534,18 +534,13 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .acct-chip .cnt{font-size:11px;font-weight:700;color:var(--ink-mute)}
 /* 계좌 지우기 */
 /* 보유 목록 계좌별 접기 */
-/* ★ overflow:hidden 이면 안쪽 summary 의 position:sticky 가 죽는다.
-   모서리 둥글리기는 summary 에 직접 radius 를 줘서 대신한다. */
-.hgrp{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;
+/* 계좌 이름줄은 sticky 로 만들지 않는다.
+   2단으로 따라다니게 해 봤더니 화면 위쪽이 계속 가려져 오히려 답답했다.
+   고정은 표 헤더(.holding-head) 하나로 충분하다. */
+.hgrp{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;
   background:var(--white)}
-/* 계좌 이름줄을 표 헤더 바로 아래에 겹쳐 쌓는다(2단 sticky).
-   펼친 계좌를 훑는 동안 "지금 보는 게 어느 계좌인지"가 항상 남아 있고,
-   다음 계좌로 넘어가면 새 계좌 이름이 이전 것을 밀어낸다. */
-.hgrp>summary{position:sticky;top:calc(var(--tabs-h,68px) + var(--hhead-h,46px));z-index:30;
-  list-style:none;cursor:pointer;padding:11px 14px;display:flex;align-items:center;gap:9px;
-  background:var(--bg-alt);font-weight:800;font-size:13px;user-select:none;
-  border-radius:11px 11px 0 0}
-.hgrp:not([open])>summary{border-radius:11px}
+.hgrp>summary{list-style:none;cursor:pointer;padding:11px 14px;display:flex;align-items:center;gap:9px;
+  background:var(--bg-alt);font-weight:800;font-size:13px;user-select:none}
 .hgrp>summary::-webkit-details-marker{display:none}
 .hgrp>summary::after{content:'▾';margin-left:auto;font-size:12px;color:var(--ink-mute);
   transition:transform .15s}
@@ -1309,14 +1304,6 @@ setInterval(renderStamp,60000);
 function syncTabsHeight(){
   const t=document.querySelector('.tabs');
   if(t) document.documentElement.style.setProperty('--tabs-h', t.offsetHeight+'px');
-  // 계좌 이름줄은 표 헤더 아래에 쌓이므로 헤더 높이(마진 포함)도 넘겨준다.
-  // 모바일(≤768px)에서는 헤더를 숨기므로 0 이어야 한다. offsetParent 로 표시 여부를 본다.
-  const h=document.querySelector('.holding-head');
-  if(h){
-    const shown=h.offsetParent!==null;
-    const mb=shown?(parseFloat(getComputedStyle(h).marginBottom)||0):0;
-    document.documentElement.style.setProperty('--hhead-h', (shown?h.offsetHeight+mb:0)+'px');
-  }
 }
 syncTabsHeight();
 window.addEventListener('resize',syncTabsHeight);
