@@ -166,8 +166,11 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .holding-head,.holding-row{display:grid;
   grid-template-columns:126px minmax(190px,1fr) 78px 116px 126px 196px 32px;
   gap:8px;align-items:center}
-.holding-head{padding:0 0 11px;border-bottom:1.5px solid var(--border);margin-bottom:13px}
-.holding-head span{font-size:13px;font-weight:800;letter-spacing:-.2px;color:var(--ink-soft);text-align:center}
+/* 위 버튼줄과 붙어 보이던 문제 → 위 여백을 크게 주고 옅은 바탕으로 헤더임을 분리한다 */
+.holding-head{padding:11px 0 12px;margin:22px 0 14px;
+  border-top:1px solid var(--border);border-bottom:1.5px solid var(--border);
+  background:var(--bg-alt);border-radius:8px}
+.holding-head span{font-size:14.5px;font-weight:800;letter-spacing:-.2px;color:var(--ink);text-align:center}
 .holding-row{margin-bottom:8px}
 .holding-row input,.holding-row select{padding:9px 12px;font-size:14px}
 .cur-wrap{position:relative}
@@ -618,7 +621,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 @media (max-width:960px) and (min-width:769px){
   .holding-head,.holding-row{
     grid-template-columns:96px minmax(110px,1fr) 56px 88px 92px 144px 26px;gap:6px}
-  .holding-head span{font-size:12px}
+  .holding-head span{font-size:13px}
   .holding-row input,.holding-row select{padding:9px 8px;font-size:13px}
   .cur-wrap input{padding-left:20px}
   .cur-mark{left:7px;font-size:12px}
