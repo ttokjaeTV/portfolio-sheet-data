@@ -20,6 +20,8 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 MASTER_URL = "https://ttokjaetv.github.io/etf-selector/data/krx_etf_master.json"
+# 마스터에 아직 없는 신규 상장 ETF 보충용 (EUC-KR 응답)
+NAVER_ETF_LIST = "https://finance.naver.com/api/sise/etfItemList.nhn"
 PRICE_URL = "https://polling.finance.naver.com/api/realtime/domestic/stock/"
 OUT_PATH = os.environ.get("OUT_PATH", "data/etf_prices.csv")
 
@@ -66,7 +68,46 @@ def load_master():
         print("마스터에서 종목을 하나도 읽지 못했습니다.", file=sys.stderr)
         sys.exit(1)
 
+    add_new_listings(out, seen)
     return out, meta
+
+
+def add_new_listings(out, seen):
+    """마스터에 아직 없는 신규 상장 ETF 를 네이버 목록에서 보충한다.
+
+    마스터(krx_etf_master.json)는 etf-selector 레포에서 주 1회 수동 갱신되므로,
+    그 사이 상장한 ETF 는 도구에서 아예 검색되지 않는다. 시세만이라도 나오게 채운다.
+    분류(자산군·총보수·안전자산)는 마스터에만 있으므로 비워 두고,
+    다음 마스터 갱신 때 정상 값으로 덮인다.
+
+    ※ KIND 상장법인목록에는 ETF 가 0건이다. ETF 는 상장'법인'이 아니라
+      집합투자증권이라 그 목록에 들어가지 않는다. 그래서 네이버 목록을 쓴다.
+    """
+    try:
+        req = urllib.request.Request(NAVER_ETF_LIST, headers=UA)
+        with urllib.request.urlopen(req, timeout=30) as r:
+            body = r.read().decode("euc-kr")          # ★ EUC-KR. utf-8 로 읽으면 깨진다
+        items = json.loads(body)["result"]["etfItemList"]
+    except Exception as exc:
+        print(f"  [warn] 신규상장 보충 실패(무시하고 진행): {exc}", file=sys.stderr)
+        return
+
+    added = 0
+    for it in items:
+        code = (it.get("itemcode") or "").strip()
+        name = (it.get("itemname") or "").strip()
+        if not code or not name or code in seen:
+            continue
+        seen.add(code)
+        out.append({
+            "code": code, "name": name,
+            "assetClass": "", "market": "", "expense": "", "safe": "N",
+        })
+        added += 1
+        print(f"  [신규] {code} {name} (분류 미정 — 마스터 갱신 필요)", file=sys.stderr)
+
+    if added:
+        print(f"  마스터에 없는 신규 상장 {added}종 보충", file=sys.stderr)
 
 
 def num(v):

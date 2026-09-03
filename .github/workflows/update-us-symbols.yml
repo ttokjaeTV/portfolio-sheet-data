@@ -1,16 +1,22 @@
-name: 미국 종목코드 매핑 갱신
+name: 미국 종목 심볼 갱신
 
-# 네이버 reutersCode 에는 규칙이 없어(NASDAQ=.O, NYSE=접미사 없음,
-# AMEX 는 SCHD.K 인데 SPY 는 접미사 없음) 한 번 조회해 캐싱해야 한다.
-# 캐시에 있는 티커는 건너뛰므로 평소에는 신규 상장분만 조회하고 몇 초면 끝난다.
-
+# us_symbols.json 은 build_us_prices.py 가 읽는 티커→reutersCode 캐시다.
+# 네이버 미국 reutersCode 는 규칙이 없어 종목마다 조회해야 하므로 느리다.
+# 그래서 15분 주기 시세 워크플로에는 넣지 않고 주 1회만 돌린다.
+#
+# 이걸 안 돌리면 신규 상장 미국 종목이 도구에서 검색되지 않는다.
 on:
   schedule:
-    - cron: "0 20 * * 6"      # 매주 토요일 05:00 KST
+    # 일요일 05:10 KST (토 20:10 UTC) — 미국장 닫힌 뒤, 주간 시세 시작 전
+    - cron: "10 20 * * 6"
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: update-us-symbols
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -23,7 +29,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: 신규 상장분 종목코드 해석
+      - name: 미국 심볼 캐시 갱신
         run: python scripts/build_us_symbols.py
 
       - name: 변경분만 커밋
@@ -34,5 +40,10 @@ jobs:
             echo "변경 없음"; exit 0
           fi
           git add data/us_symbols.json
-          git commit -m "미국 종목코드 매핑 갱신: $(TZ=Asia/Seoul date '+%Y-%m-%d')"
-          git push
+          git commit -m "미국 심볼 갱신: $(TZ=Asia/Seoul date '+%Y-%m-%d')"
+          for i in 1 2 3; do
+            git push && exit 0
+            echo "push 거절 — pull --rebase 후 재시도 ($i/3)"
+            git pull --rebase origin master || exit 1
+          done
+          exit 1
