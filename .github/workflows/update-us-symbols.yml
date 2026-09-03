@@ -1,10 +1,8 @@
-name: 미국 종목 심볼 갱신
+name: 미국 데이터 주간 갱신
 
-# us_symbols.json 은 build_us_prices.py 가 읽는 티커→reutersCode 캐시다.
-# 네이버 미국 reutersCode 는 규칙이 없어 종목마다 조회해야 하므로 느리다.
-# 그래서 15분 주기 시세 워크플로에는 넣지 않고 주 1회만 돌린다.
-#
-# 이걸 안 돌리면 신규 상장 미국 종목이 도구에서 검색되지 않는다.
+# 둘 다 종목마다 조회해야 해서 느리다. 15분 주기 시세 워크플로에는 넣지 않는다.
+#   us_symbols.json  티커→reutersCode 캐시. 없으면 신규 상장 미국 종목이 검색조차 안 된다
+#   us_dividends.csv 야후 배당 이력. 배당 시트의 미국 종목 계산에 쓴다 (약 14분)
 on:
   schedule:
     # 일요일 05:10 KST (토 20:10 UTC) — 미국장 닫힌 뒤, 주간 시세 시작 전
@@ -32,14 +30,20 @@ jobs:
       - name: 미국 심볼 캐시 갱신
         run: python scripts/build_us_symbols.py
 
+      # 심볼이 먼저 갱신돼야 신규 종목의 배당도 같이 잡힌다.
+      # 야후가 막히면 스크립트가 스스로 중단하므로 continue-on-error 로 심볼 갱신은 살린다.
+      - name: 미국 배당 이력 갱신
+        continue-on-error: true
+        run: python scripts/build_us_dividends.py
+
       - name: 변경분만 커밋
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- data/us_symbols.json; then
+          if git diff --quiet -- data/us_symbols.json data/us_dividends.csv; then
             echo "변경 없음"; exit 0
           fi
-          git add data/us_symbols.json
+          git add data/us_symbols.json data/us_dividends.csv
           git commit -m "미국 심볼 갱신: $(TZ=Asia/Seoul date '+%Y-%m-%d')"
           for i in 1 2 3; do
             git push && exit 0
