@@ -54,6 +54,13 @@ jobs:
       - name: 미국 시세 + 환율
         run: python scripts/build_us_prices.py
 
+      # 세법상 원화환산에 쓰는 고시 매매기준율. 미국 배당 세금 계산용이라
+      # 실패해도 시세 갱신은 막지 않는다(화면은 시장 종가로 떨어진다).
+      # 스크립트가 스스로 "오늘 것 이미 있음 / 고시 전"이면 요청 없이 끝낸다.
+      - name: 기준환율 (세금 환산용)
+        continue-on-error: true
+        run: python scripts/build_fx_std.py
+
       - name: 변경분만 커밋
         run: |
           git config user.name  "github-actions[bot]"
