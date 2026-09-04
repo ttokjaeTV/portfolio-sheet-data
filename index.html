@@ -439,13 +439,15 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 
 .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-.stat-card{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:24px}
+.stat-card{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:22px 20px}
 .stat-card.accent{background:var(--dark-warm);color:var(--white);border-color:var(--dark-warm)}
 .stat-card.accent .stat-label{color:var(--accent-soft)}
 .stat-card.accent .stat-sub{color:#D9D2C5}
 .stat-label{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--ink-mute);
   text-transform:uppercase;margin-bottom:8px}
-.stat-value{font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1.1}
+/* 자산이 억 단위로 커지면 '+152,082,091원' 이 14자가 되어 28px 로는 두 줄로 접혔다.
+   화면 폭에 따라 줄어들게 해서 어떤 금액이든 한 줄에 들어오게 한다. */
+.stat-value{font-size:clamp(20px,1.8vw,26px);font-weight:900;letter-spacing:-1px;line-height:1.15}
 .stat-sub{font-size:13px;color:var(--ink-mute);margin-top:6px;font-weight:500}
 .up{color:var(--red)} .down{color:var(--blue)}
 
@@ -912,7 +914,10 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 <!-- 탭 3 : 전체 현황 -->
 <div class="card">
   <div class="step-label"><div class="step-line"></div><span class="step-text">전체 현황</span></div>
-  <div class="card-desc">모든 계좌를 원화 기준으로 합친 결과입니다.</div>
+  <div class="card-desc">모든 계좌를 원화 기준으로 합친 결과입니다.
+    미국 종목은 매입금액과 평가금액을 <b>모두 오늘 환율</b>로 환산하므로,
+    <b>환차익·환차손은 손익에 들어가지 않습니다.</b>
+    살 때의 환율을 따로 받지 않기 때문입니다. 여기 손익은 달러로 번 만큼만 본 값입니다.</div>
   <div class="grid-4">
     <div class="stat-card"><div class="stat-label">총 매입금액</div>
       <div class="stat-value" id="s-buy">0원</div><div class="stat-sub" id="s-cnt">0종목</div></div>
@@ -2094,6 +2099,7 @@ function divRows(valid){
       if(!u||!(u.dpsUsd>0)||!FX){ usSkip++; return; }
       const real=u.dpsUsd*r.qty*FX;                 // 원화 환산 연배당
       out.push({r,d:u,real,annual:real,kind:'미국',isUS:true,
+        realC:u.dpsUsd*r.qty,              // 달러 원본 (해외 전용 계좌 표기용)
         taxBase:real, taxUnknown:0});
       return;
     }
@@ -2176,11 +2182,19 @@ function renderDivAcct(list,usSkip,noData){
   const by={};
   list.forEach(x=>{
     const a=x.r.acct;
-    (by[a]=by[a]||{pre:0,base:0,unk:0,wht:0,us:0,kind:acctTaxKind(a)})&&0;
+    (by[a]=by[a]||{pre:0,base:0,unk:0,wht:0,us:0,preC:0,whtC:0,n:0,nUS:0,
+                   kind:acctTaxKind(a)})&&0;
     by[a].pre+=x.real; by[a].base+=x.taxBase; by[a].unk+=x.taxUnknown;
-    by[a].wht+=divWht(x);
-    if(x.isUS) by[a].us+=x.real;
+    by[a].wht+=divWht(x); by[a].n++;
+    if(x.isUS){ by[a].us+=x.real; by[a].nUS++;
+      by[a].preC+=x.realC||0; by[a].whtC+=(x.realC||0)*US_DIV_WHT; }
   });
+  /* 해외주식 전용 계좌는 달러가 원본이다. 1페이지 계좌 합계와 같은 규칙 —
+     전 종목이 미국일 때만 달러를 앞에 세우고, 하나라도 섞이면 원화만 쓴다. */
+  const onlyUS=b=>b&&b.n>0&&b.nUS===b.n;
+  const two=(u,w)=>`<b>${usd(u)}</b>`
+    +`<span class="th-sub" style="display:block;font-weight:600">${won(w)}</span>`;
+  const money=(b,u,w)=>onlyUS(b)?two(u,w):won(w);
   const names=accts().filter(a=>by[a]);
   const row=a=>{
     const b=by[a], w=b.wht;
@@ -2193,9 +2207,12 @@ function renderDivAcct(list,usSkip,noData){
       style="--kc:${kindColor(a)};--kcbg:${hexA(kindColor(a),solo?0.10:0.045)}">
       <td class="tl kind-cell">${esc(a)}
         ${label?`<span class="dv-chip">${label}</span>`:''}</td>
-      <td>${won(b.pre)}</td><td>${baseCell}</td>
-      <td>${w>0?'<span class="down">-'+won(w)+'</span>':'<span class="dv-none">0원</span>'}</td>
-      <td><b>${won(b.pre-w)}</b></td><td>${won((b.pre-w)/12)}</td></tr>`;
+      <td>${money(b,b.preC,b.pre)}</td><td>${baseCell}</td>
+      <td>${w>0
+        ?`<span class="down">${onlyUS(b)?two(-b.whtC,-w):'-'+won(w)}</span>`
+        :'<span class="dv-none">0원</span>'}</td>
+      <td>${onlyUS(b)?two(b.preC-b.whtC,b.pre-w):`<b>${won(b.pre-w)}</b>`}</td>
+      <td>${money(b,(b.preC-b.whtC)/12,(b.pre-w)/12)}</td></tr>`;
   };
   // 전체 현황 탭 계좌별 표와 같이, 성격이 같은 계좌가 여럿이면 소계를 붙인다
   let body='', i=0;
@@ -2209,12 +2226,19 @@ function renderDivAcct(list,usSkip,noData){
       const gu=grp.reduce((t,a)=>t+by[a].unk,0);
       const gw=grp.reduce((t,a)=>t+by[a].wht,0);
       const gus=grp.reduce((t,a)=>t+by[a].us,0);
+      // 묶인 계좌가 전부 해외 전용일 때만 소계도 달러로 낼 수 있다
+      const gAllUS=grp.every(a=>onlyUS(by[a]));
+      const gpC=grp.reduce((t,a)=>t+by[a].preC,0);
+      const gwC=grp.reduce((t,a)=>t+by[a].whtC,0);
+      const gm=(u,w)=>gAllUS?two(u,w):won(w);
       body+=`<tr class="kind-sum" style="--kc:${color};--kcbg:${hexA(color,0.10)}">
         <td class="tl kind-cell">${esc(kind)} 합계<span class="acct-note">${grp.length}개 계좌</span></td>
-        <td>${won(gp)}</td>
+        <td>${gm(gpC,gp)}</td>
         <td>${(by[grp[0]].kind==='일반'||gus)?won(gb+gu):'<span class="dv-none">—</span>'}</td>
-        <td>${gw>0?'<span class="down">-'+won(gw)+'</span>':'<span class="dv-none">0원</span>'}</td>
-        <td>${won(gp-gw)}</td><td>${won((gp-gw)/12)}</td></tr>`;
+        <td>${gw>0
+          ?`<span class="down">${gAllUS?two(-gwC,-gw):'-'+won(gw)}</span>`
+          :'<span class="dv-none">0원</span>'}</td>
+        <td>${gm(gpC-gwC,gp-gw)}</td><td>${gm((gpC-gwC)/12,(gp-gw)/12)}</td></tr>`;
     }
   }
   document.getElementById('div-acct-body').innerHTML=body
