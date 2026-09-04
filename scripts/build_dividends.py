@@ -567,6 +567,43 @@ def main():
     for r in merged.values():
         r[-1] = stamp
 
+    # ── 쓰기 전에 검사한다 ──
+    # 예전에는 파일을 먼저 쓰고 검사했다. 그래서 반쪽 결과가 디스크에 남았다.
+    print(f"수집: {len(merged)}행 (KRX 접속 {'OK' if krx_ok else '실패'})", file=sys.stderr)
+
+    if not merged:
+        print("한 건도 못 모았습니다. 배포 중단.", file=sys.stderr)
+        sys.exit(1)
+    if not krx_ok:
+        print("개별주 배당이 비었습니다. 배포 중단.", file=sys.stderr)
+        sys.exit(1)
+
+    # ★ 세이브로가 통째로 실패해도 pykrx 만으로 CSV 가 만들어진다.
+    #   그러면 ETF 977종이 사라지고 지급월·회차내역이 전부 빈 반쪽 파일이 배포된다.
+    #   (2026-09-04 실제 사고: 2,485행 → 1,333행, 출처가 전부 KRX)
+    #   세이브로 몫이 비면 무조건 멈춘다.
+    if not etf:
+        print("세이브로 ETF 분배금이 0건입니다. 조회 실패로 보고 배포를 중단합니다.",
+              file=sys.stderr)
+        sys.exit(1)
+    with_month = sum(1 for r in merged.values() if r[9])
+    if with_month < len(merged) * 0.5:
+        print(f"지급월이 있는 행이 {with_month}/{len(merged)} 뿐입니다. "
+              f"세이브로 조회 실패로 보고 배포를 중단합니다.", file=sys.stderr)
+        sys.exit(1)
+
+    # 기존 파일보다 크게 줄면 멈춘다. 소스 한쪽이 조용히 빠지는 걸 잡는다.
+    if os.path.exists(OUT_PATH):
+        try:
+            with open(OUT_PATH, encoding="utf-8") as f:
+                before = sum(1 for _ in csv.reader(f)) - 1
+        except OSError:
+            before = 0
+        if before > 0 and len(merged) < before * 0.9:
+            print(f"{before}행 → {len(merged)}행 으로 줄었습니다. 배포 중단.",
+                  file=sys.stderr)
+            sys.exit(1)
+
     os.makedirs(os.path.dirname(OUT_PATH) or ".", exist_ok=True)
     with open(OUT_PATH, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -575,14 +612,6 @@ def main():
             w.writerow(merged[code])
 
     print(f"완료: {OUT_PATH} ({len(merged)}행)", file=sys.stderr)
-    print(f"KRX 접속: {'OK' if krx_ok else '실패'}", file=sys.stderr)
-
-    if not merged:
-        print("한 건도 못 모았습니다. 배포 중단.", file=sys.stderr)
-        sys.exit(1)
-    if not krx_ok:
-        print("개별주 배당이 비었습니다. ETF 분만 갱신됩니다.", file=sys.stderr)
-        sys.exit(1)
 
 
 if __name__ == "__main__":
