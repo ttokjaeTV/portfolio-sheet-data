@@ -195,7 +195,10 @@ def main():
 
             # 세법상 수입시기는 '지급받은 날'. 지급일이 있으면 그걸 쓰고 없으면 배당락일로 대체한다.
             eff = [(pay or ex, ex, pay, amt) for ex, pay, amt in divs]
-            recent = [x for x in eff if cutoff <= x[0] <= today]
+            # ★ 시작점은 포함하지 않는다 — (오늘-365일, 오늘].
+            #   월배당은 12회 간격이 364일이라 양 끝이 다 걸려 13회로 세어진다.
+            #   (실측 2026-09: 13회로 잡힌 208종 중 202종이 이 경계 현상이었다)
+            recent = [x for x in eff if cutoff < x[0] <= today]
             if not recent:
                 continue
             withdiv += 1
