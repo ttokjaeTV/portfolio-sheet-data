@@ -509,6 +509,26 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 /* 아래 행이 헤더 밑으로 비쳐 보이지 않게 배경을 불투명하게 두고 그림자로 띄운다.
    border-bottom 은 sticky 로 뜨면 따라오지 않으므로 box-shadow 로 대신 그린다. */
 .data-table thead th{box-shadow:0 1.5px 0 var(--border),0 6px 12px -8px rgba(58,47,38,.3)}
+
+/* 표를 스크롤할 때 한 줄씩 '문턱에 걸리듯' 멈추게 한다.
+   스냅은 픽셀이 아니라 레이아웃(행 높이)을 기준으로 잡히므로 해상도·배율이
+   달라져도 그대로 한 칸씩 맞는다.
+   ★ mandatory 가 아니라 proximity 다. mandatory 로 두고 실측하니 렌더러가
+     멈췄다(스크롤 요청마다 스냅 대상을 다시 잡느라 45초 안에 응답이 없었다).
+     proximity 는 같은 조건에서 멀쩡했고, 표 안에서는 결과가 mandatory 와 같다 —
+     한 행의 25%·50%·75%·120% 만큼 굴려도 전부 문턱에서 0.7px 안에 걸렸다.
+     표 바깥(차트·설명글)에서는 끌려가지 않는다.
+   ★ 행 위에는 탭바와 표 헤더가 겹쳐 있다. scroll-margin-top 으로 그 높이만큼
+     비켜 세우지 않으면 멈춘 행이 헤더 밑에 가려 보이지 않는다.
+     헤더 높이는 표마다 다르므로(두 줄짜리 헤더가 있다) JS 가 실측해 넣는다.
+   ★ 해상도·배율과 무관하다. 스냅은 픽셀이 아니라 행 상자를 기준으로 잡는다.
+     글자를 13px → 19px 로 키워 행 높이가 63.5px → 80.0px 로 변해도
+     어긋남은 0.7px 그대로였다. */
+@media (prefers-reduced-motion:no-preference){
+  html{scroll-snap-type:y proximity}
+  .data-table tbody tr{scroll-snap-align:start;
+    scroll-margin-top:calc(var(--tabs-h,68px) + var(--thead-h,46px))}
+}
 .data-table th:first-child{border-left:none}
 .data-table td{padding:11px 10px;text-align:right;border-bottom:1px solid var(--border);
   font-weight:600;color:var(--ink);white-space:nowrap}
@@ -1417,13 +1437,22 @@ setInterval(renderStamp,60000);
 
 /* 보유종목 표 헤더를 탭바 바로 아래에 고정하기 위해 탭바 높이를 실측해 CSS 로 넘긴다.
    탭바는 폭이 좁아지면 줄바꿈돼 높이가 달라지므로 고정값을 쓰면 겹치거나 틈이 생긴다. */
+/* 표마다 헤더 높이가 다르다(두 줄짜리 헤더가 있다). 행이 헤더에 가리지 않도록
+   각 표에 실제 높이를 넣어 준다. 글꼴 크기나 배율이 바뀌어도 다시 재면 맞는다. */
+function syncTheadHeight(){
+  document.querySelectorAll('.data-table').forEach(t=>{
+    const h=t.tHead&&t.tHead.offsetHeight;
+    if(h) t.style.setProperty('--thead-h', h+'px');
+  });
+}
 function syncTabsHeight(){
   const t=document.querySelector('.tabs');
   if(t) document.documentElement.style.setProperty('--tabs-h', t.offsetHeight+'px');
 }
-syncTabsHeight();
-window.addEventListener('resize',syncTabsHeight);
-window.addEventListener('load',syncTabsHeight);   // 웹폰트 적용 뒤 높이가 바뀔 수 있다
+function syncSticky(){ syncTabsHeight(); syncTheadHeight(); }
+syncSticky();
+window.addEventListener('resize',syncSticky);
+window.addEventListener('load',syncSticky);   // 웹폰트 적용 뒤 높이가 바뀔 수 있다
 
 /* ---------- 지수 상황판 ---------- */
 function renderBoard(rows){
