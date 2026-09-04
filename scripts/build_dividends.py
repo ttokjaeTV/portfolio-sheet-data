@@ -284,7 +284,7 @@ def build_stocks_seibro(today, krx):
         out[code] = [code, "국내주식", last["amt"], div,
                      cycle_name(n), n, real, annual, "",
                      "|".join(str(m) for m in months),
-                     detail_str(rows, lambda r: int((r["pay"] or r["date"])[4:6])),
+                     detail_str(rows, lambda r: ymd(r["pay"] or r["date"])),
                      ymd(last["pay"] or last["date"]),
                      "seibro" + ("+KRX" if k else ""), ""]
     return out, bool(out)
@@ -295,12 +295,17 @@ def ymd(d):
     return f"{d[:4]}-{d[4:6]}-{d[6:8]}" if d and len(d) >= 8 else ""
 
 
-def detail_str(rows, month_of):
-    """회차 내역을 '월:금액' 으로 잇는다. 화면에서 큰 회차를 짚어 주려고 쓴다.
+def detail_str(rows, date_of):
+    """회차 내역을 'YYYY-MM-DD:금액' 으로 잇는다.
+
+    ★ 월(MM)만 적으면 연도를 알 수 없다. 최근 12개월 창에는 같은 달이 두 번
+      들어올 수 있고(작년 9월 + 올해 9월), 그러면 화면에서 두 회차가 한 달로
+      합쳐진다. 또 '가장 최근 회차' 를 집어 남은 달을 채우는 계산도 못 한다.
+      미국(us_dividends.csv)과 같은 형식으로 맞춘다.
 
     특별배당인지 결산배당인지는 못 가린다(세이브로·DART 어디에도 구분이 없다).
     대신 회차를 그대로 보여줘서 보는 사람이 판단하게 한다."""
-    return ";".join(f"{month_of(r)}:{r['amt']:g}" for r in rows)
+    return ";".join(f"{date_of(r)}:{r['amt']:g}" for r in rows)
 
 
 def even_enough(amts):
@@ -408,7 +413,7 @@ def build_etf(today):
         out[code] = [code, "국내ETF", "", "", cycle_name(n), n,
                      real, annual, tax,
                      "|".join(str(m) for m in months),
-                     detail_str(rows, lambda r: int((r["pay"] or r["date"])[4:6])),
+                     detail_str(rows, lambda r: ymd(r["pay"] or r["date"])),
                      ymd(last["pay"] or last["date"]), src, ""]
     return out
 
