@@ -69,4 +69,11 @@ jobs:
           fi
           git add data/dividends.csv
           git commit -m "배당 갱신: $(TZ=Asia/Seoul date '+%Y-%m-%d')"
-          git push
+          # 계산이 5분 넘게 걸려 그 사이 시세 워크플로가 커밋을 올리면 push 가 거절되고
+          # 5분치 결과가 통째로 버려진다(2026-09-04 실패 원인). rebase 로 얹고 재시도한다.
+          for i in 1 2 3; do
+            git push && exit 0
+            echo "push 거절 — pull --rebase 후 재시도 ($i/3)"
+            git pull --rebase origin master || exit 1
+          done
+          exit 1
