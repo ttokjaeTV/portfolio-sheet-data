@@ -1924,12 +1924,16 @@ function snapshot(val,buy,cash,n,byAcct){
   state.hist=state.hist||[];
   const d=today(), last=state.hist[state.hist.length-1];
   // 계좌별로도 남긴다. 어느 계좌가 자산을 끌어올렸는지 보려면 이게 있어야 한다.
-  const acc={};
+  const acc={}, accC={};
   for(const a in (byAcct||{})){
     const t=byAcct[a];
     if(t.val||t.buy) acc[a]=[Math.round(t.buy),Math.round(t.val)];
+    /* 해외 전용 계좌(예수금 없음)는 달러도 같이 남긴다. 나중에 원화에서
+       거꾸로 계산하면 그날 환율을 알아야 하고, 그러면 오차가 섞인다. */
+    if(t.n&&t.nUS===t.n&&!(t.cash>0)&&(t.valC||t.buyC))
+      accC[a]=[+t.buyC.toFixed(2),+t.valC.toFixed(2)];
   }
-  const row={d,val:Math.round(val),buy:Math.round(buy),cash:Math.round(cash),n,acc};
+  const row={d,val:Math.round(val),buy:Math.round(buy),cash:Math.round(cash),n,acc,accC};
   if(last&&last.d===d) state.hist[state.hist.length-1]=row;
   else state.hist.push(row);
   if(state.hist.length>1200) state.hist=state.hist.slice(-1200);
@@ -1944,13 +1948,20 @@ function renderTrendTable(hist){
   const last=hist[hist.length-1], first=hist[0];
   const names=accts().filter(a=>(last.acc||{})[a]);
   if(!names.length){ box.innerHTML=''; return; }
-  const row=(nm,b,v,b0,v0,color,solo)=>{
+  /* 해외 전용 계좌는 달러를 앞에 세운다. c=[매입USD, 평가USD] 가 있을 때만이며,
+     이 값은 그 계좌가 전부 미국이고 예수금이 없을 때만 기록에 남는다.
+     기능을 넣기 전 기록에는 없으므로 그런 날은 원화로만 보인다. */
+  const two=(u,w)=>`<b>${usd(u)}</b>`
+    +`<span class="th-sub" style="display:block;font-weight:600">${won(w)}</span>`;
+  const row=(nm,b,v,b0,v0,color,solo,c)=>{
     const pl=v-b, rr=b>0?pl/b*100:0;
     const dIn=b-(b0??b), dVal=v-(v0??v);
     return `<tr class="${solo?'kind-solo':''}" style="--kc:${color};--kcbg:${hexA(color,solo?0.10:0.045)}">
       <td class="tl kind-cell">${esc(nm)}</td>
-      <td>${won(b)}</td><td>${won(v)}</td>
-      <td class="${cls(pl)}">${(pl>=0?'+':'')+won(pl)}</td>
+      <td>${c?two(c[0],b):won(b)}</td><td>${c?two(c[1],v):won(v)}</td>
+      <td class="${cls(pl)}">${c
+        ?`<b>${usdSign(c[1]-c[0])}</b><span class="th-sub" style="display:block;font-weight:600">${(pl>=0?'+':'')+won(pl)}</span>`
+        :(pl>=0?'+':'')+won(pl)}</td>
       <td class="${cls(rr)}">${pct(rr)}</td>
       <td>${dIn>0?'+'+wonShort(dIn)+'원':'—'}</td>
       <td class="${cls(dVal)}">${(dVal>=0?'+':'')+wonShort(dVal)}원</td></tr>`;
@@ -1966,17 +1977,24 @@ function renderTrendTable(hist){
         const kind=acctKind(names[i]), color=kindColor(names[i]);
         const grp=[]; while(i<names.length&&acctKind(names[i])===kind) grp.push(names[i++]);
         grp.forEach(a=>{ const t=last.acc[a], t0=(first.acc||{})[a];
-          out+=row(a,t[0],t[1],t0&&t0[0],t0&&t0[1],color,grp.length===1); });
+          out+=row(a,t[0],t[1],t0&&t0[0],t0&&t0[1],color,grp.length===1,
+                   (last.accC||{})[a]); });
         if(grp.length>1){
           const b=grp.reduce((s,a)=>s+last.acc[a][0],0);
           const v=grp.reduce((s,a)=>s+last.acc[a][1],0);
           const b0=grp.reduce((s,a)=>s+(((first.acc||{})[a]||[0,0])[0]),0);
           const v0=grp.reduce((s,a)=>s+(((first.acc||{})[a]||[0,0])[1]),0);
           const pl=v-b, rr=b>0?pl/b*100:0, dIn=b-b0, dVal=v-v0;
+          // 묶인 계좌가 전부 달러 기록을 가졌을 때만 소계도 달러로 낸다
+          const cs=grp.map(a=>(last.accC||{})[a]);
+          const gc=cs.every(Boolean)
+            ? [cs.reduce((s,c)=>s+c[0],0), cs.reduce((s,c)=>s+c[1],0)] : null;
           out+=`<tr class="kind-sum" style="--kc:${color};--kcbg:${hexA(color,0.10)}">
             <td class="tl kind-cell">${esc(kind)} 합계<span class="acct-note">${grp.length}개 계좌</span></td>
-            <td>${won(b)}</td><td>${won(v)}</td>
-            <td class="${cls(pl)}">${(pl>=0?'+':'')+won(pl)}</td>
+            <td>${gc?two(gc[0],b):won(b)}</td><td>${gc?two(gc[1],v):won(v)}</td>
+            <td class="${cls(pl)}">${gc
+              ?`<b>${usdSign(gc[1]-gc[0])}</b><span class="th-sub" style="display:block;font-weight:600">${(pl>=0?'+':'')+won(pl)}</span>`
+              :(pl>=0?'+':'')+won(pl)}</td>
             <td class="${cls(rr)}">${pct(rr)}</td>
             <td>${dIn>0?'+'+wonShort(dIn)+'원':'—'}</td>
             <td class="${cls(dVal)}">${(dVal>=0?'+':'')+wonShort(dVal)}원</td></tr>`;
