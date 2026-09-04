@@ -1167,6 +1167,10 @@ function parseCSV(text){
 }
 const won=n=>Math.round(n).toLocaleString('ko-KR')+'원';
 const usd=n=>(n<0?'-$':'$')+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+/* 주당 배당은 $0.262 처럼 셋째 자리까지 의미가 있다. usd() 는 두 자리에서 끊어 0.26 이 된다. */
+const usdFine=n=>'$'+Math.abs(n).toLocaleString('en-US',
+  {minimumFractionDigits:2,
+   maximumFractionDigits:Math.abs(n)<1?4:(Math.abs(n)<10?3:2)});
 const usdSign=n=>(n>=0?'+':'-')+'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 /* 미국 종목은 달러가 기본, 원화는 괄호로 병기 */
 function money(r,cAmt,krw,signed){
@@ -2320,16 +2324,20 @@ function renderDivTable(list){
     const bym=us?Object.fromEntries(Object.entries(d.byMonth||{}).map(([k,v])=>[k,v*FX])):d.byMonth;
     const dps=us?(d.perYear>0?d.dpsUsd/d.perYear*FX:0):d.dps;
     const per1=us?dps:(d.dps>0?d.dps:(d.perYear>0?d.annual/d.perYear:0));
+    /* 미국은 달러가 원본이고 원화는 오늘 환율로 환산한 값이다.
+       달러를 위에, 원화를 아래 작게 둬서 어느 쪽이 실제 받는 돈인지 헷갈리지 않게 한다. */
+    const two=(u,w)=>`<b>${u}</b>`
+      +`<span class="th-sub" style="display:block;font-weight:600">${won(w)}</span>`;
     const n=t.accts.size;
     return `<tr>
       <td class="tl"><span class="kind-dot" style="--kc:${t.kc}"></span> ${esc(t.kindNm)}
         ${n>1?`<span class="dv-chip">${n}개 계좌</span>`:''}</td>
       <td class="tl">${esc(r.name)}<br><span style="font-size:11px;color:#8B8276;font-weight:600">${esc(r.code)}</span></td>
-      <td>${per1>0?won(per1):'—'}</td>
+      <td>${per1>0?(us?two(usdFine(d.dpsUsd/d.perYear),per1):won(per1)):'—'}</td>
       <td>${esc(d.cycle)}${d.perYear?` <span class="th-sub">${d.perYear}회</span>`:''}</td>
       <td class="tl">${monthStrip(d.months,bym,r.qty)}</td>
-      <td><b>${won(x.real)}</b></td>
-      <td>${won(x.annual)}${!us&&Math.abs(x.annual-x.real)<1&&d.perYear>1
+      <td>${us?two(usd(d.dpsUsd*t.qty),x.real):`<b>${won(x.real)}</b>`}</td>
+      <td>${us?two(usd(d.dpsUsd*t.qty),x.annual):won(x.annual)}${!us&&Math.abs(x.annual-x.real)<1&&d.perYear>1
         ?'<span class="th-sub" style="display:block">회차 편차 커서 실지급 사용</span>':''}</td>
       <td>${yld>0?pct(yld):'—'}</td>
       <td class="${yoc>yld?'up':''}">${yoc>0?pct(yoc):'—'}</td>
