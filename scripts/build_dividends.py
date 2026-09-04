@@ -285,9 +285,14 @@ def build_stocks_seibro(today, krx):
                      cycle_name(n), n, real, annual, "",
                      "|".join(str(m) for m in months),
                      detail_str(rows, lambda r: int((r["pay"] or r["date"])[4:6])),
-                     f"{last['date'][:4]}-{last['date'][4:6]}-{last['date'][6:]}",
+                     ymd(last["pay"] or last["date"]),
                      "seibro" + ("+KRX" if k else ""), ""]
     return out, bool(out)
+
+
+def ymd(d):
+    """'20260325' → '2026-03-25'. 빈 값이면 빈 문자열."""
+    return f"{d[:4]}-{d[4:6]}-{d[6:8]}" if d and len(d) >= 8 else ""
 
 
 def detail_str(rows, month_of):
@@ -386,8 +391,14 @@ def build_etf(today):
         # 회차가 고르지 않으면 연환산은 못 믿는다. 실지급을 그대로 쓴다.
         annual = round(amts[-1] * n, 4) if even_enough(amts) else real
         last = rows[-1]
-        months = sorted({int(x["date"][4:6]) for x in rows})
+        # ★ 국내 ETF 는 배당락일(기준일)이 월말이고 실제 지급은 며칠 뒤 =
+        #   대개 '다음 달' 이다. 배당락일로 월을 세면 달력이 한 달씩 앞당겨진다.
+        #   (2026-09 실측: 977종 중 827종의 기준일이 30·31일)
+        #   세이브로 TH1_PAY_TERM_BEGIN_DT 가 실지급일이므로 그것을 쓴다.
+        months = sorted({int((x["pay"] or x["date"])[4:6]) for x in rows})
         # 과표는 아는 종목만. 모르면 빈칸으로 두고 화면에서 '미확인'으로 표시한다.
+        # ★ 여기만 배당락일(date)로 찾는다. etf_tax_base 의 키가 배당락일이기 때문이다.
+        #   지급일로 바꾸면 월이 어긋나 과표를 통째로 못 찾는다.
         tm = taxmap.get(code)
         if tm:
             tax = round(sum(tm.get(x["date"][:4] + "-" + x["date"][4:6], 0.0) for x in rows), 4)
@@ -397,8 +408,8 @@ def build_etf(today):
         out[code] = [code, "국내ETF", "", "", cycle_name(n), n,
                      real, annual, tax,
                      "|".join(str(m) for m in months),
-                     detail_str(rows, lambda r: int(r["date"][4:6])),
-                     f"{last['date'][:4]}-{last['date'][4:6]}-{last['date'][6:]}", src, ""]
+                     detail_str(rows, lambda r: int((r["pay"] or r["date"])[4:6])),
+                     ymd(last["pay"] or last["date"]), src, ""]
     return out
 
 
