@@ -2200,7 +2200,10 @@ function renderDivAcct(list,usSkip,noData){
     const b=by[a], w=b.wht;
     const label={'일반':'','연금':'과세이연','ISA':'만기정산'}[b.kind];
     // 연금·ISA 라도 미국 종목이 섞였으면 현지 원천징수가 있어 '—' 로 둘 수 없다
+    /* 해외 전용 계좌는 과표가 곧 분배금 전액이라 달러 금액이 그대로 대응된다.
+       다른 칸과 같이 달러를 위에 둔다. 미확인 과표는 국내에만 있어 여기선 안 걸린다. */
     const baseCell=(b.kind!=='일반'&&!b.us) ? '<span class="dv-none">—</span>'
+      : onlyUS(b) ? two(b.preC, b.base+b.unk)
       : won(b.base+b.unk)+(b.unk>0?`<span class="th-sub" style="display:block">미확인 ${wonShort(b.unk)} 포함</span>`:'');
     const solo=names.filter(x=>acctKind(x)===acctKind(a)).length===1;
     return `<tr class="${solo?'kind-solo':''}"
@@ -2258,7 +2261,9 @@ function renderDivAcct(list,usSkip,noData){
      <b>연금저축·IRP</b>는 과세이연이라 지금은 세금이 없고, 연금으로 받을 때 연금소득세를 냅니다.
      <b>ISA</b>도 지금은 떼지 않고 만기에 순이익 기준으로 정산합니다(일반형 200만원·서민형 400만원 비과세, 초과분 9.9% 분리과세).<br>
      <b>미국 종목</b>은 현지에서 <b>15%</b>를 떼고 그것으로 끝납니다. 국내 세율(14%)보다 높아 추가로 내지 않고
-     지방소득세도 붙지 않습니다. 다만 금융소득종합과세 2,000만원 한도에는 그대로 합산됩니다.`
+     지방소득세도 붙지 않습니다. 다만 금융소득종합과세 2,000만원 한도에는 그대로 합산됩니다.<br>
+     <b>미국 배당의 원화 금액은 오늘 환율로 환산한 값</b>이라 실제 과세표준과 다릅니다.
+     세법은 배당을 <b>받은 시점의 기준환율</b>로 환산합니다. 2,000만원 경계에 가깝다면 이 차이만큼 어긋날 수 있습니다.`
     +(miss.length?'<br>'+miss.join(' '):'');
 }
 /* 과표를 모르는 종목이 있으면 한 점이 아니라 구간으로 보여준다.
