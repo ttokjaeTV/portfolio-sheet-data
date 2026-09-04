@@ -205,7 +205,10 @@ def main():
 
             annual = round(sum(a for _, _, _, a in recent), 4)
             months = sorted({d.month for d, _, _, _ in recent})
-            hist = ";".join(f"{d:%Y-%m}:{a:g}" for d, _, _, a in recent)
+            # ★ 월(YYYY-MM)이 아니라 날짜까지 적는다.
+            #   원화 환산은 '수입시기의 기준환율' 로 해야 하므로 회차별 지급일이 필요하다.
+            #   오늘 환율로 일괄 환산하면 최근 1년 기준 7~8% 어긋난다(2026-09 실측).
+            hist = ";".join(f"{d:%Y-%m-%d}:{a:g}" for d, _, _, a in recent)
             p = px.get(ticker)
             yld = round(annual / p * 100, 2) if p else ""
             last_ex = max(x[1] for x in recent)
