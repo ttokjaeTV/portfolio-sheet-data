@@ -5,8 +5,13 @@ name: 미국 데이터 주간 갱신
 #   us_dividends.csv stockanalysis 배당 이력(지급일 포함). 배당 시트용 (약 10분)
 on:
   schedule:
-    # 일요일 05:10 KST (토 20:10 UTC) — 미국장 닫힌 뒤, 주간 시세 시작 전
-    - cron: "10 20 * * 6"
+    # ★ 주 1회로 두면 안 된다. GitHub 무료 러너의 예약 실행은 대부분 누락된다
+    #   (실측 2026-09: 시세 워크플로 예정 34회/일 중 7회만 실행 = 21%).
+    #   주 1회짜리가 79% 확률로 날아가면 일주일 내내 낡은 데이터가 남는다.
+    #   그래서 매일 두 번 두드리고, 데이터가 7일 이상 낡았을 때만 실제로 돌린다.
+    #   놓쳐도 다음 슬롯이 이어받으므로 결국 실행된다.
+    - cron: "10 20 * * *"   # 05:10 KST
+    - cron: "40 21 * * *"   # 06:40 KST
   workflow_dispatch:
 
 permissions:
@@ -27,16 +32,49 @@ jobs:
         with:
           python-version: "3.12"
 
+      # 매일 두드리되 실제 작업은 주 1회만 한다.
+      # 기준은 CSV 안의 '갱신시각' 열이다. git 이력을 뒤지려면 전체 클론이 필요한데
+      # 이 레포는 15분마다 커밋돼 이력이 빠르게 무거워지므로 파일 자체를 읽는다.
+      - name: 갱신이 필요한지 확인
+        id: chk
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "수동 실행 — 신선도와 무관하게 진행합니다."
+            echo "run=yes" >> $GITHUB_OUTPUT; exit 0
+          fi
+          f=data/us_dividends.csv
+          if [ ! -f "$f" ]; then
+            echo "$f 가 없습니다 — 진행합니다."
+            echo "run=yes" >> $GITHUB_OUTPUT; exit 0
+          fi
+          stamp=$(awk -F, 'NR==2{print $NF}' "$f")          # 예: 2026-09-04 06:55 (KST)
+          last=$(TZ=Asia/Seoul date -d "$stamp" +%s 2>/dev/null || echo 0)
+          if [ "$last" -eq 0 ]; then
+            echo "갱신시각을 읽지 못했습니다('$stamp') — 안전하게 진행합니다."
+            echo "run=yes" >> $GITHUB_OUTPUT; exit 0
+          fi
+          age=$(( ( $(date +%s) - last ) / 86400 ))
+          echo "마지막 갱신 $stamp (${age}일 전)"
+          if [ "$age" -ge 7 ]; then
+            echo "run=yes" >> $GITHUB_OUTPUT
+          else
+            echo "7일이 지나지 않아 건너뜁니다."
+            echo "run=no" >> $GITHUB_OUTPUT
+          fi
+
       - name: 미국 심볼 캐시 갱신
+        if: steps.chk.outputs.run == 'yes'
         run: python scripts/build_us_symbols.py
 
       # 심볼이 먼저 갱신돼야 신규 종목의 배당도 같이 잡힌다.
       # 야후가 막히면 스크립트가 스스로 중단하므로 continue-on-error 로 심볼 갱신은 살린다.
       - name: 미국 배당 이력 갱신
+        if: steps.chk.outputs.run == 'yes'
         continue-on-error: true
         run: python scripts/build_us_dividends.py
 
       - name: 변경분만 커밋
+        if: steps.chk.outputs.run == 'yes'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
