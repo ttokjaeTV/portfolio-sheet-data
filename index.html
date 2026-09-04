@@ -2377,8 +2377,9 @@ function renderDivCal(list){
   /* 이 막대는 '최근 12개월 실적' 이라 올해 아직 안 지난 달에는 작년 값이 서 있다.
      같은 색으로 두면 올해 확정된 금액처럼 읽히므로 셋으로 나눈다. */
   const nowM=new Date().getMonth()+1;
-  /* 예상치가 섞였거나(est) 아직 안 지난 달이면 '예상' 색. 이번 달은 따로 표시한다. */
-  const stOf=i=>((i+1)===nowM&&!est[i])?'now':((est[i]||(i+1)>nowM)?'ahead':'');
+  /* 이번 달이 가장 먼저다. 이번 달에도 예상치가 섞이지만(아직 안 들어온 회차)
+     그걸 '예상' 으로 칠해 버리면 지금이 어느 달인지 화면에서 사라진다. */
+  const stOf=i=>(i+1)===nowM?'now':((est[i]||(i+1)>nowM)?'ahead':'');
   const showNet=!!state.divNet;            // 토글이 꺼져 있으면 세전만 보여 준다
   const anyTax=showNet&&w.some(v=>v>0);
   box.innerHTML='<div class="cal">'+m.map((v,i)=>{
