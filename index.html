@@ -1803,19 +1803,36 @@ function render(){
   const val=valid.reduce((s,r)=>s+r.val,0)+cashSum;
   const pl=val-buy, ror=buy>0?(pl/buy*100):0;
 
+  /* 전체 합계는 국내·미국이 섞여 있어 달러로 더할 수 없다.
+     대신 미국분이 얼마인지를 각 카드 밑에 달러로 같이 적는다. */
+  const us=valid.filter(r=>r.isUS);
+  const usBuyC=us.reduce((s,r)=>s+r.buyC,0), usValC=us.reduce((s,r)=>s+r.valC,0);
+  const usPlC=usValC-usBuyC;
+  const tail=t=>us.length?` · 미국 ${t}`:'';
+
   document.getElementById('s-buy').textContent=won(buy);
-  document.getElementById('s-cnt').textContent=valid.length+'종목';
+  document.getElementById('s-cnt').textContent=valid.length+'종목'+tail(usd(usBuyC));
   document.getElementById('s-val').textContent=won(val);
-  document.getElementById('s-cash').textContent='예수금 '+won(cashSum)+' 포함';
+  document.getElementById('s-cash').textContent=
+    '예수금 '+won(cashSum)+' 포함'+tail(usd(usValC));
   const plEl=document.getElementById('s-pl');
   plEl.textContent=(pl>=0?'+':'')+won(pl); plEl.className='stat-value '+cls(pl);
-  document.getElementById('s-pl-sub').textContent=valid.length?'평가 - 매입':'—';
+  document.getElementById('s-pl-sub').textContent=
+    valid.length?('평가 - 매입'+tail(usdSign(usPlC))):'—';
   const rorEl=document.getElementById('s-ror');
   rorEl.textContent=pct(ror); rorEl.className='stat-value '+cls(ror);
 
   const byAcct={};
-  accts().forEach(a=>byAcct[a]={buy:cash[a],val:cash[a]});
-  valid.forEach(r=>{ byAcct[r.acct].buy+=r.buy; byAcct[r.acct].val+=r.val; });
+  accts().forEach(a=>byAcct[a]={buy:cash[a],val:cash[a],
+    buyC:0,valC:0,n:0,nUS:0,cash:cash[a]});
+  valid.forEach(r=>{ const b=byAcct[r.acct];
+    b.buy+=r.buy; b.val+=r.val; b.n++;
+    if(r.isUS){ b.nUS++; b.buyC+=r.buyC; b.valC+=r.valC; } });
+  /* 해외주식 전용 계좌만 달러를 앞에 세운다. 예수금은 원화로 받으므로
+     예수금이 남아 있으면 달러로 합칠 수 없어 원화만 쓴다. */
+  const onlyUS=d=>d&&d.n>0&&d.nUS===d.n&&!(d.cash>0);
+  const two=(u,w)=>`<b>${usd(u)}</b>`
+    +`<span class="th-sub" style="display:block;font-weight:600">${won(w)}</span>`;
   // 계좌를 성격끼리 묶어 보여준다. 연금저축펀드가 넷이면 넷을 붙여 놓고 소계를 낸다.
   const shown=accts().filter(a=>byAcct[a].val||byAcct[a].buy);
   const arow=(a,d,color,solo)=>{
@@ -1825,8 +1842,12 @@ function render(){
     return `<tr data-arow="${esc(a)}" class="${detailFilter===a?'on ':''}${solo?'kind-solo':''}"
       style="--kc:${color};--kcbg:${hexA(color,solo?0.10:0.045)}">
       <td class="tl kind-cell">${esc(a)}${note?`<span class="acct-note">${esc(note)}</span>`:''}</td>
-      <td>${won(d.buy)}</td><td>${won(d.val)}</td>
-      <td class="${cls(p)}">${(p>=0?'+':'')+won(p)}</td><td class="${cls(rr)}">${pct(rr)}</td><td>${w.toFixed(1)}%</td></tr>`;
+      <td>${onlyUS(d)?two(d.buyC,d.buy):won(d.buy)}</td>
+      <td>${onlyUS(d)?two(d.valC,d.val):won(d.val)}</td>
+      <td class="${cls(p)}">${onlyUS(d)
+        ?`<b>${usdSign(d.valC-d.buyC)}</b><span class="th-sub" style="display:block;font-weight:600">${(p>=0?'+':'')+won(p)}</span>`
+        :(p>=0?'+':'')+won(p)}</td>
+      <td class="${cls(rr)}">${pct(rr)}</td><td>${w.toFixed(1)}%</td></tr>`;
   };
   let body='';
   for(let i=0;i<shown.length;){
@@ -1836,10 +1857,17 @@ function render(){
     if(grp.length>1){                       // 여럿일 때만 합계를 따로 낸다
       const gb=grp.reduce((t,a)=>t+byAcct[a].buy,0), gv=grp.reduce((t,a)=>t+byAcct[a].val,0);
       const gp=gv-gb, gr=gb>0?(gp/gb*100):0, gw=val>0?(gv/val*100):0;
+      // 묶인 계좌가 전부 해외 전용일 때만 소계도 달러로 낼 수 있다
+      const gU=grp.every(a=>onlyUS(byAcct[a]));
+      const gbC=grp.reduce((t,a)=>t+byAcct[a].buyC,0);
+      const gvC=grp.reduce((t,a)=>t+byAcct[a].valC,0);
       body+=`<tr class="kind-sum" style="--kc:${color};--kcbg:${hexA(color,0.10)}">
         <td class="tl kind-cell">${esc(kind)} 합계<span class="acct-note">${grp.length}개 계좌</span></td>
-        <td>${won(gb)}</td><td>${won(gv)}</td>
-        <td class="${cls(gp)}">${(gp>=0?'+':'')+won(gp)}</td><td class="${cls(gr)}">${pct(gr)}</td><td>${gw.toFixed(1)}%</td></tr>`;
+        <td>${gU?two(gbC,gb):won(gb)}</td><td>${gU?two(gvC,gv):won(gv)}</td>
+        <td class="${cls(gp)}">${gU
+          ?`<b>${usdSign(gvC-gbC)}</b><span class="th-sub" style="display:block;font-weight:600">${(gp>=0?'+':'')+won(gp)}</span>`
+          :(gp>=0?'+':'')+won(gp)}</td>
+        <td class="${cls(gr)}">${pct(gr)}</td><td>${gw.toFixed(1)}%</td></tr>`;
     }
   }
   document.getElementById('acct-body').innerHTML=body
