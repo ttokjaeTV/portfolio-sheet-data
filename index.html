@@ -493,12 +493,22 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .badge.ok{background:#DCE8DC;color:var(--green)}
 .badge.warn{background:#F6D9D4;color:var(--red)}
 
+/* 표가 길면 스크롤 중에 어느 열인지 알 수 없다. 헤더를 탭바 밑에 붙여 둔다.
+   ★ 감싼 요소에 overflow-x:auto 가 있으면 y 축도 auto 로 계산돼 스크롤 컨테이너가
+     생기고, 그러면 sticky 가 페이지가 아니라 그 컨테이너를 기준으로 잡혀 안 붙는다.
+     표가 다 들어오는 넓은 화면에서만 overflow 를 풀어 준다. 좁은 화면은
+     어차피 가로로 밀어 보는 상황이라 가로 스크롤을 살린다. */
 .table-wrap{overflow-x:auto;margin-top:16px;border-radius:12px}
+@media(min-width:1000px){ .table-wrap{overflow:visible} }
 .data-table{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
 .data-table.narrow{min-width:640px}
 /* 헤더는 가운데 정렬 + 본문보다 살짝 큰 글자. 값은 그대로 오른쪽 정렬을 지킨다 */
 .data-table th{background:var(--bg-alt);padding:12px 10px;text-align:center;font-weight:800;border-left:1px solid var(--border);
-  color:var(--ink-soft);font-size:13px;letter-spacing:-.2px;border-bottom:1.5px solid var(--border);white-space:nowrap}
+  color:var(--ink-soft);font-size:13px;letter-spacing:-.2px;border-bottom:1.5px solid var(--border);white-space:nowrap;
+  position:sticky;top:var(--tabs-h,68px);z-index:30}
+/* 아래 행이 헤더 밑으로 비쳐 보이지 않게 배경을 불투명하게 두고 그림자로 띄운다.
+   border-bottom 은 sticky 로 뜨면 따라오지 않으므로 box-shadow 로 대신 그린다. */
+.data-table thead th{box-shadow:0 1.5px 0 var(--border),0 6px 12px -8px rgba(58,47,38,.3)}
 .data-table th:first-child{border-left:none}
 .data-table td{padding:11px 10px;text-align:right;border-bottom:1px solid var(--border);
   font-weight:600;color:var(--ink);white-space:nowrap}
