@@ -552,6 +552,8 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .chip-note{font-size:10px;font-weight:600;color:var(--ink-mute);opacity:.85}
 .merge-sub{display:block;font-size:10px;font-weight:600;color:var(--ink-mute);opacity:.8}
 .hg-val{font-size:12px;font-weight:800;color:var(--ink-mute)}
+/* 해외주식 전용 계좌는 달러를 앞세우고 원화를 옅게 뒤에 붙인다 */
+.hg-val .hg-krw{font-weight:700;opacity:.68;margin-left:4px}
 .hg-body{padding:4px 0}
 .acct-x{background:none;border:none;padding:0 2px;margin-left:2px;cursor:pointer;
   font-size:15px;line-height:1;font-weight:800;color:var(--ink-mute);opacity:.45;
@@ -1581,14 +1583,21 @@ function renderRows(){
   };
   box.innerHTML=order.map(a=>{
     const list=groups[a];
-    const val=list.reduce((t,i)=>t+((rows[i].found&&(!rows[i].isUS||FX))?rows[i].val:0),0);
+    const ok=list.filter(i=>rows[i].found&&(!rows[i].isUS||FX));
+    const val=ok.reduce((t,i)=>t+rows[i].val,0);
+    /* 해외주식 전용 계좌라면 달러 합계가 그대로 의미를 갖는다.
+       국내가 하나라도 섞이면 달러로 더할 수 없으므로 원화만 둔다. */
+    const allUS=ok.length>0&&ok.every(i=>rows[i].isUS);
+    const valC=allUS?ok.reduce((t,i)=>t+rows[i].valC,0):0;
     // 계좌가 하나뿐이면 접을 이유가 없다
     const open=order.length<2||!fold[a];
     return `<details class="hgrp" data-fold="${esc(a)}" ${open?'open':''} style="--kc:${kindColor(a)}">
       <summary><span class="kind-dot"></span><span class="hg-nm">${esc(a)}</span>
         ${(state.notes||{})[a]?`<span class="hg-note">${esc(state.notes[a])}</span>`:''}
         <span class="hg-cnt">${list.length}종목</span>
-        <span class="hg-val">${wonShort(val)}원</span></summary>
+        <span class="hg-val">${allUS
+          ?`${usd(valC)}<span class="hg-krw">≈ ${wonShort(val)}원</span>`
+          :`${wonShort(val)}원`}</span></summary>
       <div class="hg-body">${list.map(rowHtml).join('')}</div>
     </details>`;
   }).join('');
