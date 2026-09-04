@@ -499,11 +499,17 @@ input::placeholder{color:#BFB6A6;font-weight:500}
      표가 다 들어오는 넓은 화면에서만 overflow 를 풀어 준다. 좁은 화면은
      어차피 가로로 밀어 보는 상황이라 가로 스크롤을 살린다. */
 .table-wrap{overflow-x:auto;margin-top:16px;border-radius:12px}
-@media(min-width:1000px){ .table-wrap{overflow:visible} }
-.data-table{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
+/* 표가 다 들어올 때만 overflow 를 푼다. 화면 폭으로 어림잡으면 배율·글꼴에 따라
+   어긋나 표가 잘린다. JS 가 실제 폭을 재서 .fits 를 붙인다. */
+.table-wrap.fits{overflow:visible}
+.data-table{width:100%;border-collapse:collapse;font-size:13px;min-width:760px}
 .data-table.narrow{min-width:640px}
+/* 열을 줄이는 대신 관련 값을 위아래로 묶는다. 아랫줄은 보조 정보다. */
+.data-table .cell-sub{display:block;margin-top:3px;font-size:11px;font-weight:700;
+  color:var(--ink-mute);white-space:nowrap}
+.data-table .cell-sub.up{color:var(--red)} .data-table .cell-sub.down{color:var(--blue)}
 /* 헤더는 가운데 정렬 + 본문보다 살짝 큰 글자. 값은 그대로 오른쪽 정렬을 지킨다 */
-.data-table th{background:var(--bg-alt);padding:12px 10px;text-align:center;font-weight:800;border-left:1px solid var(--border);
+.data-table th{background:var(--bg-alt);padding:12px 7px;text-align:center;font-weight:800;border-left:1px solid var(--border);
   color:var(--ink-soft);font-size:13px;letter-spacing:-.2px;border-bottom:1.5px solid var(--border);white-space:nowrap;
   position:sticky;top:var(--tabs-h,68px);z-index:30}
 /* 아래 행이 헤더 밑으로 비쳐 보이지 않게 배경을 불투명하게 두고 그림자로 띄운다.
@@ -530,7 +536,7 @@ input::placeholder{color:#BFB6A6;font-weight:500}
     scroll-margin-top:calc(var(--tabs-h,68px) + var(--thead-h,46px))}
 }
 .data-table th:first-child{border-left:none}
-.data-table td{padding:11px 10px;text-align:right;border-bottom:1px solid var(--border);
+.data-table td{padding:11px 7px;text-align:right;border-bottom:1px solid var(--border);
   font-weight:600;color:var(--ink);white-space:nowrap}
 .data-table td:first-child,.data-table td.tl{text-align:left}
 .data-table tbody tr:hover{background:var(--bg-alt)}
@@ -1050,9 +1056,13 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="table-wrap">
     <table class="data-table">
       <thead><tr>
-        <th class="tl">계좌</th><th class="tl">종목</th><th class="tl">자산군</th>
-        <th>수량</th><th>평균매입가</th><th>현재가</th><th>전일대비<br><span class="th-sub">종목 통화 기준</span></th>
-        <th>매입금액</th><th>평가금액</th><th>평가손익</th><th>수익률</th><th>비중</th>
+        <th class="tl">계좌</th>
+        <th class="tl">종목<br><span class="th-sub">코드 · 자산군</span></th>
+        <th>수량<br><span class="th-sub">평균매입가</span></th>
+        <th>현재가<br><span class="th-sub">전일대비</span></th>
+        <th>매입금액</th><th>평가금액</th>
+        <th>평가손익<br><span class="th-sub">수익률</span></th>
+        <th>비중</th>
       </tr></thead>
       <tbody id="detail-body"></tbody>
     </table>
@@ -1445,11 +1455,22 @@ function syncTheadHeight(){
     if(h) t.style.setProperty('--thead-h', h+'px');
   });
 }
+/* 표가 감싼 칸에 다 들어오는지 실제로 재서 판정한다.
+   들어오면 overflow 를 풀어 헤더 고정이 살고, 넘치면 가로 스크롤을 살린다.
+   재려면 먼저 스크롤 상태로 돌려놔야 스크롤 폭이 제대로 나온다. */
+function syncTableFit(){
+  document.querySelectorAll('.table-wrap').forEach(w=>{
+    const t=w.querySelector('table');
+    if(!t) return;
+    w.classList.remove('fits');
+    if(w.clientWidth>0 && t.scrollWidth<=w.clientWidth+1) w.classList.add('fits');
+  });
+}
 function syncTabsHeight(){
   const t=document.querySelector('.tabs');
   if(t) document.documentElement.style.setProperty('--tabs-h', t.offsetHeight+'px');
 }
-function syncSticky(){ syncTabsHeight(); syncTheadHeight(); }
+function syncSticky(){ syncTabsHeight(); syncTheadHeight(); syncTableFit(); }
 syncSticky();
 window.addEventListener('resize',syncSticky);
 window.addEventListener('load',syncSticky);   // 웹폰트 적용 뒤 높이가 바뀔 수 있다
@@ -2760,7 +2781,7 @@ function renderDetail(all,total){
 
   const valid = detailFilter ? all.filter(r=>r.acct===detailFilter) : all;
   if(!valid.length){
-    body.innerHTML='<tr><td colspan="12" style="text-align:center;color:#8B8276;padding:24px">데이터가 없습니다</td></tr>';
+    body.innerHTML='<tr><td colspan="8" style="text-align:center;color:#8B8276;padding:24px">데이터가 없습니다</td></tr>';
     note.textContent=''; return;
   }
 
@@ -2791,16 +2812,17 @@ function renderDetail(all,total){
             +`<span class="acct-note">${esc([...r.accts].join(' · '))}</span>`
           : `<span class="chip">${esc(r.acct)}</span>`
             +((state.notes||{})[r.acct]?`<span class="acct-note">${esc(state.notes[r.acct])}</span>`:'')}</td>
-      <td class="tl">${esc(r.name)}<br><span style="font-size:11px;color:#8B8276">
+      <td class="tl">${esc(r.name)}<br><span class="cell-sub">
         ${r.isUS?'<span class="flag us">미국</span>':''}${esc(r.code)}
+        ${r.assetClass?' · '+esc(r.assetClass):''}${r.safe?' · 안전':''}
         ${r.lots>1?`<span class="chip lot">${r.lots}건 합산</span>`:''}</span></td>
-      <td class="tl"><span class="chip">${esc(r.assetClass)}${r.safe?' · 안전':''}</span></td>
-      <td>${r.qty.toLocaleString('ko-KR',{maximumFractionDigits:6})}</td><td>${avg}</td><td>${price}</td>
-      <td class="${cls(r.change)}">${chg}</td>
+      <td>${r.qty.toLocaleString('ko-KR',{maximumFractionDigits:6})}
+        <span class="cell-sub">${avg}</span></td>
+      <td>${price}<span class="cell-sub ${cls(r.change)}">${chg}</span></td>
       <td>${money(r,r.buyC,r.buy,false)}</td>
       <td>${money(r,r.valC,r.val,false)}</td>
-      <td class="${cls(r.pl)}">${money(r,r.plC,r.pl,true)}</td>
-      <td class="${cls(r.ror)}">${pct(r.ror)}</td>
+      <td class="${cls(r.pl)}">${money(r,r.plC,r.pl,true)}
+        <span class="cell-sub ${cls(r.ror)}">${pct(r.ror)}</span></td>
       <td>${total>0?(r.val/total*100).toFixed(1):'0.0'}%</td></tr>`;
   }).join('');
 }
@@ -4719,6 +4741,9 @@ function showTab(id){
   document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('on',p.dataset.pane===id));
   state.tab=id; save();
   render();
+  /* 숨은 탭의 표는 폭이 0이라 잴 수 없다. 탭을 연 뒤 다시 재야 판정이 맞는다.
+     행이 새로 그려지면 열 폭도 달라지므로 render() 다음에 잰다. */
+  syncSticky();
 }
 document.getElementById('tabs').addEventListener('click',e=>{
   const b=e.target.closest('[data-tab]');
