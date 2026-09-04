@@ -111,6 +111,29 @@ def main():
         seen.add(k)
         dedup.append(r)
 
+    # ★ 이 스크립트는 파일을 덧붙이지 않고 매번 새로 그린다.
+    #   그래서 API 가 일부만 응답하면 있던 이력이 조용히 사라진다.
+    #   '원/달러' 는 미국 배당의 원화 환산(세금 계산)에 쓰이므로 특히 위험하다.
+    #   시리즈별로 기존 행 수의 90% 미만이면 배포를 중단한다.
+    if os.path.exists(OUT_PATH):
+        prev = {}
+        try:
+            with open(OUT_PATH, encoding="utf-8") as f:
+                for r in csv.reader(f):
+                    if len(r) >= 2 and r[0] != "이름":
+                        prev[r[0]] = prev.get(r[0], 0) + 1
+        except OSError as exc:
+            print(f"  [warn] 기존 파일을 읽지 못했습니다: {exc}", file=sys.stderr)
+        now = {}
+        for r in dedup:
+            now[r[0]] = now.get(r[0], 0) + 1
+        for name, before in prev.items():
+            after = now.get(name, 0)
+            if after < before * 0.9:
+                print(f"{name} 이력이 {before}일 → {after}일 로 줄었습니다. "
+                      f"수집 실패로 보고 배포를 중단합니다.", file=sys.stderr)
+                sys.exit(1)
+
     os.makedirs(os.path.dirname(OUT_PATH) or ".", exist_ok=True)
     with open(OUT_PATH, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
