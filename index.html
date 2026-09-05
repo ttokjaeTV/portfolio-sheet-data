@@ -2088,7 +2088,8 @@ function renderTrendTable(hist){
     const pl=v-b, rr=b>0?pl/b*100:0;
     const dIn=b-(b0??b), dVal=v-(v0??v);
     return `<tr class="${solo?'kind-solo':''}" style="--kc:${color};--kcbg:${hexA(color,solo?0.10:0.045)}">
-      <td class="tl kind-cell">${esc(nm)}</td>
+      <td class="tl kind-cell">${esc(nm)}${(state.notes||{})[nm]
+        ?`<span class="acct-note">${esc(state.notes[nm])}</span>`:''}</td>
       <td>${c?two(c[0],b):won(b)}</td><td>${c?two(c[1],v):won(v)}</td>
       <td class="${cls(pl)}">${c
         ?`<b>${usdSign(c[1]-c[0])}</b><span class="th-sub" style="display:block;font-weight:600">${(pl>=0?'+':'')+won(pl)}</span>`
@@ -2508,7 +2509,8 @@ function renderDivAcct(list,usSkip,noData){
     return `<tr class="${solo?'kind-solo':''}"
       style="--kc:${kindColor(a)};--kcbg:${hexA(kindColor(a),solo?0.10:0.045)}">
       <td class="tl kind-cell">${esc(a)}
-        ${label?`<span class="dv-chip">${label}</span>`:''}</td>
+        ${label?`<span class="dv-chip">${label}</span>`:''}
+        ${(state.notes||{})[a]?`<span class="acct-note">${esc(state.notes[a])}</span>`:''}</td>
       <td>${money(b,b.preC,b.pre)}</td><td>${baseCell}</td>
       <td>${w>0
         ?`<span class="down">${onlyUS(b)?two(-b.whtC,-w):'-'+won(w)}</span>`
