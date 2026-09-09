@@ -8,8 +8,9 @@
        DPS = 주당배당금(최근 결산), DIV = 배당수익률(%)
        ※ 시장 전체를 한 번에 받으므로 종목별 반복 조회가 없다.
 
-  2) 국내 ETF     : 월배당 트래커(ttokjaeTV/montly-div)의 분배금 이력 JSON
-       실제 지급된 분배금과 과세표준액이 들어 있어 세후 계산까지 된다.
+  2) 국내 ETF     : 분배금은 세이브로(전 운용사 전 종목), 과세표준액은
+       data/etf_tax_base.json(954종) + funetf_tax_base.json + 월배당 트래커.
+       과표까지 있어야 세후 계산이 되고, 없는 종목은 화면에서 '미확인'으로 뜬다.
 
 두 값을 나란히 낸다.
   연배당_실지급  = 최근 12개월 실제 지급액 합계        (보수적)
@@ -40,7 +41,15 @@ ETF_PATH = os.environ.get("OUT_PATH", "data/etf_prices.csv")
 STOCK_PATH = os.environ.get("KR_STOCKS_PATH", "data/kr_stocks.csv")
 HISTORY_PATH = os.environ.get("DIV_HISTORY_PATH", "data/dividend_history.csv")
 
-# 월배당 트래커가 매월 갱신하는 분배금 이력 (분배금·과세표준액)
+# 과세표준액 소스. 뒤에 오는 것이 앞을 덮는다 (월 단위로 겹쳐 쓴다).
+#
+#   1) 레포 자체 etf_tax_base.json  — 전 운용사 954종. ttokjae-tax-base-updater 가 채운다.
+#   2) funetf_tax_base.json         — 삼성 계열 202종. 1)에 이미 합쳐져 있지만 보험으로 둔다.
+#   3) 월배당 트래커 두 파일 189종  — 매월 갱신돼 가장 최신이므로 맨 뒤에서 덮는다.
+#
+# ★ 한때 3)만 읽었다. 그래서 954종 과표를 다 받아 놓고도 189종만 채워지고
+#   나머지 788종이 화면에서 '과표 미확인'으로 떴다. 1)을 빠뜨리지 말 것.
+LOCAL_TAX_FILES = ["data/etf_tax_base.json", "data/funetf_tax_base.json"]
 TRACKER = "https://ttokjaetv.github.io/montly-div/data/"
 TRACKER_FILES = ["tax-base.json", "tax-base-extra.json"]
 
@@ -159,36 +168,75 @@ def html_unescape(s):
     return s
 
 
+def _tax_months(doc, cutoff):
+    """과표 JSON 한 건 → {코드: {YYYY-MM: 과세표준액}}.
+
+    세 소스 모두 `코드 -> [[배당락일, 분배금, 과세표준액], ...]` 로 같은 모양이다.
+    한 달에 두 번 분배한 종목은 그 달 안에서 합산한다."""
+    out = {}
+    for code, recs in (doc.get("data") or {}).items():
+        by = {}
+        for r in recs or []:
+            if not r or len(r) < 3:
+                continue
+            d = norm_date(r[0])
+            if not d or d < cutoff:
+                continue
+            try:
+                tax = float(r[2] or 0)
+            except (TypeError, ValueError):
+                continue
+            by[d[:7]] = by.get(d[:7], 0.0) + max(0.0, tax)
+        if by:
+            out[code.upper()] = by
+    return out
+
+
+def _local_json(path):
+    """레포 상대경로로 먼저 찾고, 없으면 스크립트 기준 상위에서 찾는다.
+    (Actions 는 레포 루트에서, 사람은 scripts/ 안에서 돌리기도 한다.)"""
+    for p in (path, os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), path)):
+        if os.path.exists(p):
+            with open(p, encoding="utf-8") as f:
+                return json.load(f)
+    raise FileNotFoundError(path)
+
+
 def tracker_tax(today):
-    """트래커 JSON → {코드: {YYYY-MM: 과세표준액}}.
+    """과표 소스 전부 → {코드: {YYYY-MM: 과세표준액}}.
 
     분배금은 세이브로가 전 종목을 주므로 여기서는 과표만 쓴다.
     세이브로 지급기준일(8/31)과 ETF CHECK 배당락일(8/28)이 1영업일 어긋나므로
-    날짜가 아니라 **월 단위**로 맞춘다. 한 달에 두 번 분배한 경우는 합산한다."""
+    날짜가 아니라 **월 단위**로 맞춘다.
+
+    소스가 여럿이라 뒤에 오는 것이 앞을 **월 단위로** 덮는다. 종목 단위로 덮으면
+    트래커에 있는 189종이 etf_tax_base 의 더 긴 이력을 통째로 밀어내 버린다."""
     cutoff = (today - timedelta(days=400)).strftime("%Y-%m-%d")
     out, got = {}, 0
+
+    def merge(src, doc):
+        nonlocal got
+        got += 1
+        m = _tax_months(doc, cutoff)
+        for code, by in m.items():
+            out.setdefault(code, {}).update(by)
+        print(f"  과표 {src}: {len(m)}종", file=sys.stderr)
+
+    for fn in LOCAL_TAX_FILES:
+        try:
+            merge(fn, _local_json(fn))
+        except Exception as e:
+            print(f"  과표 {fn} 실패: {e}", file=sys.stderr)
+
     for fn in TRACKER_FILES:
         try:
-            doc = fetch_json(TRACKER + fn)
+            merge("트래커 " + fn, fetch_json(TRACKER + fn))
         except Exception as e:
             print(f"  트래커 {fn} 실패: {e}", file=sys.stderr)
-            continue
-        got += 1
-        for code, recs in (doc.get("data") or {}).items():
-            by = out.setdefault(code.upper(), {})
-            for r in recs or []:
-                if not r or len(r) < 3:
-                    continue
-                d = norm_date(r[0])
-                if not d or d < cutoff:
-                    continue
-                try:
-                    tax = float(r[2] or 0)
-                except (TypeError, ValueError):
-                    continue
-                by[d[:7]] = by.get(d[:7], 0.0) + max(0.0, tax)
+
     if not got:
-        print("  트래커 JSON 을 한 건도 못 받았습니다.", file=sys.stderr)
+        print("  과표 소스를 한 건도 못 읽었습니다.", file=sys.stderr)
     return out
 
 
@@ -363,14 +411,14 @@ def append_history(recs):
 
 
 def build_etf(today):
-    """세이브로 분배금(전 종목) + 트래커 과표(189종) → {코드: 행}."""
+    """세이브로 분배금(전 종목) + 과표 소스 전부(etf_tax_base 954종 + 트래커) → {코드: 행}."""
     frm = (today - timedelta(days=372)).strftime("%Y%m%d")
     to = today.strftime("%Y%m%d")
     recs = seibro(frm, to)
     print(f"  세이브로 {len(recs)}건 · 종목 {len({r['code'] for r in recs})}개", file=sys.stderr)
     append_history(recs)
     taxmap = tracker_tax(today)
-    print(f"  트래커 과표 {len(taxmap)}종", file=sys.stderr)
+    print(f"  과표 합계 {len(taxmap)}종", file=sys.stderr)
 
     # ★ 상장폐지 종목의 '청산분배' 를 반드시 뺀다.
     #   전액 상환이라 한 회차가 주가만큼 크다. 정상 분배와 섞으면 연배당이 수백 배로 뛴다.

@@ -2332,10 +2332,15 @@ function divRows(valid){
     // 과표를 아는 것과 모르는 것을 섞지 않는다.
     // 세후 배당금은 전액과세로 잡아도 '덜 받는 쪽' 이라 안전하지만,
     // 종합과세 2,000만원 게이지는 과대추정이 곧 잘못된 경고가 되기 때문이다.
-    const known=d.tax!==null;
+    /* ★ 국내 개별주는 과세표준액이라는 개념 자체가 없다. 배당금 전액이 배당소득이다.
+       (과표는 ETF 가 보유자산에서 나온 이자·배당만 걸러내려고 두는 값이다.)
+       그래서 과표 칸이 비어 있는 게 정상이며 '미확인' 이 아니라 확정된 전액과세다.
+       이걸 미확인으로 세면 종합과세 게이지에 "과표 미확인 1,500종" 같은 헛경고가 뜬다. */
+    const stock=d.kind==='국내주식';
+    const known=stock||d.tax!==null;
     out.push({r,d,real,annual,kind:acctTaxKind(r.acct),isUS:false,
-      taxBase: known?d.tax*r.qty:0,      // 확인된 과세표준액
-      taxUnknown: known?0:real});        // 미확인분 (최대 이만큼 더 잡힐 수 있다)
+      taxBase: stock?real:(known?d.tax*r.qty:0),   // 확인된 과세표준액
+      taxUnknown: known?0:real});                  // 미확인분 (최대 이만큼 더 잡힐 수 있다)
   });
   return {list:out,usSkip,noData};
 }
@@ -2633,6 +2638,8 @@ function renderDivTable(list){
   const chip=d=>{
     // 미국은 과세표준액 개념이 없다. 분배금 전액이 배당소득이고 현지에서 15% 를 뗀다.
     if(d.dpsUsd!==undefined) return '<span class="dv-chip">미국 · 현지 15%</span>';
+    // 국내 개별주도 과표 개념이 없다. 배당금 전액이 배당소득 — 가정이 아니라 확정이다.
+    if(d.kind==='국내주식') return '<span class="dv-chip">전액과세</span>';
     if(d.tax===null) return '<span class="dv-chip miss">미확인 · 전액과세 가정</span>';
     if(d.tax<=0) return '<span class="dv-chip zero">과표 0 · 비과세</span>';
     if(d.real>0&&d.tax<d.real*0.99) return `<span class="dv-chip part">일부과세 ${Math.round(d.tax/d.real*100)}%</span>`;
