@@ -278,6 +278,8 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .dgauge-fill.over{background:var(--red)}
 /* 과표 미확인분 : 확정분과 확실히 구분되게 빗금 */
 .dgauge-fill.unk{background:repeating-linear-gradient(45deg,#B8C4B8,#B8C4B8 5px,#D3DAD3 5px,#D3DAD3 10px)}
+/* 고배당 분리과세분 : 신청하면 한도 계산에서 빠지는 몫이라 확정분과 색을 나눈다 */
+.dgauge-fill.hidiv{background:var(--blue);opacity:.55}
 .dgauge-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:9px;flex-wrap:wrap}
 .dgauge-l{font-size:13.5px;font-weight:800}
 .dgauge-v{font-size:19px;font-weight:900;letter-spacing:-.5px}
@@ -289,6 +291,7 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .dv-chip.part{background:#DCE4EE;color:var(--blue)}
 .dv-chip.zero{background:#DCE8DC;color:var(--green)}
 .dv-chip.miss{background:#F6D9D4;color:var(--red)}
+.dv-chip.hidiv{background:#DCE4EE;color:var(--blue);cursor:help}
 /* 종목별 지급월 띠 — 12칸 중 실제로 받은 달만 채운다 */
 .mrow{display:inline-flex;gap:2px}
 .mcell{width:15px;height:17px;border-radius:3px;background:var(--bg-alt);color:#B9AF9F;
@@ -1232,6 +1235,11 @@ const COLORS=['#D9542B','#E89A6F','#8B6F47','#C4A57B','#5A6B5A','#A03D1F','#9B93
 let KR={}, US={}, FX=0, STAMP='', STAMP_US='';   // KR = 국내 ETF + 국내 개별주식
 let DIV={}, DIV_STAMP='';                        // 종목코드 → 배당·분배금 (국내)
 let USDIV={};                                    // 티커 → 배당 (미국, 금액은 USD)
+/* 종목코드 → 고배당기업(배당소득 분리과세 대상) 정보. 국내 개별주만이다.
+   조특법 §104의27, 2026~2028 한시. ETF·펀드·리츠는 제외라 ETF 에는 붙지 않는다.
+   ★ 자율공시 목록이라 '없으면 비대상' 이 아니고, 투자자가 종합소득세 신고 때
+     분리과세를 신청해야 적용된다. 그래서 화면에서 단정하지 않는다. */
+let HIDIV={}, HIDIV_STAMP='';
 let state={holdings:[],cash:{},cashUsd:{}};   // cashUsd = 달러 예수금(외화 그대로)
 let ocrRows=[];
 
@@ -1373,6 +1381,13 @@ async function loadAll(){
         DIV_STAMP=r[12]||DIV_STAMP;
       });
     }
+
+    /* 고배당기업(배당소득 분리과세 대상). 실패하면 칩만 안 붙고 나머지는 그대로 돈다. */
+    try{
+      const doc=await fetch(BASE+'high_dividend.json',{cache:'no-store'}).then(r=>r.json());
+      HIDIV=doc&&doc.data?doc.data:{};
+      HIDIV_STAMP=(doc&&doc._meta&&doc._meta.collected)||'';
+    }catch(e){ HIDIV={}; }
 
     parseCSV(krT).slice(1).forEach(r=>{
       if(!r[0]) return;
@@ -2340,7 +2355,9 @@ function divRows(valid){
     const known=stock||d.tax!==null;
     out.push({r,d,real,annual,kind:acctTaxKind(r.acct),isUS:false,
       taxBase: stock?real:(known?d.tax*r.qty:0),   // 확인된 과세표준액
-      taxUnknown: known?0:real});                  // 미확인분 (최대 이만큼 더 잡힐 수 있다)
+      taxUnknown: known?0:real,                    // 미확인분 (최대 이만큼 더 잡힐 수 있다)
+      // 고배당 분리과세 대상은 개별주에만 붙는다. ETF 는 법에서 제외돼 있다.
+      hiDiv: stock&&!!HIDIV[d.code]});
   });
   return {list:out,usSkip,noData};
 }
@@ -2587,7 +2604,14 @@ function renderDivGauge(list){
   const unk=gen.reduce((s,x)=>s+x.taxUnknown,0);        // 미확인 (최대 이만큼 더)
   const nUnk=gen.filter(x=>x.taxUnknown>0).length;
   const max=base+unk;
-  const w1=Math.min(100,base/LIMIT*100), w2=Math.min(100-w1,unk/LIMIT*100);
+  /* 고배당 분리과세분. 신고 때 신청하면 이 몫은 한도 계산에서 빠진다.
+     신청은 본인이 하는 것이라 자동으로 빼지 않고, 같은 막대 안에서 색만 나눈다. */
+  const hi=gen.filter(x=>x.hiDiv).reduce((s,x)=>s+x.taxBase,0);
+  const nHi=gen.filter(x=>x.hiDiv).length;
+  const plain=Math.max(0,base-hi);
+  const w0=Math.min(100,plain/LIMIT*100);
+  const w1=Math.min(100-w0,hi/LIMIT*100);
+  const w2=Math.min(100-w0-w1,unk/LIMIT*100);
   const over=base>LIMIT, mayOver=!over&&max>LIMIT;
   document.getElementById('div-gauge').innerHTML=
     `<div class="dgauge">
@@ -2597,20 +2621,31 @@ function renderDivGauge(list){
            <span style="font-size:13px;color:#8B8276">/ 2,000만원</span></span>
        </div>
        <div class="dgauge-bar">
-         <div class="dgauge-fill ${over?'over':''}" style="width:${w1}%"></div>
+         <div class="dgauge-fill ${over?'over':''}" style="width:${w0}%"></div>
+         ${hi>0?`<div class="dgauge-fill hidiv" style="width:${w1}%"
+                   title="고배당 분리과세 대상 ${won(hi)}"></div>`:''}
          ${unk>0?`<div class="dgauge-fill unk" style="width:${w2}%"></div>`:''}
        </div>
        <div class="dgauge-sub">
          ${over
            ? `<span class="dv-warn">한도를 ${won(base-LIMIT)} 넘습니다.</span> 초과분이 다른 종합소득과 합산돼 6~45% 누진세율로 과세됩니다.`
+             +(hi>0?(plain<=LIMIT
+                 ? ` 다만 <b>고배당 분리과세를 신청하면 ${won(plain)}</b>으로 내려가 한도 안에 들어옵니다.`
+                 : ` 고배당 분리과세를 신청해도 ${won(plain)}이 남아 한도는 여전히 넘습니다.`):'')
            : mayOver
              ? `확인된 과표로는 한도까지 <b>${won(LIMIT-base)}</b> 남았습니다.
                 다만 <b>과표 미확인 ${nUnk}종</b>을 전액과세로 보면 한도를 넘을 수 있습니다.`
              : `한도까지 <b>${won(LIMIT-base)}</b> 남았습니다. 2,000만원까지는 15.4% 원천징수로 끝납니다.`}<br>
          ${unk>0?`옅은 칸은 <b>과표를 아직 모르는 ${nUnk}종</b>입니다. 분배금 전액이 과세된다고 가정한 상한이라,
                   실제로는 이보다 낮습니다 — 커버드콜·채권형은 과표가 분배금보다 훨씬 작습니다.<br>`:''}
+         ${hi>0?`파란 칸은 <b>고배당 분리과세 대상 ${nHi}종 ${won(hi)}</b>입니다.
+                  종합소득세 신고 때 <b>분리과세를 신청하면</b> 이 몫은 위 한도 계산에서 빠지고
+                  2,000만원 초과분도 20~30%로 끝납니다(신청하지 않으면 그대로 합산됩니다).
+                  다만 <b>건강보험료는 줄지 않습니다</b> — 세율만 낮추고 소득 자체를 줄이는 제도가 아닙니다.<br>`:''}
          이 막대는 <b>일반계좌 배당만</b> 셉니다. 연금저축·IRP·ISA는 금융소득 종합과세 대상이 아닙니다.
          실제 판정에는 예금·채권 이자와 다른 금융기관 배당까지 합산되므로, 여기 숫자만으로 단정하지 마세요.
+         ${HIDIV_STAMP?`<br><span style="font-size:12px;color:#8B8276">고배당기업 명단은 거래소 KIND 공시 기준 ${esc(HIDIV_STAMP)} 수집분입니다.
+           기업이 스스로 공시하는 자율공시라, 요건을 채웠어도 공시하지 않은 기업은 이 명단에 없습니다.</span>`:''}
        </div>
      </div>`;
 }
@@ -2639,7 +2674,13 @@ function renderDivTable(list){
     // 미국은 과세표준액 개념이 없다. 분배금 전액이 배당소득이고 현지에서 15% 를 뗀다.
     if(d.dpsUsd!==undefined) return '<span class="dv-chip">미국 · 현지 15%</span>';
     // 국내 개별주도 과표 개념이 없다. 배당금 전액이 배당소득 — 가정이 아니라 확정이다.
-    if(d.kind==='국내주식') return '<span class="dv-chip">전액과세</span>';
+    if(d.kind==='국내주식'){
+      const h=HIDIV[d.code];
+      // '신청 가능' 이다. 자동 적용이 아니라 종합소득세 신고 때 신청해야 한다.
+      return h
+        ? `<span class="dv-chip hidiv" title="배당성향 ${h.payout??'—'}% · 배당증가율 ${h.growth??'—'}% (${h.year||''} 사업연도 기준) · 종합소득세 신고 때 분리과세를 신청해야 적용됩니다">고배당 · 분리과세 신청 가능</span>`
+        : '<span class="dv-chip">전액과세</span>';
+    }
     if(d.tax===null) return '<span class="dv-chip miss">미확인 · 전액과세 가정</span>';
     if(d.tax<=0) return '<span class="dv-chip zero">과표 0 · 비과세</span>';
     if(d.real>0&&d.tax<d.real*0.99) return `<span class="dv-chip part">일부과세 ${Math.round(d.tax/d.real*100)}%</span>`;
