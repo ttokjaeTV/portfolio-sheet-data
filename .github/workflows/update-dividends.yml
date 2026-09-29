@@ -34,7 +34,11 @@ jobs:
           python-version: "3.12"
 
       - name: pykrx 설치
-        run: pip install --quiet pykrx pandas
+        # ★ 버전 고정 (2026-09-29). 9/18 까지 성공한 실행은 1.2.8 이었고,
+        #   1.2.9(2026-09-19 배포)를 처음 받은 9/25 두 번이 모두 실패했다.
+        #   1.2.9 는 import·조회 때 자동 로그인하면서 '로그인 ID' 를 stdout 에 찍는다
+        #   (공개 레포 로그에 계정이 남는다). 원인 확정 전까지 검증된 버전에 묶어 둔다.
+        run: pip install --quiet "pykrx==1.2.8" pandas
 
       # GitHub Actions 러너에서 KRX 가 열리는지 먼저 본다.
       # 로컬 샌드박스에서는 빈 응답이 와서 확인이 안 됐다.
@@ -44,7 +48,9 @@ jobs:
         run: |
           python - <<'PY'
           from datetime import date, timedelta
-          from pykrx import stock
+          import io, contextlib
+          with contextlib.redirect_stdout(io.StringIO()):   # 로그인 ID 가 로그에 찍히지 않게
+              from pykrx import stock
           for back in range(0, 8):
               d = (date.today() - timedelta(days=back)).strftime("%Y%m%d")
               try:
@@ -65,7 +71,21 @@ jobs:
         env:
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
-        run: python scripts/build_dividends.py
+        # ★ 실패 원인을 로그인 없이 볼 수 있게 stderr 끝부분을 실행 요약(Summary)에 남긴다.
+        #   공개 레포라도 Actions 로그는 로그인해야 열리지만, 요약은 누구나 본다.
+        #   (2026-09-25 두 번 실패했을 때 원인을 끝내 못 봤다.) 계정 값은 stderr 에 찍지 않는다.
+        run: |
+          set -o pipefail
+          python scripts/build_dividends.py 2> >(tee /tmp/div_err.log >&2)
+      - name: 실패 시 요약에 오류 남기기
+        if: failure()
+        run: |
+          {
+            echo "### 배당 CSV 생성 실패 — stderr 마지막 60줄"
+            echo '```'
+            tail -n 60 /tmp/div_err.log 2>/dev/null | grep -viE 'KRX_ID|KRX_PW|로그인 ID' || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # 고배당기업(배당소득 분리과세 대상) 명단. 거래소 KIND 자율공시를 그대로 받는다.
       # 정기주총 시즌(3월)에만 실질적으로 바뀌지만, 배당과 같이 주 1회 두드려 둔다.

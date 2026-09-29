@@ -477,10 +477,19 @@ def build_stocks(today):
     except Exception as e:
         print(f"  krx_auth 로드 실패: {type(e).__name__}", file=sys.stderr)
 
+    # ★ pykrx 는 import·조회 때 자동 로그인하며 '로그인 ID' 를 stdout 에 찍는다(1.2.9 확인).
+    #   공개 레포 Actions 로그에 계정이 남지 않도록 stdout 을 삼킨다. (krx_auth.login 과 같은 처리)
+    import io
+    import contextlib
+    _quiet = contextlib.redirect_stdout(io.StringIO())
     try:
-        from pykrx import stock
+        with _quiet:
+            from pykrx import stock
     except ImportError:
         print("  pykrx 가 없습니다. pip install pykrx", file=sys.stderr)
+        return {}, False
+    except Exception as e:
+        print(f"  pykrx import 실패: {type(e).__name__}", file=sys.stderr)
         return {}, False
 
     # KRX 는 휴장일에 빈 응답을 준다. 최근 영업일을 며칠 거슬러 찾는다.
@@ -491,7 +500,8 @@ def build_stocks(today):
         got_any = False
         for mkt in ("KOSPI", "KOSDAQ"):
             try:
-                df = stock.get_market_fundamental(d, market=mkt)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    df = stock.get_market_fundamental(d, market=mkt)
             except Exception as e:
                 print(f"  {d} {mkt}: {type(e).__name__} {e}", file=sys.stderr)
                 continue
