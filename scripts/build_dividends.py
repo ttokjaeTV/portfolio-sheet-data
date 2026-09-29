@@ -18,7 +18,8 @@
 
 출력: data/dividends.csv
   종목코드,구분,주당배당금,배당수익률,지급주기,연지급횟수,
-  연배당_실지급,연배당_연환산,과표_실지급,최근지급일,출처,갱신시각
+  연배당_실지급,연배당_연환산,과표_실지급,지급월,회차내역,최근지급일,출처,갱신시각,특별배당
+  (배당수익률 = 실지급 ÷ 빌드 시점 현재가, 특별배당 = 평소를 넘는 초과분 추정 — split_special 참고)
 
 ※ pykrx 는 KRX 서버를 직접 부른다. 일부 네트워크(사내망·일부 클라우드)에서는
    빈 응답이 오며 `Expecting value: line 1 column 1` 로 터진다.
@@ -63,9 +64,16 @@ SEIBRO_PAGE = 30          # 한 번에 30건 고정. START_PAGE 는 행 오프�
 KST = timezone(timedelta(hours=9))
 UA = {"User-Agent": "Mozilla/5.0"}
 
+# ★ 열 순서를 바꾸지 말 것. index.html 이 번호(r[0]~r[13])로 읽는다.
+#   '특별배당' 은 2026-09-29 에 맨 뒤(r[14])로 붙였다 — 옛 화면은 이 열을 무시하므로 안전하다.
+#   배당수익률 = 연배당_실지급 ÷ 현재가 × 100 (빌드 시점 시세). KRX DIV 는 토요일 새벽 실행마다
+#   빈 응답이라 전 종목이 빈칸으로 덮였다. 화면은 이 열을 쓰지 않고 실시간으로 계산한다.
 HEADER = ["종목코드", "구분", "주당배당금", "배당수익률", "지급주기", "연지급횟수",
           "연배당_실지급", "연배당_연환산", "과표_실지급", "지급월", "회차내역",
-          "최근지급일", "출처", "갱신시각"]
+          "최근지급일", "출처", "갱신시각", "특별배당"]
+STAMP_COL = HEADER.index("갱신시각")
+# 특별배당이 결산배당인지 가리려면 작년 같은 시기 회차가 필요하다. 그래서 2년치를 받는다.
+LOOKBACK_DAYS = 760
 
 
 def now_kst():
@@ -302,7 +310,7 @@ def seibro_stock(frm, to):
 
 def build_stocks_seibro(today, krx):
     """세이브로 회차별 배당 → {코드: 행}. 배당수익률은 KRX 값이 있으면 쓴다."""
-    frm = (today - timedelta(days=372)).strftime("%Y%m%d")
+    frm = (today - timedelta(days=LOOKBACK_DAYS)).strftime("%Y%m%d")
     recs = seibro_stock(frm, today.strftime("%Y%m%d"))
     print(f"  세이브로(주식) {len(recs)}건 · 종목 {len({r['code'] for r in recs})}개",
           file=sys.stderr)
@@ -310,31 +318,36 @@ def build_stocks_seibro(today, krx):
         return {}, False
 
     cut = (today - timedelta(days=365)).strftime("%Y%m%d")
-    by = {}
+    by, prior = {}, {}
     for r in recs:
         # 무배당·주식배당·현물배당은 현금이 0 이라 여기서 자연히 빠진다.
         # 반대로 '동시배당'(현금+주식 동시)은 현금 부분이 있으니 세야 한다.
-        if r["date"] < cut or r["amt"] <= 0:
+        if r["amt"] <= 0:
             continue
-        by.setdefault(r["code"], []).append(r)
+        (by if r["date"] >= cut else prior).setdefault(r["code"], []).append(r)
 
-    out = {}
+    px = load_prices()
+    out, nsp = {}, 0
     for code, rows in by.items():
         rows.sort(key=lambda x: x["date"])
         amts = [x["amt"] for x in rows]
         n = len(amts)
         real = round(sum(amts), 4)                      # 실제로 받은 돈 전부
-        annual = round(amts[-1] * n, 4) if even_enough(amts) else real
+        reg, sp = split_special(rows, prior.get(code, []))
+        nsp += bool(sp)
+        annual = annualize(amts, reg, sp)
         last = rows[-1]
         months = sorted({int((x["pay"] or x["date"])[4:6]) for x in rows})
         k = krx.get(code)
-        div = k[3] if k else ""
+        p = px.get(code)
+        div = round(real / p * 100, 2) if p else (k[3] if k else "")
         out[code] = [code, "국내주식", last["amt"], div,
                      cycle_name(n), n, real, annual, "",
                      "|".join(str(m) for m in months),
                      detail_str(rows, lambda r: ymd(r["pay"] or r["date"])),
                      ymd(last["pay"] or last["date"]),
-                     "seibro" + ("+KRX" if k else ""), ""]
+                     "seibro" + ("+KRX" if k else ""), "", special_str(sp)]
+    print(f"  특별배당 추정 {nsp}종 (개별주)", file=sys.stderr)
     return out, bool(out)
 
 
@@ -370,6 +383,99 @@ def even_enough(amts):
     if len(a) < 2:
         return True
     return max(a) <= min(a) * 3
+
+
+# ---------------------------------------------------------------- 특별배당 추정
+# 세이브로·DART 어디에도 정기/특별 구분이 없다. 그래서 '금액이 평소와 너무 다르면
+# 일단 특별배당으로 본다' 는 규칙으로 가른다 (2026-09-29, 삼성전자 3분기 특별배당 계기).
+#
+#   1) 최근 12개월 회차가 3회 이상일 때만 판정한다. 비교할 '평소' 가 있어야 한다.
+#   2) 한 회차가 나머지 회차 중앙값의 SPECIAL_X 배를 넘으면 후보. (화면의 진한 칸과 같은 2배)
+#   3) 단 작년 같은 시기(11~13개월 전)에도 평소의 1.5배 넘는 회차가 있었으면
+#      해마다 반복되는 결산배당·결산분배로 보고 특별로 치지 않는다.
+#      (예: 현대엘리베이터 분기 1,000 + 결산 12,010 / 연말 결산분배가 큰 배당성장 ETF)
+#   4) 특별로 판정되면 **평소 금액(중앙값)을 넘는 초과분만** 특별배당으로 뺀다.
+#      삼성전자처럼 정기분에 특별분을 얹어 한 번에 주는 경우 정기분까지 지우면 안 되기 때문이다.
+#
+# 실지급(최근 12개월 실제로 받은 돈)은 그대로 둔다. 사실이기 때문이다.
+# 연환산(앞으로 1년 예상)에서만 초과분을 빼고, 특별배당 열에 따로 적어 화면이 보여 주게 한다.
+SPECIAL_X = 2.0
+RECUR_X = 1.5
+
+
+def _median(v):
+    s = sorted(v)
+    n = len(s)
+    if not n:
+        return 0.0
+    return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2
+
+
+def split_special(rows, prior):
+    """rows = 최근 12개월 회차(오름차순), prior = 그 이전 회차.
+    → (정기 금액 리스트, [(회차, 초과분), ...])"""
+    amts = [x["amt"] for x in rows]
+    n = len(amts)
+    if n < 3:
+        return amts, []
+    reg, specials = [], []
+    for i, r in enumerate(rows):
+        a = r["amt"]
+        base = _median(amts[:i] + amts[i + 1:])
+        if base <= 0 or a <= base * SPECIAL_X:
+            reg.append(a)
+            continue
+        # 1년 안에 비슷하게 큰 회차가 또 있으면 한 번 튄 게 아니다.
+        #   - 분배 수준이 올라간 경우 (데일리타겟커버드콜 150원대 → 6월부터 300~600원대)
+        #   - 1년에 두 번 크게 주는 패턴 (TDF 2·8월, 중국 ETF 반기)
+        others = amts[:i] + amts[i + 1:]
+        if any(x >= a * 0.7 for x in others):
+            reg.append(a)
+            continue
+        # 작년 같은 시기(10~15개월 전). 기준일이 해마다 조금씩 옮겨 다닌다
+        # (현대엘리베이터 결산 기준일 2024-12-31 → 2026-02-28), 창을 넉넉히 잡는다.
+        d = datetime.strptime(r["date"], "%Y%m%d").date()
+        lo = (d - timedelta(days=460)).strftime("%Y%m%d")
+        hi = (d - timedelta(days=300)).strftime("%Y%m%d")
+        ps = max([p["amt"] for p in prior if lo <= p["date"] <= hi] or [0.0])
+        # 작년 이맘때도 평소보다 컸고 올해의 40% 이상이면 해마다 반복되는 결산분이다.
+        if ps >= max(base * RECUR_X, a * 0.4):
+            reg.append(a)
+            continue
+        # 초과분 = 올해 금액 - max(평소, 작년 같은 시기). 작년 결산 수준까지는 정기분으로 둔다.
+        keep = max(base, ps)
+        specials.append((r, round(a - keep, 4)))
+        reg.append(keep)
+    return reg, specials
+
+
+def annualize(amts, reg, specials):
+    """연환산(앞으로 1년 예상).
+    - 특별배당 추정분이 있으면: 지난 12개월 **정기분 합계** (초과분만 뺀 실지급)
+      '최근 1회 × 횟수' 를 쓰면 특별 직후의 들뜬 회차가 12배로 불어난다(495850 364→480 실측).
+    - 없으면 예전과 같다: 고르면 최근 1회 × 횟수, 고르지 않으면 실지급."""
+    if specials:
+        return round(sum(reg), 4)
+    return round(amts[-1] * len(amts), 4) if even_enough(amts) else round(sum(amts), 4)
+
+
+def special_str(specials):
+    return ";".join(f"{ymd(r['pay'] or r['date'])}:{ex:g}" for r, ex in specials)
+
+
+def load_prices():
+    """배당수익률 계산용 현재가. 국내 ETF·개별주 시세 CSV 에서 읽는다."""
+    px = {}
+    for path in (ETF_PATH, STOCK_PATH):
+        if not os.path.isfile(path):
+            continue
+        with open(path, encoding="utf-8-sig") as f:
+            for r in csv.DictReader(f):
+                code = (r.get("종목코드") or "").strip().upper()
+                v = num(r.get("현재가"))
+                if code and v > 0:
+                    px[code] = v
+    return px
 
 
 def append_history(recs):
@@ -412,7 +518,7 @@ def append_history(recs):
 
 def build_etf(today):
     """세이브로 분배금(전 종목) + 과표 소스 전부(etf_tax_base 954종 + 트래커) → {코드: 행}."""
-    frm = (today - timedelta(days=372)).strftime("%Y%m%d")
+    frm = (today - timedelta(days=LOOKBACK_DAYS)).strftime("%Y%m%d")
     to = today.strftime("%Y%m%d")
     recs = seibro(frm, to)
     print(f"  세이브로 {len(recs)}건 · 종목 {len({r['code'] for r in recs})}개", file=sys.stderr)
@@ -424,25 +530,28 @@ def build_etf(today):
     #   전액 상환이라 한 회차가 주가만큼 크다. 정상 분배와 섞으면 연배당이 수백 배로 뛴다.
     #   (예: TIME 미국배당다우존스액티브 0036D0 — 월 52원짜리가 청산 12,998원으로 잡혔다)
     cut = (today - timedelta(days=365)).strftime("%Y%m%d")
-    by, dropped = {}, 0
+    by, prior, dropped = {}, {}, 0
     for r in recs:
-        if r["date"] < cut or r["amt"] <= 0:
+        if r["amt"] <= 0:
             continue
         if r.get("kind") and r["kind"] != "이익분배":
-            dropped += 1
+            dropped += r["date"] >= cut
             continue
-        by.setdefault(r["code"], []).append(r)
+        (by if r["date"] >= cut else prior).setdefault(r["code"], []).append(r)
     if dropped:
         print(f"  이익분배가 아닌 회차 {dropped}건 제외 (청산분배 등)", file=sys.stderr)
 
-    out = {}
+    px = load_prices()
+    out, nsp = {}, 0
     for code, rows in by.items():
         rows.sort(key=lambda x: x["date"])
         amts = [x["amt"] for x in rows]
         n = len(amts)
         real = round(sum(amts), 4)
-        # 회차가 고르지 않으면 연환산은 못 믿는다. 실지급을 그대로 쓴다.
-        annual = round(amts[-1] * n, 4) if even_enough(amts) else real
+        # 평소보다 튄 회차는 초과분을 빼고 연환산한다(특별배당 추정). 실지급은 그대로.
+        reg, sp = split_special(rows, prior.get(code, []))
+        nsp += bool(sp)
+        annual = annualize(amts, reg, sp)
         last = rows[-1]
         # ★ 국내 ETF 는 배당락일(기준일)이 월말이고 실제 지급은 며칠 뒤 =
         #   대개 '다음 달' 이다. 배당락일로 월을 세면 달력이 한 달씩 앞당겨진다.
@@ -458,11 +567,14 @@ def build_etf(today):
             src = "seibro+etfcheck"
         else:
             tax, src = "", "seibro"
-        out[code] = [code, "국내ETF", "", "", cycle_name(n), n,
+        p = px.get(code)
+        out[code] = [code, "국내ETF", "", round(real / p * 100, 2) if p else "",
+                     cycle_name(n), n,
                      real, annual, tax,
                      "|".join(str(m) for m in months),
                      detail_str(rows, lambda r: ymd(r["pay"] or r["date"])),
-                     ymd(last["pay"] or last["date"]), src, ""]
+                     ymd(last["pay"] or last["date"]), src, "", special_str(sp)]
+    print(f"  특별배당(초과분배) 추정 {nsp}종 (ETF)", file=sys.stderr)
     return out
 
 
@@ -623,7 +735,8 @@ def main():
     merged.update(stk)
     merged.update(etf)
     for r in merged.values():
-        r[-1] = stamp
+        r.extend([""] * (len(HEADER) - len(r)))      # KRX·네이버 폴백 행은 특별배당 열이 없다
+        r[STAMP_COL] = stamp
 
     # ── 쓰기 전에 검사한다 ──
     # 예전에는 파일을 먼저 쓰고 검사했다. 그래서 반쪽 결과가 디스크에 남았다.

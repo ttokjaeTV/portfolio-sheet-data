@@ -1134,7 +1134,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
         </span>
       </label>
     </div>
-    <div class="chart-subtitle">실지급 = 최근 12개월 합계 · 연환산 = 최근 1회 × 연 지급횟수<br>지급월 띠에서 <b style="color:#3A2F26">진한 칸</b>은 평소보다 2배 넘게 나온 달입니다 — 결산배당이거나 특별배당입니다. 칸에 마우스를 올리면 그달 금액이 보입니다.</div>
+    <div class="chart-subtitle">실지급 = 최근 12개월 합계 · 연환산 = 최근 1회 × 연 지급횟수 (특별배당 추정분이 있으면 그 초과분을 뺀 정기분 합계)<br>
+      한 회차가 평소의 2배를 넘고 작년 같은 시기엔 그렇지 않았으면 <b style="color:#D9542B">특별배당으로 추정</b>합니다 — 정기·특별 구분 자료가 없어 확정은 아닙니다.<br>지급월 띠에서 <b style="color:#3A2F26">진한 칸</b>은 평소보다 2배 넘게 나온 달입니다 — 결산배당이거나 특별배당입니다. 칸에 마우스를 올리면 그달 금액이 보입니다.</div>
     <div class="table-wrap">
       <table class="data-table">
         <thead><tr>
@@ -1349,7 +1350,12 @@ async function loadAll(){
               const mm=k.length>=7?parseInt(k.slice(5,7),10):parseInt(k,10);
               if(mm>=1&&mm<=12) o[mm]=(o[mm]||0)+num(p.slice(i+1)); });
             return o; })(),
-          lastPaid:r[11]||'', src:r[12]||''};
+          lastPaid:r[11]||'', src:r[12]||'',
+          // 특별배당 추정분 'YYYY-MM-DD:초과분;…' (r[14], 2026-09-29 추가). 옛 CSV 면 빈 배열.
+          special:(r[14]||'').split(';').map(p=>{
+            const i=p.indexOf(':'); if(i<0) return null;
+            return [p.slice(0,i),num(p.slice(i+1))];
+          }).filter(x=>x&&x[1]>0)};
         DIV_STAMP=r[13]||DIV_STAMP;
       });
     }
@@ -2725,6 +2731,11 @@ function renderDivTable(list){
     const two=(u,w)=>`<b>${u}</b>`
       +`<span class="th-sub" style="display:block;font-weight:600">${won(w)}</span>`;
     const n=t.accts.size;
+    // 특별배당 추정분(주당). 평소보다 튄 회차의 '평소를 넘는 몫' 이다. 확정이 아니라 추정.
+    const sp=(!us&&d.special)||[];
+    const spSum=sp.reduce((s,[,v])=>s+v,0);
+    const spTip=sp.map(([dt,v])=>`${dt} 주당 ${won(v)}`).join(' · ')
+      +' — 평소 회차보다 크게 나온 초과분을 특별배당으로 추정했습니다. 세이브로·DART 에 정기/특별 구분이 없어 확정이 아닙니다.';
     return `<tr>
       <td class="tl"><span class="kind-dot" style="--kc:${t.kc}"></span> ${esc(t.kindNm)}
         ${n>1?`<span class="dv-chip">${n}개 계좌</span>`:''}</td>
@@ -2732,9 +2743,12 @@ function renderDivTable(list){
       <td>${per1>0?(us?two(usdFine(lastPay?lastPay[1]:0),per1):won(per1)):'—'}</td>
       <td>${esc(d.cycle)}${d.perYear?` <span class="th-sub">${d.perYear}회</span>`:''}</td>
       <td class="tl">${monthStrip(d.months,bym,r.qty)}</td>
-      <td>${us?two(usd(d.dpsUsd*t.qty),x.real):`<b>${won(x.real)}</b>`}</td>
-      <td>${us?two(usd(d.dpsUsd*t.qty),x.annual):won(x.annual)}${!us&&Math.abs(x.annual-x.real)<1&&d.perYear>1
-        ?'<span class="th-sub" style="display:block">회차 편차 커서 실지급 사용</span>':''}</td>
+      <td>${us?two(usd(d.dpsUsd*t.qty),x.real):`<b>${won(x.real)}</b>`}${spSum>0
+        ?`<span class="th-sub" style="display:block;color:#D9542B" title="${esc(spTip)}">특별 추정 ${won(spSum*t.qty)} 포함</span>`:''}</td>
+      <td>${us?two(usd(d.dpsUsd*t.qty),x.annual):won(x.annual)}${spSum>0
+        ?`<span class="th-sub" style="display:block" title="${esc(spTip)}">특별 추정분 제외</span>`
+        :(!us&&Math.abs(x.annual-x.real)<1&&d.perYear>1
+          ?'<span class="th-sub" style="display:block">회차 편차 커서 실지급 사용</span>':'')}</td>
       <td>${yld>0?pct(yld):'—'}</td>
       <td class="${yoc>yld?'up':''}">${yoc>0?pct(yoc):'—'}</td>
       <td class="tl">${chip(d)}</td>
