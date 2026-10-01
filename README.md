@@ -22,7 +22,7 @@ scripts/build_etf_prices.py           국내 ETF 시세 → etf_prices.csv
 scripts/build_index_history.py        지수·환율 5년치 일별 종가 → indices_history.csv
 scripts/build_us_symbols.py           미국 티커 → 네이버 코드 매핑 (증분)
 scripts/build_us_prices.py            미국 시세 + 환율 → us_prices.csv, fx.csv
-.github/workflows/update-prices.yml   장중 10분마다 시세 갱신
+.github/workflows/update-prices.yml   약 15분마다 시세 갱신
 .github/workflows/update-us-symbols.yml  주 1회 신규 상장분 코드 해석
 data/                                 산출물 (자동 커밋)
 docs/시트_적용가이드.md                 기존 스프레드시트를 CSV로 전환하는 법
