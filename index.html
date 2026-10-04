@@ -335,6 +335,11 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .buy-prev{font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.7;
   background:var(--bg-alt);border-radius:11px;padding:12px 14px;margin:4px 0 14px}
 .buy-prev.err{background:#FBE4DE;color:var(--red)}
+.buy-prev.warn{background:#FFF4D6}
+.miss{color:#B5651D !important;font-weight:800}
+.chip.miss{background:#FFF4D6;border-color:#E8C77A}
+.excl-note{margin:-6px 0 14px;padding:9px 12px;border-radius:10px;background:#FFF4D6;
+  font-size:12.5px;font-weight:600;line-height:1.6;color:var(--ink-soft)}
 .buy-prev b{color:var(--accent);font-weight:900}
 .buy-prev .arw{color:var(--ink-mute);margin:0 6px;font-weight:800}
 .buy-btns{display:flex;gap:9px;flex-wrap:wrap}
@@ -992,18 +997,19 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     사람마다 매수 시점의 환율이 다르고, 알더라도 분할매수할 때마다 그날 환율을 하나하나 입력하기는 어렵기 때문입니다.
     환율 변동까지 반영한 원화 손익은 증권사 앱에서 확인하세요.</div>
   <div class="grid-4">
-    <div class="stat-card"><div class="stat-label">총 매입금액</div>
+    <div class="stat-card"><div class="stat-label">총 매입원가</div>
       <div class="stat-value" id="s-buy">0원</div><div class="stat-sub" id="s-cnt">0종목</div></div>
     <div class="stat-card accent"><div class="stat-label">총 평가금액</div>
       <div class="stat-value" id="s-val">0원</div><div class="stat-sub" id="s-cash">예수금 0원 포함</div></div>
     <div class="stat-card"><div class="stat-label">평가손익</div>
       <div class="stat-value" id="s-pl">0원</div><div class="stat-sub" id="s-pl-sub">—</div></div>
     <div class="stat-card"><div class="stat-label">수익률</div>
-      <div class="stat-value" id="s-ror">0.00%</div><div class="stat-sub">매입금액 대비</div></div>
+      <div class="stat-value" id="s-ror">0.00%</div><div class="stat-sub" id="s-ror-sub">매입원가 대비 · 예수금 제외</div></div>
   </div>
+  <div class="excl-note" id="s-excl" hidden></div>
   <div class="table-wrap">
     <table class="data-table narrow">
-      <thead><tr><th class="tl">계좌</th><th>매입금액</th><th>평가금액</th><th>평가손익</th><th>수익률</th><th>비중</th></tr></thead>
+      <thead><tr><th class="tl">계좌</th><th>매입원가<span class="th-sub" style="display:block">예수금 제외</span></th><th>평가금액<span class="th-sub" style="display:block">예수금 포함</span></th><th>평가손익</th><th>수익률<span class="th-sub" style="display:block">손익÷원가</span></th><th>비중</th></tr></thead>
       <tbody id="acct-body"></tbody>
       <tfoot><tr id="acct-foot"></tr></tfoot>
     </table>
@@ -1651,16 +1657,24 @@ function compute(){
     const qty=num(h.qty), avg=num(h.avg);
     const isUS=m&&m.cur==='USD';
     const fx=isUS?(FX||0):1;
-    const buyC=qty*avg;                   // 표시통화 기준 매입금액
-    const valC=m?qty*m.price:0;           // 표시통화 기준 평가금액
+    /* 평단가가 비었거나 0 이면 '원가 미상'이다. 0원으로 세면 손익이 평가금액 전부가 되고
+       수익률이 부풀려지므로 원가·손익·수익률 집계에서 뺀다(평가금액에는 들어간다). */
+    const hasAvg=String(h.avg??'').trim()!==''&&avg>0;
+    /* 현재가가 0 이거나 없으면 '시세 없음'이다. 0원으로 평가하면 -100% 가 되므로
+       평가금액·손익·수익률 집계에서 뺀다. */
+    const hasPrice=!!m&&num(m.price)>0;
+    const plOk=hasAvg&&hasPrice;           // 손익을 계산할 수 있는 행
+    const buyC=hasAvg?qty*avg:0;          // 표시통화 기준 매입금액
+    const valC=hasPrice?qty*m.price:0;    // 표시통화 기준 평가금액
     const buy=buyC*fx;                    // 원화 환산 (집계용)
     const val=valC*fx;
     return {acct:h.acct||accts()[0], code:h.code?String(h.code).toUpperCase():'',
       name:m?m.name:'', found:!!m, isUS, cur:isUS?'USD':'KRW',
       assetClass:m?m.assetClass:'', safe:m?m.safe:false,
       price:m?m.price:0, change:m?m.change:0, qty, avg,
-      buyC, valC, plC:valC-buyC,
-      buy, val, pl:val-buy, ror:buy>0?((val-buy)/buy*100):0};
+      hasAvg, hasPrice, plOk,
+      buyC, valC, plC:plOk?valC-buyC:0,
+      buy, val, pl:plOk?val-buy:0, ror:plOk?(buy>0?((val-buy)/buy*100):0):null};
   });
   /* 예수금은 원화 칸과 달러 칸을 따로 받는다.
      cash    = 원화 환산 합계(집계용)
@@ -1726,16 +1740,20 @@ function renderRows(){
     else if(r.isUS&&!FX) err='환율을 불러오지 못했습니다';
 
     let buy='', calc='';
+    const noAvgTag='<span class="rb-sub miss">평단 미입력</span>';
+    const noPxTag='<span class="rc-sub miss">시세 없음</span>';
     if(err){
       calc=`<span class="sub" style="color:${h.code?'#C0392B':'#8B8276'}">${err}</span>`;
     }else if(r.isUS){
-      buy=`<span class="rb-val">${usd(r.buyC)}</span><span class="rb-sub">≈ ${wonShort(r.buy)}원</span>`;
-      calc=`<span class="rc-val">${usd(r.valC)}</span><span class="rc-sub">≈ ${wonShort(r.val)}원</span>`
-          +`<span class="rc-pl ${cls(r.pl)}">${usdSign(r.plC)}<b class="rc-ror">${pct(r.ror)}</b></span>`;
+      buy=r.hasAvg?`<span class="rb-val">${usd(r.buyC)}</span><span class="rb-sub">≈ ${wonShort(r.buy)}원</span>`:noAvgTag;
+      calc=!r.hasPrice?noPxTag
+          :`<span class="rc-val">${usd(r.valC)}</span><span class="rc-sub">≈ ${wonShort(r.val)}원</span>`
+          +(r.plOk?`<span class="rc-pl ${cls(r.pl)}">${usdSign(r.plC)}<b class="rc-ror">${pct(r.ror)}</b></span>`:'');
     }else{
-      buy=`<span class="rb-val">${wonShort(r.buy)}원</span>`;
-      calc=`<span class="rc-val">${wonShort(r.val)}원</span>`
-          +`<span class="rc-pl ${cls(r.pl)}">${r.pl>=0?'+':''}${wonShort(r.pl)}<b class="rc-ror">${pct(r.ror)}</b></span>`;
+      buy=r.hasAvg?`<span class="rb-val">${wonShort(r.buy)}원</span>`:noAvgTag;
+      calc=!r.hasPrice?noPxTag
+          :`<span class="rc-val">${wonShort(r.val)}원</span>`
+          +(r.plOk?`<span class="rc-pl ${cls(r.pl)}">${r.pl>=0?'+':''}${wonShort(r.pl)}<b class="rc-ror">${pct(r.ror)}</b></span>`:'');
     }
     const mark=r.isUS?'$':'₩';
     return `<div class="holding-row">
@@ -1749,7 +1767,7 @@ function renderRows(){
       <div><input type="number" data-i="${i}" data-k="qty" value="${esc(h.qty??'')}" placeholder="0" min="0" step="any"></div>
       <div class="cur-wrap"><span class="cur-mark">${mark}</span>
         <input type="number" data-i="${i}" data-k="avg" value="${esc(h.avg??'')}" placeholder="0" min="0" step="any"></div>
-      <div class="row-buy"${buy?' data-l="매입금액"':''}>${buy}</div>
+      <div class="row-buy"${buy&&r.hasAvg?' data-l="매입금액"':''}>${buy}</div>
       <div class="row-calc${err?' is-err':''}"${err?'':' data-l="평가금액 / 손익"'}>${calc}</div>
       <div><button class="row-del" data-del="${i}" title="삭제">×</button></div>
     </div>`;
@@ -1767,7 +1785,7 @@ function renderRows(){
     return `<details class="hgrp" data-fold="${esc(a)}" ${open?'open':''} style="--kc:${kindColor(a)}">
       <summary><span class="kind-dot"></span><span class="hg-nm">${esc(a)}</span>
         ${(state.notes||{})[a]?`<span class="hg-note">${esc(state.notes[a])}</span>`:''}
-        <span class="hg-cnt">${list.length}종목</span>
+        <span class="hg-cnt">${new Set(list.map(i=>rows[i].code).filter(Boolean)).size}종목</span>
         <span class="hg-val">${allUS
           ?`${usd(valC)}<span class="hg-krw">≈ ${wonShort(val)}원</span>`
           :`${wonShort(val)}원`}</span></summary>
@@ -1952,40 +1970,67 @@ function render(){
   renderAccts();
   const {rows,cash,cashC,cashW,cashSum}=compute();
   const valid=rows.filter(r=>r.found&&r.qty>0&&(!r.isUS||FX>0));
+  const priced=valid.filter(r=>r.hasPrice);          // 평가금액을 셀 수 있는 행
+  const known=priced.filter(r=>r.hasAvg);            // 손익·수익률을 셀 수 있는 행
+  const uniq=l=>new Set(l.map(r=>r.code)).size;      // 같은 종목이 여러 계좌·로트에 있어도 1종목
+  const nNoAvg=uniq(valid.filter(r=>!r.hasAvg)), nNoPx=uniq(valid.filter(r=>!r.hasPrice));
 
-  const buy=valid.reduce((s,r)=>s+r.buy,0)+cashSum;
-  const val=valid.reduce((s,r)=>s+r.val,0)+cashSum;
-  const pl=val-buy, ror=buy>0?(pl/buy*100):0;
+  /* 수익률 = 평가손익 ÷ 매입원가. 예수금은 분모·분자 어디에도 넣지 않는다
+     (예수금을 매입금액에 섞으면 현금이 많을수록 수익률이 0 쪽으로 희석된다).
+     평단 미입력·시세 없음 종목도 손익을 알 수 없으므로 뺀다. */
+  const cost=known.reduce((s,r)=>s+r.buy,0);
+  const valK=known.reduce((s,r)=>s+r.val,0);
+  const val=priced.reduce((s,r)=>s+r.val,0)+cashSum;  // 총 평가금액(예수금 포함)
+  const pl=valK-cost, ror=cost>0?(pl/cost*100):0;
+  // 자산 추이 기록용 '원금' — 예전 기록과 같은 정의(매입원가 + 예수금)를 유지한다.
+  // 평단 미입력 종목은 평가금액을 원금으로 간주해 추이 손익을 부풀리지 않는다.
+  const snapBuy=cost+priced.filter(r=>!r.hasAvg).reduce((s,r)=>s+r.val,0)+cashSum;
 
   /* 전체 합계는 국내·미국이 섞여 있어 달러로 더할 수 없다.
      대신 미국분이 얼마인지를 각 카드 밑에 달러로 같이 적는다. */
   const us=valid.filter(r=>r.isUS);
   const usCashC=accts().reduce((s,a)=>s+(cashC[a]||0),0);   // 달러 예수금
-  const usBuyC=us.reduce((s,r)=>s+r.buyC,0)+usCashC;
-  const usValC=us.reduce((s,r)=>s+r.valC,0)+usCashC;
-  const usPlC=usValC-usBuyC;
+  const usK=known.filter(r=>r.isUS);
+  const usBuyC=usK.reduce((s,r)=>s+r.buyC,0);
+  const usValC=priced.filter(r=>r.isUS).reduce((s,r)=>s+r.valC,0)+usCashC;
+  const usPlC=usK.reduce((s,r)=>s+r.valC-r.buyC,0);
   const tail=t=>(us.length||usCashC>0)?` · 미국 ${t}`:'';
+  const excl=[nNoAvg?`평단 미입력 ${nNoAvg}종목`:'',nNoPx?`시세 없음 ${nNoPx}종목`:''].filter(Boolean).join(' · ');
 
-  document.getElementById('s-buy').textContent=won(buy);
-  document.getElementById('s-cnt').textContent=valid.length+'종목'+tail(usd(usBuyC));
+  document.getElementById('s-buy').textContent=won(cost);
+  document.getElementById('s-cnt').textContent=uniq(valid)+'종목 · 예수금 제외'+(usK.length?` · 미국 ${usd(usBuyC)}`:'');
   document.getElementById('s-val').textContent=won(val);
   document.getElementById('s-cash').textContent=
     '예수금 '+won(cashSum)+' 포함'+tail(usd(usValC));
   const plEl=document.getElementById('s-pl');
   plEl.textContent=(pl>=0?'+':'')+won(pl); plEl.className='stat-value '+cls(pl);
   document.getElementById('s-pl-sub').textContent=
-    valid.length?('평가 - 매입'+tail(usdSign(usPlC))):'—';
+    valid.length?('평가 - 매입원가'+tail(usdSign(usPlC))):'—';
   const rorEl=document.getElementById('s-ror');
   rorEl.textContent=pct(ror); rorEl.className='stat-value '+cls(ror);
+  const rsEl=document.getElementById('s-ror-sub');
+  if(rsEl) rsEl.textContent='매입원가 대비 · 예수금 제외'+(excl?` · ${excl} 제외`:'');
+  const exEl=document.getElementById('s-excl');
+  if(exEl){ exEl.hidden=!excl;
+    exEl.innerHTML=excl?`<b>${excl}</b>은(는) 매입원가·평가손익·수익률 합계에서 뺐습니다. `
+      +(nNoAvg?'평단가를 넣으면 다시 포함됩니다. ':'')
+      +(nNoPx?'시세가 없는 종목은 평가금액에도 넣지 않았습니다.':''):''; }
 
   const byAcct={};
-  /* 예수금의 달러분은 달러 집계에도 그대로 들어간다.
-     cashW(원화 예수금)만 남아 있으면 달러로 합칠 수 없다. */
-  accts().forEach(a=>byAcct[a]={buy:cash[a],val:cash[a],
-    buyC:cashC[a]||0, valC:cashC[a]||0, n:0,nUS:0, cash:cashW[a]||0});
+  /* buy  = 매입원가(평단 입력 종목, 예수금 제외)
+     val  = 평가금액(시세 있는 종목 + 예수금)
+     pl   = 손익을 셀 수 있는 종목만의 평가 − 원가
+     sbuy = 추이 기록용 원금(원가 + 평단 미입력 종목 평가액 + 예수금) — 예전 기록과 같은 정의
+     예수금의 달러분은 달러 평가 집계에 그대로 들어간다. */
+  accts().forEach(a=>byAcct[a]={buy:0,val:cash[a],pl:0,sbuy:cash[a],
+    buyC:0, valC:cashC[a]||0, plC:0, sbuyC:cashC[a]||0, n:0,nUS:0, cash:cashW[a]||0});
   valid.forEach(r=>{ const b=byAcct[r.acct];
-    b.buy+=r.buy; b.val+=r.val; b.n++;
-    if(r.isUS){ b.nUS++; b.buyC+=r.buyC; b.valC+=r.valC; } });
+    b.n++; if(r.isUS) b.nUS++;
+    if(!r.hasPrice) return;
+    b.val+=r.val; b.sbuy+=r.hasAvg?r.buy:r.val;
+    if(r.isUS){ b.valC+=r.valC; b.sbuyC+=r.hasAvg?r.buyC:r.valC; }
+    if(r.hasAvg){ b.buy+=r.buy; b.pl+=r.val-r.buy;
+      if(r.isUS){ b.buyC+=r.buyC; b.plC+=r.valC-r.buyC; } } });
   /* 해외주식 전용 계좌만 달러를 앞에 세운다.
      예수금을 달러로 넣었으면 그대로 합쳐지고, 원화로 넣었으면 합칠 수 없다. */
   const onlyUS=d=>d&&d.n>0&&d.nUS===d.n&&!(d.cash>0);
@@ -1994,7 +2039,7 @@ function render(){
   // 계좌를 성격끼리 묶어 보여준다. 연금저축펀드가 넷이면 넷을 붙여 놓고 소계를 낸다.
   const shown=accts().filter(a=>byAcct[a].val||byAcct[a].buy);
   const arow=(a,d,color,solo)=>{
-    const p=d.val-d.buy, rr=d.buy>0?(p/d.buy*100):0, w=val>0?(d.val/val*100):0;
+    const p=d.pl, rr=d.buy>0?(p/d.buy*100):0, w=val>0?(d.val/val*100):0;
     const note=(state.notes||{})[a];
     // 그 계열에 계좌가 하나뿐이면 그 줄이 곧 그 계열이다. 합계 줄과 같은 무게로 보여 준다.
     return `<tr data-arow="${esc(a)}" class="${detailFilter===a?'on ':''}${solo?'kind-solo':''}"
@@ -2003,9 +2048,9 @@ function render(){
       <td>${onlyUS(d)?two(d.buyC,d.buy):won(d.buy)}</td>
       <td>${onlyUS(d)?two(d.valC,d.val):won(d.val)}</td>
       <td class="${cls(p)}">${onlyUS(d)
-        ?`<b>${usdSign(d.valC-d.buyC)}</b><span class="th-sub" style="display:block;font-weight:600">${(p>=0?'+':'')+won(p)}</span>`
+        ?`<b>${usdSign(d.plC)}</b><span class="th-sub" style="display:block;font-weight:600">${(p>=0?'+':'')+won(p)}</span>`
         :(p>=0?'+':'')+won(p)}</td>
-      <td class="${cls(rr)}">${pct(rr)}</td><td>${w.toFixed(1)}%</td></tr>`;
+      <td class="${cls(rr)}">${d.buy>0?pct(rr):'—'}</td><td>${w.toFixed(1)}%</td></tr>`;
   };
   let body='';
   for(let i=0;i<shown.length;){
@@ -2014,28 +2059,29 @@ function render(){
     grp.forEach(a=>{ body+=arow(a,byAcct[a],color,grp.length===1); });
     if(grp.length>1){                       // 여럿일 때만 합계를 따로 낸다
       const gb=grp.reduce((t,a)=>t+byAcct[a].buy,0), gv=grp.reduce((t,a)=>t+byAcct[a].val,0);
-      const gp=gv-gb, gr=gb>0?(gp/gb*100):0, gw=val>0?(gv/val*100):0;
+      const gp=grp.reduce((t,a)=>t+byAcct[a].pl,0), gr=gb>0?(gp/gb*100):0, gw=val>0?(gv/val*100):0;
       // 묶인 계좌가 전부 해외 전용일 때만 소계도 달러로 낼 수 있다
       const gU=grp.every(a=>onlyUS(byAcct[a]));
       const gbC=grp.reduce((t,a)=>t+byAcct[a].buyC,0);
       const gvC=grp.reduce((t,a)=>t+byAcct[a].valC,0);
+      const gpC=grp.reduce((t,a)=>t+byAcct[a].plC,0);
       body+=`<tr class="kind-sum" style="--kc:${color};--kcbg:${hexA(color,0.10)}">
         <td class="tl kind-cell">${esc(kind)} 합계<span class="acct-note">${grp.length}개 계좌</span></td>
         <td>${gU?two(gbC,gb):won(gb)}</td><td>${gU?two(gvC,gv):won(gv)}</td>
         <td class="${cls(gp)}">${gU
-          ?`<b>${usdSign(gvC-gbC)}</b><span class="th-sub" style="display:block;font-weight:600">${(gp>=0?'+':'')+won(gp)}</span>`
+          ?`<b>${usdSign(gpC)}</b><span class="th-sub" style="display:block;font-weight:600">${(gp>=0?'+':'')+won(gp)}</span>`
           :(gp>=0?'+':'')+won(gp)}</td>
-        <td class="${cls(gr)}">${pct(gr)}</td><td>${gw.toFixed(1)}%</td></tr>`;
+        <td class="${cls(gr)}">${gb>0?pct(gr):'—'}</td><td>${gw.toFixed(1)}%</td></tr>`;
     }
   }
   document.getElementById('acct-body').innerHTML=body
     ||'<tr><td colspan="6" style="text-align:center;color:#8B8276;padding:24px">데이터가 없습니다</td></tr>';
   document.getElementById('acct-foot').innerHTML= val>0
-    ? `<td class="tl">합계</td><td>${won(buy)}</td><td>${won(val)}</td>
+    ? `<td class="tl">합계</td><td>${won(cost)}</td><td>${won(val)}</td>
        <td class="${cls(pl)}">${(pl>=0?'+':'')+won(pl)}</td><td class="${cls(ror)}">${pct(ror)}</td><td>100.0%</td>` : '';
 
   const byAsset={};
-  valid.forEach(r=>{ byAsset[r.assetClass]=(byAsset[r.assetClass]||0)+r.val; });
+  priced.forEach(r=>{ byAsset[r.assetClass]=(byAsset[r.assetClass]||0)+r.val; });
   if(cashSum>0) byAsset['현금']=(byAsset['현금']||0)+cashSum;
   drawDonut('chart-asset',chartAsset,byAsset,c=>chartAsset=c);
   // 계좌를 하나씩 다 그리면 일반계좌10 까지 조각이 잘게 쪼개져 읽을 수가 없다.
@@ -2056,12 +2102,12 @@ function render(){
   drawDonut('chart-acct',chartAcct,acctData,c=>chartAcct=c,
     l=>kindColor(labelKind[l]), l=>labelNames[l]);
 
-  renderGauge(valid,cash);
-  renderAcctHoldings(valid,cash);
+  renderGauge(priced,cash);
+  renderAcctHoldings(priced,cash);
   renderDetail(valid,val);
   renderDividends(valid);
-  renderInsight(valid,byAsset,val,byAcct);
-  snapshot(val,buy,cashSum,valid.length,byAcct);
+  renderInsight(priced,byAsset,val,byAcct);
+  snapshot(val,snapBuy,cashSum,uniq(valid),snapAcct(byAcct));
   renderTrend();
 }
 
@@ -2077,6 +2123,13 @@ function logEvent(kind,a,b){
   if(state.events.length>500) state.events=state.events.slice(-500);
 }
 
+/* 추이 기록용 계좌 집계. 기존 기록과 이어지도록 원금은 '원가 + 예수금' 정의를 쓴다. */
+function snapAcct(byAcct){
+  const o={};
+  for(const a in (byAcct||{})){ const t=byAcct[a];
+    o[a]={buy:t.sbuy,val:t.val,buyC:t.sbuyC,valC:t.valC,n:t.n,nUS:t.nUS,cash:t.cash}; }
+  return o;
+}
 function snapshot(val,buy,cash,n,byAcct){
   if(!(n>0)) return;                       // 종목이 없으면 기록하지 않는다
   state.hist=state.hist||[];
@@ -2387,13 +2440,15 @@ function renderDividends(valid){
   // 세후는 보수적으로 — 미확인 과표도 전액과세로 보고 세금을 최대로 잡는다
   const wht=list.reduce((s,x)=>s+divWht(x),0);
   const post=pre-wht;
-  const buy=list.reduce((s,x)=>s+x.r.buy,0);
-  const val=list.reduce((s,x)=>s+x.r.val,0);
+  // 배당률은 시세 있는 종목, YOC 는 평단을 아는 종목끼리만 나눈다(분자·분모 대상 일치)
+  const lp=list.filter(x=>x.r.hasPrice), lk=list.filter(x=>x.r.hasAvg);
+  const val=lp.reduce((s,x)=>s+x.r.val,0), preP=lp.reduce((s,x)=>s+x.real,0);
+  const buy=lk.reduce((s,x)=>s+x.r.buy,0), preK=lk.reduce((s,x)=>s+x.real,0);
 
   document.getElementById('div-stats').innerHTML=
     `<div class="stat-card accent"><div class="stat-label">연 배당금 (세전)</div>
        <div class="stat-value">${won(pre)}</div>
-       <div class="stat-sub">${list.length?list.length+'종목':'—'}</div></div>
+       <div class="stat-sub">${list.length?new Set(list.map(x=>x.r.code)).size+'종목':'—'}</div></div>
      <div class="stat-card"><div class="stat-label">연 배당금 (세후)</div>
        <div class="stat-value">${won(post)}</div>
        <div class="stat-sub">${wht>0?'원천징수 '+won(wht)+' 차감':'지급 시점 원천징수 없음'}</div></div>
@@ -2401,8 +2456,8 @@ function renderDividends(valid){
        <div class="stat-value">${won(post/12)}</div>
        <div class="stat-sub">12개월 단순 분할</div></div>
      <div class="stat-card"><div class="stat-label">배당률 / YOC</div>
-       <div class="stat-value">${val>0?pct(pre/val*100):'—'}</div>
-       <div class="stat-sub">${buy>0?'매입가 대비 '+pct(pre/buy*100):'—'}</div></div>`;
+       <div class="stat-value">${val>0?pct(preP/val*100):'—'}</div>
+       <div class="stat-sub">${buy>0?'매입가 대비 '+pct(preK/buy*100):'—'}</div></div>`;
 
   renderDivCal(list);
   renderDivAcct(list,usSkip,noData);
@@ -2706,18 +2761,23 @@ function renderDivTable(list){
     const nm=on?acctKind(x.r.acct):x.r.acct;
     const k=nm+'|'+x.r.code;
     const t=g[k]||(g[k]={kindNm:nm,accts:new Set(),d:x.d,
-      code:x.r.code,name:x.r.name,real:0,annual:0,qty:0,buy:0,val:0,kc:kindColor(x.r.acct)});
+      code:x.r.code,name:x.r.name,real:0,annual:0,qty:0,
+      qtyP:0,valC:0,qtyK:0,buyC:0,kc:kindColor(x.r.acct)});
     t.accts.add(x.r.acct);
     t.real+=x.real; t.annual+=x.annual;
-    t.qty+=x.r.qty; t.buy+=x.r.buy; t.val+=x.r.val;
+    t.qty+=x.r.qty;
+    /* 배당률·YOC 는 표시통화(미국은 USD) 그대로 나눈다. 주당배당금이 USD 이므로
+       원화 환산액(val·buy)으로 나누면 0.00% 가 된다. 평단 미입력·시세 없음 로트는 뺀다. */
+    if(x.r.hasPrice){ t.qtyP+=x.r.qty; t.valC+=x.r.valC; }
+    if(x.r.hasAvg){ t.qtyK+=x.r.qty; t.buyC+=x.r.buyC; }
   });
   const rows=Object.values(g).sort((a,b)=>b.real-a.real);
   body.innerHTML=rows.map(t=>{
     const d=t.d, r={acct:t.kindNm,code:t.code,name:t.name,qty:t.qty,
       // 배당률·YOC 는 합친 금액끼리 나눠야 맞다. 계좌마다 매입가가 다르기 때문이다.
-      price:t.qty>0?t.val/t.qty:0, avg:t.qty>0?t.buy/t.qty:0};
+      price:t.qtyP>0?t.valC/t.qtyP:0, avg:t.qtyK>0?t.buyC/t.qtyK:0};
     const x={real:t.real,annual:t.annual};
-    // 미국은 주당배당금이 USD 이고 현재가·매입가도 USD 라 그대로 나눠도 비율이 맞는다.
+    // 미국은 주당배당금이 USD 이고 현재가·매입가도 USD(valC·buyC) 라 그대로 나눠도 비율이 맞는다.
     const us=d.dpsUsd!==undefined;
     const ps=us?d.dpsUsd:d.real;
     const yld=r.price>0?ps/r.price*100:0;
@@ -2810,16 +2870,22 @@ function mergeLots(rows,byKind){
   rows.forEach(r=>{
     const k=byKind ? acctKind(r.acct)+'|'+r.code : r.code;
     const g=map.get(k);
-    if(!g){ map.set(k,{...r,acct:byKind?acctKind(r.acct):r.acct,
-                       lots:1,accts:new Set([r.acct])}); return; }
+    const add=(g,r)=>{ if(r.hasAvg){ g.qtyK+=r.qty; g.buyCK+=r.buyC; g.buyK+=r.buy;
+                          if(r.hasPrice){ g.plC+=r.valC-r.buyC; g.pl+=r.val-r.buy; } }
+                        else g.qtyNoAvg+=r.qty; };
+    if(!g){ const n={...r,acct:byKind?acctKind(r.acct):r.acct,
+                     lots:1,accts:new Set([r.acct]),qtyK:0,buyCK:0,buyK:0,qtyNoAvg:0,plC:0,pl:0};
+            add(n,r); map.set(k,n); return; }
     g.qty+=r.qty; g.buyC+=r.buyC; g.valC+=r.valC;
-    g.buy+=r.buy; g.val+=r.val; g.lots++; g.accts.add(r.acct);
+    g.buy+=r.buy; g.val+=r.val; g.lots++; g.accts.add(r.acct); add(g,r);
   });
   return [...map.values()].map(g=>{
-    g.avg = g.qty>0 ? g.buyC/g.qty : 0;      // 가중평균 매입단가
-    g.plC = g.valC-g.buyC;
-    g.pl  = g.val-g.buy;
-    g.ror = g.buy>0 ? (g.pl/g.buy*100) : 0;
+    /* 가중평균 매입단가 — 평단을 아는 로트끼리만 평균한다.
+       평단 미입력 로트를 0원으로 섞으면 평단이 희석된다. */
+    g.hasAvg = g.qtyK>0;
+    g.avg = g.hasAvg ? g.buyCK/g.qtyK : 0;
+    g.plOk = g.hasAvg && g.hasPrice;
+    g.ror = g.plOk ? (g.buyK>0 ? g.pl/g.buyK*100 : 0) : null;
     return g;
   });
 }
@@ -2843,8 +2909,9 @@ function renderDetail(all,total){
         <span class="fname">${esc(label)}${nt?`<span class="fnote">${esc(nt)}</span>`:''}</span>
         <span class="fcnt">${cnt}종목</span><span class="fval">${wonShort(val)}원</span></span>`;
       };
-      fbox.innerHTML=chip('','전체',all.length,all.reduce((s,r)=>s+r.val,0))
-        +used.map(a=>chip(a,a,all.filter(r=>r.acct===a).length,
+      const nU=l=>new Set(l.map(r=>r.code)).size;   // 로트가 아니라 종목 수
+      fbox.innerHTML=chip('','전체',nU(all),all.reduce((s,r)=>s+r.val,0))
+        +used.map(a=>chip(a,a,nU(all.filter(r=>r.acct===a)),
                           all.filter(r=>r.acct===a).reduce((s,r)=>s+r.val,0))).join('');
     }else{ fbox.innerHTML=''; detailFilter=''; }
   }
@@ -2864,35 +2931,39 @@ function renderDetail(all,total){
     ? `<b>${esc(detailFilter)}</b>${dnote?` (${esc(dnote)})`:''} 계좌만 보고 있습니다. ` : '';
   note.innerHTML = fnote
     + '<b>성격이 같은 계좌끼리</b> 같은 종목을 묶어 보여줍니다 — 연금저축펀드1·2 는 합치고, '
-    + '연금·ISA·일반은 세금이 달라 따로 둡니다. 매입단가는 수량 가중평균입니다.'
-    + (multi ? ` 이번에 <b>${multi}건</b>이 묶였습니다.` : '');
+    + '연금·ISA·일반은 세금이 달라 따로 둡니다. 매입단가는 수량 가중평균입니다(평단 미입력 로트는 평균에서 뺍니다).'
+    + (multi ? ` 이번에 <b>${multi}건</b>이 묶였습니다.` : '')
+    + (rows.some(r=>r.isUS) ? '<br>※ 미국 종목의 원화 손익은 매입금액·평가금액을 <b>모두 오늘 환율</b>로 환산한 값입니다(환차손익 미반영). 매수 시점 환율은 저장하지 않습니다.' : '');
 
   body.innerHTML=rows.slice().sort((a,b)=>b.val-a.val).map(r=>{
-    const price=r.isUS?usd(r.price):won(r.price);
-    const avg=r.isUS?usd(r.avg):won(r.avg);
+    const miss=t=>`<span class="miss">${t}</span>`;
+    const price=!r.hasPrice?miss('시세 없음'):r.isUS?usd(r.price):won(r.price);
+    const avg=!r.hasAvg?miss('평단 미입력'):(r.isUS?usd(r.avg):won(r.avg))
+      +(r.qtyNoAvg>0?` <span class="miss" title="평단 미입력 ${r.qtyNoAvg}주는 평균에서 뺐습니다">(일부 미입력)</span>`:'');
+    // 같은 성격으로 묶어도 계좌 칸에는 실제 계좌 이름을 쓴다(연금저축펀드1 등)
+    const realAccts=[...(r.accts||[r.acct])];
     // 전일대비도 통화를 붙인다. 미국 종목과 국내 종목이 한 표에 섞여 있어
     // 숫자만 있으면 달러인지 원인지 알 수 없다.
     const chg=(r.change>=0?'+':'-')+(r.isUS?usd(Math.abs(r.change)):won(Math.abs(r.change)));
     return `<tr>
       <td class="tl">${
-        r.accts&&r.accts.size>1
-          // 성격별로 묶었으면 성격 이름을 쓴다. 전부 묶었으면 개수만 쓴다.
-          ? `<span class="chip">${mode===1?esc(r.acct):r.accts.size+'개 계좌'}</span>`
-            +(mode===1?`<span class="chip">${r.accts.size}개</span>`:'')
-            +`<span class="acct-note">${esc([...r.accts].join(' · '))}</span>`
-          : `<span class="chip">${esc(r.acct)}</span>`
-            +((state.notes||{})[r.acct]?`<span class="acct-note">${esc(state.notes[r.acct])}</span>`:'')}</td>
+        realAccts.length>1
+          // 여러 계좌가 묶였으면 실제 계좌 이름을 모두 쓴다
+          ? realAccts.map(a=>`<span class="chip">${esc(a)}</span>`).join('')
+            +`<span class="acct-note">${esc(r.acct)} ${realAccts.length}개 계좌 합산</span>`
+          : `<span class="chip">${esc(realAccts[0])}</span>`
+            +((state.notes||{})[realAccts[0]]?`<span class="acct-note">${esc(state.notes[realAccts[0]])}</span>`:'')}</td>
       <td class="tl">${esc(r.name)}<br><span class="cell-sub">
         ${r.isUS?'<span class="flag us">미국</span>':''}${esc(r.code)}
         ${r.assetClass?' · '+esc(r.assetClass):''}${r.safe?' · 안전':''}
         ${r.lots>1?`<span class="chip lot">${r.lots}건 합산</span>`:''}</span></td>
       <td>${r.qty.toLocaleString('ko-KR',{maximumFractionDigits:6})}
         <span class="cell-sub">${avg}</span></td>
-      <td>${price}<span class="cell-sub ${cls(r.change)}">${chg}</span></td>
-      <td>${money(r,r.buyC,r.buy,false)}</td>
-      <td>${money(r,r.valC,r.val,false)}</td>
-      <td class="${cls(r.pl)}">${money(r,r.plC,r.pl,true)}
-        <span class="cell-sub ${cls(r.ror)}">${pct(r.ror)}</span></td>
+      <td>${price}${r.hasPrice?`<span class="cell-sub ${cls(r.change)}">${chg}</span>`:''}</td>
+      <td>${r.hasAvg?money(r,r.buyCK,r.buyK,false):miss('평단 미입력')}</td>
+      <td>${r.hasPrice?money(r,r.valC,r.val,false):miss('시세 없음')}</td>
+      <td class="${r.plOk?cls(r.pl):''}">${r.plOk?`${money(r,r.plC,r.pl,true)}
+        <span class="cell-sub ${cls(r.ror)}">${pct(r.ror)}</span>`:'—'}</td>
       <td>${total>0?(r.val/total*100).toFixed(1):'0.0'}%</td></tr>`;
   }).join('');
 }
@@ -2961,14 +3032,16 @@ document.addEventListener('click',e=>{
     const {rows,cash,cashSum}=compute();
     const valid=rows.filter(r=>r.found&&r.qty>0&&(!r.isUS||FX>0));
     if(!valid.length){ alert('기록할 종목이 없습니다.'); return; }
+    // render() 와 같은 정의: 시세 없는 종목은 빼고, 평단 미입력 종목은 평가액을 원금으로 본다.
+    const priced=valid.filter(r=>r.hasPrice);
     const byAcct={};
     accts().forEach(a=>{ byAcct[a]={buy:cash[a]||0,val:cash[a]||0}; });
-    valid.forEach(r=>{ const t=byAcct[r.acct]||(byAcct[r.acct]={buy:0,val:0});
-      t.buy+=r.buy; t.val+=r.val; });
-    const buy=valid.reduce((s,r)=>s+r.buy,0)+cashSum;
-    const val=valid.reduce((s,r)=>s+r.val,0)+cashSum;
+    priced.forEach(r=>{ const t=byAcct[r.acct]||(byAcct[r.acct]={buy:0,val:0});
+      t.buy+=r.hasAvg?r.buy:r.val; t.val+=r.val; });
+    const buy=priced.reduce((s,r)=>s+(r.hasAvg?r.buy:r.val),0)+cashSum;
+    const val=priced.reduce((s,r)=>s+r.val,0)+cashSum;
     const had=(state.hist||[]).some(x=>x.d===today());
-    snapshot(val,buy,cashSum,valid.length,byAcct);
+    snapshot(val,buy,cashSum,new Set(valid.map(r=>r.code)).size,byAcct);
     render();
     alert(had ? `오늘(${today()}) 기록을 지금 값으로 바꿨습니다.`
               : `오늘(${today()}) 기록을 남겼습니다. 총 ${(state.hist||[]).length}일치.`);
@@ -3084,9 +3157,12 @@ document.getElementById('chk-div-net').onchange=e=>{
 var buyAcct='';   // renderAccts() 가 스크립트 위쪽에서 먼저 부를 수 있어 var 로 둔다
 function findHolding(acct,code){
   const c=String(code||'').toUpperCase();
-  return state.holdings.findIndex(h=>(h.acct||accts()[0])===acct
-    && String(h.code||'').toUpperCase()===c);
+  const same=h=>(h.acct||accts()[0])===acct && String(h.code||'').toUpperCase()===c;
+  // 평단을 아는 로트가 있으면 그쪽에 합친다. 평단 미입력 로트와는 합치지 않는다.
+  const k=state.holdings.findIndex(h=>same(h)&&holdAvgKnown(h));
+  return k>=0?k:state.holdings.findIndex(same);
 }
+const holdAvgKnown=h=>String(h.avg??'').trim()!==''&&num(h.avg)>0;
 /* 원화는 소수 둘째, 달러는 넷째 자리까지. 뒤에 붙는 0 은 떼어낸다 */
 const roundAvg=(v,isUS)=>Number(v.toFixed(isUS?4:2));
 function buyEls(){
@@ -3119,7 +3195,12 @@ function renderBuyPreview(){
 
   const i=findHolding(buyAcct,m.code);
   e.prev.className='buy-prev';
-  if(i<0){
+  if(i>=0&&!holdAvgKnown(state.holdings[i])){
+    const q0=num(state.holdings[i].qty);
+    e.prev.className='buy-prev warn';
+    e.prev.innerHTML=`<b>${esc(buyAcct)}</b>의 기존 <b>${esc(m.name)}</b> ${q0.toLocaleString('ko-KR')}주는 <b>평단 미입력</b>이라 합치지 않고 따로 담습니다.`
+      +`<br>새 로트 ${qty.toLocaleString('ko-KR')}주 · 평균 ${unit(avg)} — 평균단가는 평단을 아는 로트로만 계산됩니다. 기존 평단을 알면 먼저 입력해 주세요.`;
+  }else if(i<0){
     e.prev.innerHTML=`<b>${esc(buyAcct)}</b>에 <b>${esc(m.name)}</b>를 새로 담습니다.`
       +`<br>${qty.toLocaleString('ko-KR')}주 · 평균 ${unit(avg)} · 매입금액 ${unit(qty*avg)}`;
   }else{
@@ -3153,7 +3234,8 @@ function commitBuy(){
   }
   const isUS=m.cur==='USD';
   const i=findHolding(buyAcct,m.code);
-  if(i<0){
+  if(i<0||!holdAvgKnown(state.holdings[i])){
+    // 새 종목이거나, 기존 로트가 평단 미입력이면 따로 담는다(원가 0 으로 평균이 희석되지 않게)
     state.holdings.push({acct:buyAcct,code:m.code,qty,avg});
   }else{
     const h=state.holdings[i], q0=num(h.qty), a0=num(h.avg);
