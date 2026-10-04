@@ -779,6 +779,11 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   #review tr.shot-group td{display:block;border-radius:12px}
   #review .guess-tag{text-align:left}
 }
+
+/* iOS Safari: 글자 16px 미만 입력칸은 누를 때 화면이 자동 확대됨 → 모바일에서 16px 보장 */
+@media (max-width: 768px) {
+  input[type=text], input[type=number], input[type=search], input[type=tel], input:not([type]), select, textarea { font-size: 16px !important; }
+}
 </style>
 </head>
 <body>
@@ -2623,7 +2628,7 @@ function renderDivGauge(list){
   document.getElementById('div-gauge').innerHTML=
     `<div class="dgauge">
        <div class="dgauge-row">
-         <span class="dgauge-l">일반계좌 배당 과세표준</span>
+         <span class="dgauge-l">일반계좌·미국 직투 배당 과세표준</span>
          <span class="dgauge-v ${over?'up':''}">${won(base)}${unk>0?`<span style="font-size:13px;color:#8B8276"> ~ ${won(max)}</span>`:''}
            <span style="font-size:13px;color:#8B8276">/ 2,000만원</span></span>
        </div>
@@ -2642,7 +2647,7 @@ function renderDivGauge(list){
            : mayOver
              ? `확인된 과표로는 한도까지 <b>${won(LIMIT-base)}</b> 남았습니다.
                 다만 <b>과표 미확인 ${nUnk}종</b>을 전액과세로 보면 한도를 넘을 수 있습니다.`
-             : `한도까지 <b>${won(LIMIT-base)}</b> 남았습니다. 2,000만원까지는 15.4% 원천징수로 끝납니다.`}<br>
+             : `한도까지 <b>${won(LIMIT-base)}</b> 남았습니다. 2,000만원까지는 원천징수(국내 15.4%·미국 15%)로 끝납니다.`}<br>
          ${unk>0?`옅은 칸은 <b>과표를 아직 모르는 ${nUnk}종</b>입니다. 분배금 전액이 과세된다고 가정한 상한이라,
                   실제로는 이보다 낮습니다 — 커버드콜·채권형은 과표가 분배금보다 훨씬 작습니다.<br>`:''}
          ${hi>0?`파란 칸은 <b>고배당 분리과세 대상 ${nHi}종 ${won(hi)}</b>입니다.
@@ -2774,14 +2779,14 @@ function renderGauge(valid,cash){
     const risky=total-safe, rp=risky/total*100, ok=rp<=70;
     return `<div style="margin-bottom:22px">
       <div class="gauge-row">
-        <span class="gauge-name">${esc(acct)} 위험자산 비중<span class="badge ${ok?'ok':'warn'}">${ok?'한도 이내':'한도 초과'}</span></span>
+        <span class="gauge-name">${esc(acct)} 위험자산 비중<span class="badge ${ok?'ok':'warn'}">${ok?'한도 이내':'70% 초과 · 추가 매수 제한'}</span></span>
         <span class="gauge-val ${ok?'':'up'}">${rp.toFixed(1)}%</span>
       </div>
       <div class="gauge-bar"><div class="gauge-fill" style="width:${Math.min(rp,100)}%;background:${ok?'var(--accent)':'#C0392B'}"></div></div>
       <div class="gauge-limit">
         위험자산 ${won(risky)} / 안전자산 ${won(safe)} (예수금 ${won(c)} 포함) · 합계 ${won(total)}<br>
         ${ok?`한도까지 ${won(total*0.7-risky)} 여유가 있습니다.`
-            :`한도를 ${won(risky-total*0.7)} 넘었습니다. 안전자산을 늘려야 추가 매수가 가능합니다.`}
+            :`70%를 ${won(risky-total*0.7)} 넘었습니다. 보유 중 평가액이 올라 넘은 것은 위반이 아니지만, 위험자산을 더 사려면 안전자산 비중을 먼저 늘려야 합니다.`}
       </div></div>`;
   }).join('');
   wrap.innerHTML=blocks+`<div class="gauge-limit" style="margin-top:0">
