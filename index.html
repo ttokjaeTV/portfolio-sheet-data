@@ -234,6 +234,16 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .seg-b:hover{color:var(--accent)}
 .seg-b.on{background:var(--dark-warm);color:var(--white)}
 
+/* 수익률 흐름 */
+.ret-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.ret-head .seg-b{padding:7px 12px}
+.data-table.ret-table{min-width:0}
+.ret-table td,.ret-table th{white-space:nowrap}
+.ret-note{font-size:11.5px;font-weight:600;color:var(--ink-mute);line-height:1.75;margin-top:10px}
+.ret-note:empty{display:none}
+.ret-more{display:block;margin:8px auto 0}
+.ret-est{font-size:10px;font-weight:800;color:var(--ink-mute);margin-left:3px}
+
 /* ---------- 배당 탭 ---------- */
 .div-block{margin-top:30px;padding-top:24px;border-top:1px solid var(--border)}
 .div-stamp{display:block;margin-top:6px;font-size:11px;font-weight:700;color:var(--ink-mute)}
@@ -1187,6 +1197,21 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="table-wrap" id="trend-table"></div>
   <div class="trend-log" id="trend-log"></div>
 </div>
+
+<div class="card" id="ret-card">
+  <div class="step-label"><div class="step-line"></div><span class="step-text">수익률 흐름</span></div>
+  <div class="card-desc">
+    위 그래프는 금액이라 돈을 더 넣어도 올라갑니다. 여기서는 <b>새로 넣은 돈·뺀 돈을 걸러 낸 순수 운용 수익률</b>(시간가중 수익률)을
+    코스피·S&amp;P 500과 같은 날 0%에서 출발시켜 비교합니다. 기간 탭을 바꾸면 그 기간 첫날을 다시 0%로 맞춥니다.
+  </div>
+  <div class="ret-head">
+    <div class="trend-stats" id="ret-stats"></div>
+    <div class="seg" id="ret-range"></div>
+  </div>
+  <div class="trend-canvas"><canvas id="chart-ret"></canvas></div>
+  <div class="table-wrap" id="ret-table"></div>
+  <div class="ret-note" id="ret-note"></div>
+</div>
 </section>
 
 <div class="ask-back" id="ask-back" hidden>
@@ -2109,6 +2134,7 @@ function render(){
   renderInsight(priced,byAsset,val,byAcct);
   snapshot(val,snapBuy,cashSum,uniq(valid),snapAcct(byAcct));
   renderTrend();
+  renderReturn();
 }
 
 /* ---------- 자산 추이 ---------- */
@@ -2145,10 +2171,195 @@ function snapshot(val,buy,cash,n,byAcct){
       accC[a]=[+t.buyC.toFixed(2),+t.valC.toFixed(2)];
   }
   const row={d,val:Math.round(val),buy:Math.round(buy),cash:Math.round(cash),n,acc,accC};
+  /* 수익률 흐름용. px = 종목별 [보유수량, 원화 가격], kx = 기록 순간의 코스피.
+     오늘 하루 수익률(r)을 바로 계산해 행에 남겨 두므로 px 는 최근 이틀치만 있으면 된다. */
+  row.px=pxMap(); if(FX>0) row.fx=FX;
+  if(BOARD['코스피']&&BOARD['코스피'].val>0) row.kx=BOARD['코스피'].val;
+  const prev=[...state.hist].reverse().find(x=>x.d<d);
+  const r=prev?dayReturn(prev,row.px):null;
+  if(r!==null) row.r=+r.toFixed(4);
   if(last&&last.d===d) state.hist[state.hist.length-1]=row;
   else state.hist.push(row);
   if(state.hist.length>1200) state.hist=state.hist.slice(-1200);
+  for(let i=0;i<state.hist.length-2;i++) delete state.hist[i].px;   // 저장 공간 절약
   save();
+}
+
+/* ---------- 수익률 흐름 (시간가중) ----------
+   하루 수익률 = 전날 기록 때 들고 있던 수량 × (오늘 가격 − 그날 가격) ÷ 전날 평가금액.
+   매수·매도·입금·출금은 수량과 현금만 바꾸고 가격 변동이 아니므로 수익률에 섞이지 않는다.
+   예수금은 수익 0으로 분모에만 들어간다. 미국 종목은 그날 환율로 원화 환산하므로 환율 변동도 수익에 포함된다. */
+function pxMap(){
+  const o={};
+  compute().rows.forEach(r=>{
+    if(!r.found||!(r.qty>0)||!r.hasPrice) return;
+    if(r.isUS&&!(FX>0)) return;
+    const p=r.isUS?+(r.price*FX).toFixed(2):r.price;
+    (o[r.code]=o[r.code]||[0,p])[0]+=r.qty;
+  });
+  return o;
+}
+function priceNowKRW(code){
+  const m=lookup(code);
+  if(!m||!(num(m.price)>0)) return null;
+  return m.cur==='USD'?(FX>0?m.price*FX:null):m.price;
+}
+// prev.px 가 없으면(기능 도입 전 기록) null — 그 구간은 원금 변화로 추정한다.
+function dayReturn(prev,px){
+  if(!prev||!prev.px||!(prev.val>0)) return null;
+  let gain=0;
+  for(const c in prev.px){
+    const [q,p0]=prev.px[c];
+    // 오늘 다 판 종목은 오늘 시세로 본다. 시세를 모르면 판 가격 = 전날 가격으로 둔다.
+    const p1=px[c]?px[c][1]:priceNowKRW(c);
+    if(p1!=null&&p0>0) gain+=q*(p1-p0);
+  }
+  return gain/prev.val*100;
+}
+// 정렬된 [{d,v}] 에서 day 이전(포함/미포함) 마지막 값
+function asofV(seq,day,strict){
+  let lo=0,hi=(seq||[]).length-1,ans=null;
+  while(lo<=hi){ const m=(lo+hi)>>1, ok=strict?seq[m].d<day:seq[m].d<=day;
+    if(ok){ ans=seq[m].v; lo=m+1; } else hi=m-1; }
+  return ans;
+}
+/* 도입 전 기록의 하루 수익률 추정: 원금이 늘어난 만큼을 입금으로 보고 뺀다.
+   원금 안의 미국분은 환율이 바뀌면 원화 금액이 따라 움직이므로, 미국 전용 계좌 원금(accC)만큼은 환율 효과를 걷어 낸다. */
+function legacyReturn(a,b){
+  if(!(a.val>0)) return null;
+  const fxs=(HIST&&HIST['원/달러'])||[];
+  const fa=a.fx||asofV(fxs,a.d,false), fb=b.fx||asofV(fxs,b.d,false);
+  let bU=0; for(const k in (a.accC||{})) bU+=(a.accC[k]||[])[0]||0;
+  const flow=(b.buy-a.buy)-(fa>0&&fb>0?bU*(fb-fa):0);
+  return ((b.val-flow)/a.val-1)*100;
+}
+// 기록 전체를 누적 수익률(%)로 바꾼다. est=true 인 날은 추정 구간이다.
+function buildReturns(){
+  const h=(state.hist||[]).filter(r=>r&&/^\d{4}-\d{2}-\d{2}$/.test(r.d)&&r.val>0)
+    .map(r=>Object.assign({},r)).sort((a,b)=>a.d<b.d?-1:1);
+  if(h.length<2) return [];
+  const K=(HIST&&HIST['코스피'])||[], S=(HIST&&HIST['S&P 500'])||[];
+  const out=[]; let cum=1;
+  h.forEach((r,i)=>{
+    let day=0, est=false;
+    if(i>0){
+      if(typeof r.r==='number'&&isFinite(r.r)) day=r.r;
+      else { const v=legacyReturn(h[i-1],r); est=true;
+        // 옛 기록은 종목을 지우거나 고친 날 원금·평가가 어긋나 하루 수십 % 가 튈 수 있다.
+        // ETF 위주 포트폴리오가 하루 25% 넘게 움직이는 일은 드물어 그런 날은 0 으로 둔다.
+        day=v===null||Math.abs(v)>25?0:v; if(v!==null&&Math.abs(v)>25) r._skip=true; }
+      if(!isFinite(day)||day<=-100){ day=0; est=true; }
+      cum*=1+day/100;
+    }
+    /* 코스피는 기록 순간 값(없으면 그날 종가), S&P 500은 한국 날짜 기준 '전 거래일 종가'.
+       미국장은 한국 시간 새벽에 끝나므로 같은 날짜 종가는 그날 한국에서 아직 모르는 값이다. */
+    out.push({d:r.d, day:i?day:null, mine:(cum-1)*100, est:i>0&&est, skip:!!r._skip,
+      kL:r.kx||asofV(K,r.d,false), sL:asofV(S,r.d,true)});
+  });
+  return out;
+}
+const RET_RANGES=[['전체',0],['3개월',91],['1개월',30],['1주',7]];
+let retRange=0, retAll=false, chartRet=null;
+// 기간 첫날을 0% 로 다시 맞춘다. 지수는 같은 날 수준끼리 나눈다.
+function sliceReturns(all,days){
+  if(!all.length) return [];
+  const lastT=Date.parse(all[all.length-1].d);
+  const from=days?lastT-(days-1)*864e5:-Infinity;
+  const rows=all.filter(r=>Date.parse(r.d)>=from);
+  if(rows.length<2) return [];
+  const b=rows[0];
+  return rows.map(r=>({d:r.d, day:r===b?null:r.day, est:r===b?false:r.est, skip:r===b?false:r.skip,
+    mine:((1+r.mine/100)/(1+b.mine/100)-1)*100,
+    kospi:b.kL>0&&r.kL>0?(r.kL/b.kL-1)*100:null,
+    snp:b.sL>0&&r.sL>0?(r.sL/b.sL-1)*100:null}));
+}
+function renderReturn(){
+  const card=document.getElementById('ret-card');
+  if(!card) return;
+  const statBox=document.getElementById('ret-stats'), rangeBox=document.getElementById('ret-range');
+  const tableBox=document.getElementById('ret-table'), noteBox=document.getElementById('ret-note');
+  const wrap=card.querySelector('.trend-canvas');
+  if(!HIST){ loadHist().then(()=>renderReturn()); return; }
+  const all=buildReturns();
+  const sp=v=>v==null||!isFinite(v)?'—':(v>0?'+':'')+v.toFixed(2)+'%';
+  if(all.length<2){
+    if(chartRet){ chartRet.destroy(); chartRet=null; }
+    wrap.innerHTML='<div class="trend-empty">기록이 이틀 이상 쌓이면 수익률 흐름이 그려집니다.</div>';
+    statBox.innerHTML=''; rangeBox.innerHTML=''; tableBox.innerHTML=''; noteBox.innerHTML='';
+    return;
+  }
+  const span=(Date.parse(all[all.length-1].d)-Date.parse(all[0].d))/864e5;
+  const ranges=RET_RANGES.filter(([,dd])=>!dd||span>=dd-1||dd===7);
+  if(!ranges.some(r=>r[1]===retRange)) retRange=0;
+  rangeBox.innerHTML=ranges.map(([t,dd])=>
+    `<button type="button" class="seg-b ${dd===retRange?'on':''}" data-ret-range="${dd}">${t}</button>`).join('');
+  let rows=sliceReturns(all,retRange);
+  if(rows.length<2){ retRange=0; rows=sliceReturns(all,0); }
+  const L=rows[rows.length-1];
+  // 지수와 비교한 차이를 말로 적는다. 숫자 부호만으로는 누가 앞섰는지 헷갈린다.
+  const gap=(a,b)=>{ if(a==null||b==null) return ''; const g=a-b;
+    return `<div class="trend-s-l" style="margin-top:2px">내 수익률이 ${Math.abs(g).toFixed(2)}%p ${g>=0?'높음':'낮음'}</div>`; };
+  statBox.innerHTML=`
+    <div class="trend-s"><div class="trend-s-l">내 수익률 · ${rows[0].d.slice(5).replace('-','.')}~${L.d.slice(5).replace('-','.')}</div>
+      <div class="trend-s-v ${cls(L.mine)}">${sp(L.mine)}</div></div>
+    <div class="trend-s"><div class="trend-s-l">같은 기간 코스피</div>
+      <div class="trend-s-v ${cls(L.kospi||0)}">${sp(L.kospi)}</div>${gap(L.mine,L.kospi)}</div>
+    <div class="trend-s"><div class="trend-s-l">같은 기간 S&amp;P 500</div>
+      <div class="trend-s-v ${cls(L.snp||0)}">${sp(L.snp)}</div>${gap(L.mine,L.snp)}</div>`;
+
+  if(!wrap.querySelector('canvas')) wrap.innerHTML='<canvas id="chart-ret"></canvas>';
+  const el=document.getElementById('chart-ret');
+  if(chartRet) chartRet.destroy();
+  const ds=(label,key,color,w,dash)=>({label,data:rows.map(r=>r[key]==null?null:+r[key].toFixed(3)),
+    borderColor:color,backgroundColor:color,borderWidth:w,borderDash:dash||[],fill:false,tension:.15,
+    pointRadius:rows.length<=2?3:0,pointHoverRadius:4,spanGaps:true});
+  chartRet=new Chart(el,{type:'line',
+    data:{labels:rows.map(r=>r.d),datasets:[
+      ds('내 포트폴리오','mine','#D9542B',2.4),
+      ds('코스피','kospi','#8B8276',1.5),
+      ds('S&P 500','snp','#5B7FA3',1.5,[5,4])]},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{position:'bottom',labels:{boxWidth:12,font:{size:11,weight:'700'},color:'#8B8276'}},
+        tooltip:{backgroundColor:'#3A2F26',padding:10,
+          callbacks:{title:c=>c[0].label+(rows[c[0].dataIndex].est?' (추정 구간)':''),
+            label:c=>' '+c.dataset.label+' '+sp(c.parsed.y),
+            afterBody:c=>{ const r=rows[c[0].dataIndex]; return r.day==null?[]:['그날 내 수익률 '+sp(r.day)]; }}}},
+      scales:{
+        x:{grid:{display:false},ticks:{maxTicksLimit:7,font:{size:10},color:'#8A7B6C',
+          callback(i){ const d=this.getLabelForValue(i); return d?d.slice(5).replace('-','.'):''; }}},
+        y:{position:'right',
+          grid:{color:c=>c.tick&&c.tick.value===0?'rgba(58,47,38,.35)':'rgba(58,47,38,.07)'},
+          ticks:{maxTicksLimit:6,font:{size:10},color:'#8A7B6C',callback:v=>(v>0?'+':'')+(+v).toFixed(1)+'%'}}}}});
+
+  // 날짜별 표 — 최근 날짜가 위
+  const desc=rows.slice().reverse();
+  const shown=retAll?desc:desc.slice(0,10);
+  const td=v=>`<td class="${v==null?'':cls(v)}">${sp(v)}</td>`;
+  tableBox.innerHTML=`<table class="data-table ret-table"><thead><tr>
+      <th class="tl">날짜</th><th>그날<br><span class="th-sub">내 수익률</span></th>
+      <th>누적<br><span class="th-sub">내 포트폴리오</span></th><th>코스피<br><span class="th-sub">누적</span></th>
+      <th>S&amp;P 500<br><span class="th-sub">누적</span></th></tr></thead><tbody>`
+    +shown.map(r=>`<tr><td class="tl">${esc(r.d)}</td>`
+      +(r.day==null?'<td>시작</td>':r.skip?'<td>—<span class="ret-est">제외</span></td>'
+        :`<td class="${cls(r.day)}">${sp(r.day)}${r.est?'<span class="ret-est">추정</span>':''}</td>`)
+      +td(r.mine)+td(r.kospi)+td(r.snp)+'</tr>').join('')
+    +'</tbody></table>'
+    +(desc.length>10?`<button type="button" class="btn-ghost ret-more" data-ret-all="1">${retAll?'접기':`전체 ${desc.length}일 보기`}</button>`:'');
+
+  const firstExact=all.find((r,i)=>i>0&&!r.est);
+  const estN=all.filter(r=>r.est).length, skipN=all.filter(r=>r.skip).length;
+  noteBox.innerHTML=[
+    trendAcct?`수익률 흐름은 계좌 선택과 관계없이 <b>전체 계좌</b> 기준입니다.`:'',
+    '도구를 연 날만 기록되므로 건너뛴 날은 다음 기록일에 한꺼번에 반영됩니다. 같은 날 여러 번 열면 마지막 값이 남습니다.',
+    '코스피는 기록할 때의 지수(장중이면 장중 값), S&amp;P 500은 한국 날짜 기준 전 거래일 종가(달러 기준)입니다.',
+    estN?`<b>추정</b> 표시는 이 기능을 넣기 전 기록이라 종목별 가격이 없어, 원금 변화를 입금으로 보고 걸러 낸 값입니다.`
+      +' 매도한 날이나 환율이 크게 움직인 날은 실제와 차이가 날 수 있습니다.'
+      +(firstExact?` ${esc(firstExact.d)}부터는 종목별 가격으로 정확히 계산합니다.`:' 다음 기록부터는 종목별 가격으로 정확히 계산합니다.')
+      +(skipN?` 추정치가 하루 25%를 넘은 ${skipN}일은 종목을 고친 날로 보고 <b>제외</b>(0%) 처리했습니다.`:''):'',
+    '가격 변동만 보는 수익률이라 배당·분배금은 들어가지 않습니다. 배당락일에 가격이 빠지는 만큼 낮게 보이고, 받은 배당을 예수금에 넣어도 수익률은 오르지 않습니다(비교 지수도 배당 미포함 지수입니다).'
+  ].filter(Boolean).map(t=>'※ '+t).join('<br>');
 }
 
 // 계좌별 원금·평가·수익금과, 첫 기록 이후 무엇이 얼마나 늘었는지.
@@ -3022,7 +3233,7 @@ document.addEventListener('change',e=>{
   }
 });
 document.addEventListener('change',e=>{
-  if(e.target.id==='trend-acct-sel'){ trendAcct=e.target.value; renderTrend(); }
+  if(e.target.id==='trend-acct-sel'){ trendAcct=e.target.value; renderTrend(); renderReturn(); }
 });
 document.addEventListener('click',e=>{
   // 자산 추이 기록 지우기
@@ -3047,6 +3258,10 @@ document.addEventListener('click',e=>{
               : `오늘(${today()}) 기록을 남겼습니다. 총 ${(state.hist||[]).length}일치.`);
     return;
   }
+  // 수익률 흐름 기간 탭 / 표 펼치기
+  const rr=e.target.closest('[data-ret-range]');
+  if(rr){ retRange=+rr.dataset.retRange; renderReturn(); return; }
+  if(e.target.closest('[data-ret-all]')){ retAll=!retAll; renderReturn(); return; }
   if(e.target.id==='btn-trend-clear'){
     const n=(state.hist||[]).length;
     if(!n){ alert('아직 기록이 없습니다.'); return; }
