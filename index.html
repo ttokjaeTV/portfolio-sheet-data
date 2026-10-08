@@ -1127,7 +1127,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 
   <div class="div-block">
     <div class="chart-title">계좌별 배당</div>
-    <div class="chart-subtitle">배당을 받는 그 시점에 실제로 떼이는 세금만 반영했습니다</div>
+    <div class="chart-subtitle">배당을 받는 그 시점에 실제로 떼이는 세금만 반영했습니다 · 미국 종목은 오늘 환율로 환산한 예상액입니다</div>
     <div class="table-wrap">
       <table class="data-table narrow">
         <thead><tr><th class="tl">계좌</th><th>연 배당금(세전)</th><th>과세 대상</th>
@@ -2608,11 +2608,15 @@ function divRows(valid){
            현지 원천징수는 계좌 성격과 무관하게 발생하므로 kind 를 '미국' 으로 따로 둔다. */
       const u=USDIV[r.code];
       if(!u||!(u.dpsUsd>0)||!FX){ usSkip++; return; }
-      /* 회차마다 그 날의 환율로 환산해 더한다. 회차 정보가 없으면 오늘 환율로 떨어진다. */
-      const real=(u.hist&&u.hist.length)
-        ? u.hist.reduce((s,[d,v])=>s+v*r.qty*fxOn(d),0)
-        : u.dpsUsd*r.qty*FX;
-      out.push({r,d:u,real,annual:real,kind:'미국',isUS:true,
+      /* 원화 금액을 두 가지로 둔다.
+         paid = 지난 1년 실제로 받은 원화 — 회차마다 그 날 환율 (세법의 수입시기 환산과 같다)
+         real = 앞으로 1년 받을 예상 — 같은 달러를 '오늘 환율' 로 환산
+         예상·월평균·배당률·종합과세 막대는 real 을 쓴다. 작년 환율(1,450~1,530)로
+         앞으로를 세면 환율이 내려간 만큼 부풀려지기 때문이다(2026-10 실측 약 8%). */
+      const real=u.dpsUsd*r.qty*FX;
+      const paid=(u.hist&&u.hist.length)
+        ? u.hist.reduce((s,[d,v])=>s+v*r.qty*fxOn(d),0) : real;
+      out.push({r,d:u,real,paid,annual:real,kind:'미국',isUS:true,
         realC:u.dpsUsd*r.qty,              // 달러 원본 (해외 전용 계좌 표기용)
         taxBase:real, taxUnknown:0});
       return;
@@ -2629,7 +2633,7 @@ function divRows(valid){
        이걸 미확인으로 세면 종합과세 게이지에 "과표 미확인 1,500종" 같은 헛경고가 뜬다. */
     const stock=d.kind==='국내주식';
     const known=stock||d.tax!==null;
-    out.push({r,d,real,annual,kind:acctTaxKind(r.acct),isUS:false,
+    out.push({r,d,real,paid:real,annual,kind:acctTaxKind(r.acct),isUS:false,
       taxBase: stock?real:(known?d.tax*r.qty:0),   // 확인된 과세표준액
       taxUnknown: known?0:real,                    // 미확인분 (최대 이만큼 더 잡힐 수 있다)
       // 고배당 분리과세 대상은 개별주에만 붙는다. ETF 는 법에서 제외돼 있다.
@@ -2648,6 +2652,8 @@ function renderDividends(valid){
   if(st) st.textContent=DIV_STAMP?`배당 데이터 갱신 ${DIV_STAMP}`:'';
 
   const pre=list.reduce((s,x)=>s+x.real,0);
+  const paidSum=list.reduce((s,x)=>s+x.paid,0);           // 지난 1년 실제 (받은 날 환율)
+  const hasUS=list.some(x=>x.isUS);
   // 세후는 보수적으로 — 미확인 과표도 전액과세로 보고 세금을 최대로 잡는다
   const wht=list.reduce((s,x)=>s+divWht(x),0);
   const post=pre-wht;
@@ -2657,10 +2663,11 @@ function renderDividends(valid){
   const buy=lk.reduce((s,x)=>s+x.r.buy,0), preK=lk.reduce((s,x)=>s+x.real,0);
 
   document.getElementById('div-stats').innerHTML=
-    `<div class="stat-card accent"><div class="stat-label">연 배당금 (세전)</div>
+    `<div class="stat-card accent"><div class="stat-label">예상 연 배당금 (세전)</div>
        <div class="stat-value">${won(pre)}</div>
-       <div class="stat-sub">${list.length?new Set(list.map(x=>x.r.code)).size+'종목':'—'}</div></div>
-     <div class="stat-card"><div class="stat-label">연 배당금 (세후)</div>
+       <div class="stat-sub">${list.length?new Set(list.map(x=>x.r.code)).size+'종목':'—'}${hasUS?' · 미국은 오늘 환율':''}
+         ${hasUS&&Math.abs(paidSum-pre)>=1?`<span style="display:block">지난 1년 실제 받은 금액 ${won(paidSum)}</span>`:''}</div></div>
+     <div class="stat-card"><div class="stat-label">예상 연 배당금 (세후)</div>
        <div class="stat-value">${won(post)}</div>
        <div class="stat-sub">${wht>0?'원천징수 '+won(wht)+' 차감':'지급 시점 원천징수 없음'}</div></div>
      <div class="stat-card"><div class="stat-label">월평균 (세후)</div>
@@ -2687,9 +2694,12 @@ function renderDivCal(list){
     const rate=x.real>0?divWht(x)/x.real:0;      // 이 종목의 실효 세율
     const put=(mo,amt,isEst)=>{ m[mo-1]+=amt; w[mo-1]+=amt*rate; if(isEst) est[mo-1]=1; };
 
-    // 회차별 원화 금액. 국내는 주당×수량, 미국은 주당×수량×그날 환율.
+    /* 회차별 원화 금액. 국내는 주당×수량.
+       미국은 올해 이미 받은 회차만 그날 환율이고, 작년 회차는 '올해 같은 달 예상' 으로
+       서 있는 값이라 오늘 환율로 환산한다. */
+    const yNow=new Date().getFullYear();
     const h=(d.hist||[]).map(([dt,v])=>
-      [dt, x.isUS ? v*x.r.qty*fxOn(dt) : v*x.r.qty]);
+      [dt, x.isUS ? v*x.r.qty*(+dt.slice(0,4)===yNow?fxOn(dt):FX) : v*x.r.qty]);
     if(!h.length){                               // 회차 이력이 없으면 예전처럼 고르게 나눈다
       const each=x.real/ms.length;
       ms.forEach(v=>put(v,each,false));
@@ -2697,7 +2707,6 @@ function renderDivCal(list){
     }
     /* 최근 12개월 창에는 같은 달이 두 번 들어올 수 있다(작년 9월 + 올해 9월).
        그대로 더하면 그 달만 두 배로 솟는다. 올해 회차가 있으면 작년 건 버린다. */
-    const yNow=new Date().getFullYear();
     const hasNew=new Set(h.filter(([dt])=>+dt.slice(0,4)===yNow).map(([dt])=>+dt.slice(5,7)));
     h.forEach(([dt,amt])=>{
       const mo=+dt.slice(5,7);
@@ -2712,7 +2721,9 @@ function renderDivCal(list){
        연 1~2회 배당(국내 개별주 대부분)은 결산 주기가 전부라 손대지 않는다. */
     const per=d.perYear||ms.length;
     if(per<4) return;                            // 연·반기 배당은 작년 그대로
-    const last=h[h.length-1][1];                 // 가장 최근 회차 금액
+    const hl=d.hist[d.hist.length-1];
+    // 가장 최근 회차 금액. 미국은 그 달러를 오늘 환율로 — 앞으로 받을 돈이다.
+    const last=x.isUS ? hl[1]*x.r.qty*FX : h[h.length-1][1];
     const anchor=+h[h.length-1][0].slice(5,7);
     const step=per>=11?1:3;                      // 월 / 분기
 
@@ -2767,6 +2778,7 @@ function renderDivCal(list){
    +`<div class="cal-legend">
       <p>${nowM>1?`<b>${nowM-1}월까지</b>는 국내·미국 모두 <b>실제 지급일</b> 기준으로, 실제로 들어온 금액입니다. `:''}<b>${nowM}월은 아직 진행 중</b>이라 이미 들어온 회차와 아직 안 온 회차가 섞여 있습니다. 그 달에 들어올 배당이 다 들어왔는지는 알 수 없습니다.</p>
       <p><b>${nowM}월 이후</b>는 아직 안 온 달이라 <b>예상치</b>입니다. 월·분기 배당은 <b>가장 최근 회차 금액</b>을 남은 달에 세웠고, 연 1~2회 배당(국내 개별주 대부분)은 결산 주기가 정해져 있어 <b>작년 같은 달</b>을 그대로 씁니다.</p>
+      ${list.some(x=>x.isUS)?'<p>미국 배당은 <b>이미 받은 달은 받은 날 환율</b>, <b>아직 안 온 달은 오늘 환율</b>로 원화를 셌습니다.</p>':''}
       <p>최근 회차를 쓰는 이유는 둘입니다. 올해 분배금이 오르내린 것을 작년 값이 못 따라가고, <b>올해 상장한 종목은 작년 회차가 없어 그 달이 통째로 비기</b> 때문입니다. 그래도 예상은 예상이라 분배금이 바뀌면 실제와 달라집니다.</p>
       <p>금액은 전부 <b>지금 보유수량</b>을 곱한 값이라, 과거에 실제로 받은 돈과는 다릅니다.
       ${anyTax
@@ -2863,9 +2875,10 @@ function renderDivAcct(list,usSkip,noData){
      <b>ISA</b>도 지금은 떼지 않고 만기에 순이익 기준으로 정산합니다(일반형 200만원·서민형 400만원 비과세, 초과분 9.9% 분리과세).<br>
      <b>미국 종목</b>은 현지에서 <b>15%</b>를 떼고 그것으로 끝납니다. 국내 세율(14%)보다 높아 추가로 내지 않고
      지방소득세도 붙지 않습니다. 다만 금융소득종합과세 2,000만원 한도에는 그대로 합산됩니다.<br>
-     <b>미국 배당의 원화 금액은 회차마다 그 배당을 받은 날의 환율</b>로 환산했습니다
-     ${FX_SRC?`(${esc(FX_SRC)})`:''}. 세법이 외화 소득을 수입시기의 기준환율로 환산하기 때문입니다.
-     오늘 환율로 일괄 환산하면 최근 1년 기준 7~8% 어긋납니다.<br>
+     <b>미국 배당의 원화 금액은 두 가지로 셉니다.</b> 지난 1년 <b>실제로 받은 금액</b>(종목별 표의 '실지급', 달력의 이미 받은 달)은
+     회차마다 <b>받은 날의 환율</b>${FX_SRC?`(${esc(FX_SRC)})`:''}로 환산했습니다. 세법이 외화 소득을 수입시기의 기준환율로 환산하기 때문입니다.
+     반면 <b>예상 연 배당금·월평균·이 계좌별 표·종합과세 막대</b>는 앞으로 받을 돈이라 같은 달러를 <b>오늘 환율</b>로 환산했습니다.
+     작년 환율로 앞으로를 세면 그 사이 환율이 움직인 만큼 부풀거나 줄어듭니다. 실제로 받을 원화는 받는 날 환율에 따라 달라집니다.<br>
      다만 <b>개별주</b>는 세법상 기준일이 지급일이 아니라 <b>배당 결의일</b>일 수 있습니다.
      결의일은 지급일보다 3~6주 앞서므로 그만큼 오차가 남습니다. 확정 금액은 홈택스 지급명세서를 보세요.`
     +(miss.length?'<br>'+miss.join(' '):'');
@@ -2972,10 +2985,10 @@ function renderDivTable(list){
     const nm=on?acctKind(x.r.acct):x.r.acct;
     const k=nm+'|'+x.r.code;
     const t=g[k]||(g[k]={kindNm:nm,accts:new Set(),d:x.d,
-      code:x.r.code,name:x.r.name,real:0,annual:0,qty:0,
+      code:x.r.code,name:x.r.name,real:0,paid:0,annual:0,qty:0,
       qtyP:0,valC:0,qtyK:0,buyC:0,kc:kindColor(x.r.acct)});
     t.accts.add(x.r.acct);
-    t.real+=x.real; t.annual+=x.annual;
+    t.real+=x.real; t.paid+=x.paid; t.annual+=x.annual;
     t.qty+=x.r.qty;
     /* 배당률·YOC 는 표시통화(미국은 USD) 그대로 나눈다. 주당배당금이 USD 이므로
        원화 환산액(val·buy)으로 나누면 0.00% 가 된다. 평단 미입력·시세 없음 로트는 뺀다. */
@@ -3020,9 +3033,9 @@ function renderDivTable(list){
       <td>${per1>0?(us?two(usdFine(lastPay?lastPay[1]:0),per1):won(per1)):'—'}</td>
       <td>${esc(d.cycle)}${d.perYear?` <span class="th-sub">${d.perYear}회</span>`:''}</td>
       <td class="tl">${monthStrip(d.months,bym,r.qty)}</td>
-      <td>${us?two(usd(d.dpsUsd*t.qty),x.real):`<b>${won(x.real)}</b>`}${spSum>0
+      <td>${us?two(usd(d.dpsUsd*t.qty),t.paid)+'<span class="th-sub" style="display:block">받은 날 환율</span>':`<b>${won(x.real)}</b>`}${spSum>0
         ?`<span class="th-sub" style="display:block;color:#D9542B" title="${esc(spTip)}">특별 추정 ${won(spSum*t.qty)} 포함</span>`:''}</td>
-      <td>${us?two(usd(d.dpsUsd*t.qty),x.annual):won(x.annual)}${spSum>0
+      <td>${us?two(usd(d.dpsUsd*t.qty),x.annual)+'<span class="th-sub" style="display:block">오늘 환율</span>':won(x.annual)}${spSum>0
         ?`<span class="th-sub" style="display:block" title="${esc(spTip)}">특별 추정분 제외</span>`
         :(!us&&Math.abs(x.annual-x.real)<1&&d.perYear>1
           ?'<span class="th-sub" style="display:block">회차 편차 커서 실지급 사용</span>':'')}</td>
