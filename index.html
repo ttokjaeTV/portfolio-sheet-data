@@ -388,6 +388,12 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .trend-tools select{padding:7px 10px;border:1px solid var(--border);border-radius:9px;
   background:var(--white);font-size:12px;font-weight:700;font-family:inherit;color:var(--ink)}
 .trend-canvas{height:260px;margin:10px 0 6px}
+.mdd-canvas{height:200px}
+.mdd-sub{font-size:14px;font-weight:900;color:var(--ink);margin:14px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mdd-tag{font-size:11px;font-weight:800;color:var(--ink-mute);background:var(--bg-alt);border-radius:6px;padding:2px 8px}
+.mdd-tag.est{color:#9A3B1C;background:#F4E4DA}
+.mdd-hr{height:1px;background:var(--border);margin:18px 0 4px}
+.mdd-s2{font-size:11px;font-weight:700;color:var(--ink-mute);margin-top:2px}
 #trend-table{margin:4px 0 14px}
 #trend-table:empty{display:none}
 .trend-empty{padding:34px 20px;text-align:center;color:var(--ink-mute);font-size:13px;font-weight:600;
@@ -1211,6 +1217,26 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="trend-canvas"><canvas id="chart-ret"></canvas></div>
   <div class="table-wrap" id="ret-table"></div>
   <div class="ret-note" id="ret-note"></div>
+</div>
+
+<div class="card" id="mdd-card">
+  <div class="step-label"><div class="step-line"></div><span class="step-text">최대 낙폭 (MDD)</span></div>
+  <div class="card-desc">
+    <b>MDD</b>는 고점에서 저점까지 가장 크게 떨어졌던 비율입니다. 같은 수익률이라도 중간에 얼마나 흔들렸는지를 보여 줍니다.
+    <b>①</b>은 실제로 쌓인 내 기록으로, <b>②</b>는 지금 들고 있는 종목·수량을 과거 1년에 그대로 대입해 <b>추정</b>합니다.
+  </div>
+  <div class="mdd-sub">① 내 실제 기록 <span class="mdd-tag">기간은 위 '수익률 흐름' 탭과 같음</span></div>
+  <div class="trend-stats" id="mdd-stats"></div>
+  <div class="trend-canvas mdd-canvas" id="mdd-wrap"><canvas id="chart-mdd"></canvas></div>
+  <div class="ret-note" id="mdd-note"></div>
+  <div class="mdd-hr"></div>
+  <div class="mdd-sub">② 지금 구성으로 들고 있었다면 <span class="mdd-tag est">추정</span></div>
+  <div class="ret-head">
+    <div class="trend-stats" id="mddb-stats"></div>
+    <div class="seg" id="mddb-range"></div>
+  </div>
+  <div class="trend-canvas mdd-canvas" id="mddb-wrap"><canvas id="chart-mddb"></canvas></div>
+  <div class="ret-note" id="mddb-note"></div>
 </div>
 </section>
 
@@ -2286,6 +2312,7 @@ function renderReturn(){
     if(chartRet){ chartRet.destroy(); chartRet=null; }
     wrap.innerHTML='<div class="trend-empty">기록이 이틀 이상 쌓이면 수익률 흐름이 그려집니다.</div>';
     statBox.innerHTML=''; rangeBox.innerHTML=''; tableBox.innerHTML=''; noteBox.innerHTML='';
+    renderMddA([]); renderMddB();
     return;
   }
   const span=(Date.parse(all[all.length-1].d)-Date.parse(all[0].d))/864e5;
@@ -2359,6 +2386,211 @@ function renderReturn(){
       +(firstExact?` ${esc(firstExact.d)}부터는 종목별 가격으로 정확히 계산합니다.`:' 다음 기록부터는 종목별 가격으로 정확히 계산합니다.')
       +(skipN?` 추정치가 하루 25%를 넘은 ${skipN}일은 종목을 고친 날로 보고 <b>제외</b>(0%) 처리했습니다.`:''):'',
     '가격 변동만 보는 수익률이라 배당·분배금은 들어가지 않습니다. 배당락일에 가격이 빠지는 만큼 낮게 보이고, 받은 배당을 예수금에 넣어도 수익률은 오르지 않습니다(비교 지수도 배당 미포함 지수입니다).'
+  ].filter(Boolean).map(t=>'※ '+t).join('<br>');
+  renderMddA(rows); renderMddB();
+}
+/* ---------- 최대 낙폭 (MDD) ----------
+   낙폭(t) = 수준(t) ÷ 그때까지의 최고 수준 − 1.  MDD = 낙폭의 최솟값.
+   ① 실제 기록: 수익률 흐름(시간가중)의 누적 수익률을 수준으로 쓴다. 입금·출금이 섞이지 않는다.
+   ② 추정: 지금 보유 수량을 과거 일별 종가에 그대로 곱한 평가금액 흐름(예수금 제외, 가격 기준). */
+function ddStats(levels){
+  let peak=null, curPk=-1, mdd=0, pk=-1, tr=-1, last=-1;
+  const dd=levels.map((v,i)=>{
+    if(v==null||!(v>0)) return null;
+    last=i;
+    if(peak==null||v>=peak){ peak=v; curPk=i; }
+    const x=(v/peak-1)*100;
+    if(x<mdd){ mdd=x; tr=i; pk=curPk; }
+    return x;
+  });
+  let rec=-1;
+  if(tr>=0) for(let j=tr+1;j<levels.length;j++) if(levels[j]!=null&&levels[j]>=levels[pk]){ rec=j; break; }
+  return {dd, mdd, pk, tr, rec, cur:last>=0?dd[last]:null, last};
+}
+const mdShort=d=>d?d.slice(5).replace('-','.'):'';
+const ymd=d=>d?d.slice(2).replace(/-/g,'.'):'';   // 해가 바뀌는 기간은 연도까지 적는다
+const ddTxt=v=>v==null||!isFinite(v)?'—':(v<0?'−':'')+Math.abs(v).toFixed(2)+'%';
+function ddSpan(st,dates,f=mdShort){
+  if(st.tr<0) return '고점 대비 하락 없음';
+  const days=(Date.parse(dates[st.tr])-Date.parse(dates[st.pk]))/864e5;
+  let t=`고점 ${f(dates[st.pk])} → 저점 ${f(dates[st.tr])} (${Math.round(days)}일)`;
+  if(st.rec>=0) t+=` · ${f(dates[st.rec])} 회복`;
+  else t+=' · 아직 회복 전';
+  return t;
+}
+function ddChart(prev,el,dates,sets,tick=mdShort){
+  if(prev) prev.destroy();
+  return new Chart(el,{type:'line',
+    data:{labels:dates,datasets:sets.map(([label,data,color,w,dash,fill])=>({label,
+      data:data.map(v=>v==null?null:+v.toFixed(3)),borderColor:color,backgroundColor:fill?hexA(color,.14):color,
+      borderWidth:w,borderDash:dash||[],fill:fill?'origin':false,tension:.15,pointRadius:0,pointHoverRadius:4,spanGaps:true}))},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11,weight:'700'},color:'#8B8276'}},
+        tooltip:{backgroundColor:'#3A2F26',padding:10,callbacks:{label:c=>' '+c.dataset.label+' 고점 대비 '+ddTxt(c.parsed.y)}}},
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:7,font:{size:10},color:'#8A7B6C',
+          callback(i){ const d=this.getLabelForValue(i); return d?tick(d):''; }}},
+        y:{position:'right',max:0,grid:{color:'rgba(58,47,38,.07)'},
+          ticks:{maxTicksLimit:5,font:{size:10},color:'#8A7B6C',callback:v=>(+v).toFixed(1)+'%'}}}}});
+}
+
+/* ① 실제 기록 MDD — renderReturn 이 잘라 둔 같은 기간(rows)을 쓴다 */
+let chartMdd=null;
+function renderMddA(rows){
+  const statBox=document.getElementById('mdd-stats'), noteBox=document.getElementById('mdd-note');
+  const wrap=document.getElementById('mdd-wrap');
+  if(!statBox) return;
+  if(!rows||rows.length<2){
+    if(chartMdd){ chartMdd.destroy(); chartMdd=null; }
+    statBox.innerHTML=''; noteBox.innerHTML='';
+    wrap.innerHTML='<div class="trend-empty">기록이 이틀 이상 쌓이면 실제 MDD가 계산됩니다.</div>';
+    return;
+  }
+  const dates=rows.map(r=>r.d);
+  const me=ddStats(rows.map(r=>1+r.mine/100));
+  const kx=ddStats(rows.map(r=>r.kospi==null?null:1+r.kospi/100));
+  const sx=ddStats(rows.map(r=>r.snp==null?null:1+r.snp/100));
+  const yr=dates[0].slice(0,4)!==dates[dates.length-1].slice(0,4), f=yr?ymd:mdShort;
+  statBox.innerHTML=`
+    <div class="trend-s"><div class="trend-s-l">내 포트폴리오 MDD · ${f(dates[0])}~${f(dates[dates.length-1])}</div>
+      <div class="trend-s-v ${me.mdd<0?'down':''}">${ddTxt(me.mdd)}</div><div class="mdd-s2">${ddSpan(me,dates,f)}</div></div>
+    <div class="trend-s"><div class="trend-s-l">지금 고점 대비</div>
+      <div class="trend-s-v ${me.cur<0?'down':''}">${me.cur===0?'고점':ddTxt(me.cur)}</div></div>
+    <div class="trend-s"><div class="trend-s-l">같은 기간 코스피 MDD</div>
+      <div class="trend-s-v ${kx.mdd<0?'down':''}">${kx.last<0?'—':ddTxt(kx.mdd)}</div></div>
+    <div class="trend-s"><div class="trend-s-l">같은 기간 S&amp;P 500 MDD</div>
+      <div class="trend-s-v ${sx.mdd<0?'down':''}">${sx.last<0?'—':ddTxt(sx.mdd)}</div></div>`;
+  if(!wrap.querySelector('canvas')) wrap.innerHTML='<canvas id="chart-mdd"></canvas>';
+  chartMdd=ddChart(chartMdd,document.getElementById('chart-mdd'),dates,[
+    ['내 포트폴리오',me.dd,'#D9542B',2.2,null,true],
+    ['코스피',kx.dd,'#8B8276',1.4],
+    ['S&P 500',sx.dd,'#5B7FA3',1.4,[5,4]]],yr?(d=>d.slice(2,7).replace('-','.')):mdShort);
+  const estN=rows.filter(r=>r.est).length;
+  noteBox.innerHTML=[
+    '도구를 연 날의 값만 기록되므로, 열지 않은 날에 찍은 더 낮은 저점은 빠집니다. 그래서 실제 MDD보다 <b>작게</b> 나올 수 있습니다. 매일 한 번씩 열어 두면 정확해집니다.',
+    '입금·출금·매수·매도는 걸러 낸 운용 수익률 기준이라, 돈을 빼서 평가금액이 줄어든 것은 낙폭으로 잡히지 않습니다.',
+    estN?`이 기간에 <b>추정</b> 구간 ${estN}일이 섞여 있습니다(위 수익률 흐름 표의 '추정' 표시와 같음).`:'',
+    '배당·분배금은 들어가지 않는 가격 기준입니다. 비교 지수도 배당 미포함 지수입니다.'
+  ].filter(Boolean).map(t=>'※ '+t).join('<br>');
+}
+
+/* ② 지금 구성 추정 MDD — 종목별 과거 일별 종가가 필요하다.
+   물타기 계산기(Water-Calc)가 매일 받는 1년치 일봉을 종목별 파일로 내보낸 것을 읽는다.
+   파일 형식: {"d":["2025-10-01",...], "c":[종가,...]} (날짜 오름차순, 국내=원·미국=달러 종가) */
+const HISTB_BASE='https://ttokjaetv.github.io/Water-Calc/data/hist/';
+const MDDB_RANGES=[['1년',365],['6개월',182],['3개월',91]];
+let mddbRange=365, chartMddb=null, HB={}, HB_P={}, mddbTok=0;
+function loadHB(code,isUS){
+  const key=(isUS?'us/':'kr/')+code;
+  if(HB[key]!==undefined) return Promise.resolve(HB[key]);
+  if(!HB_P[key]) HB_P[key]=fetch(HISTB_BASE+key+'.json').then(r=>r.ok?r.json():null)
+    .then(j=>(HB[key]=j&&Array.isArray(j.d)&&Array.isArray(j.c)&&j.d.length===j.c.length?j:null))
+    .catch(()=>(HB[key]=null));
+  return HB_P[key];
+}
+function asofArr(dates,vals,day){   // 정렬된 날짜 배열에서 day 이하 마지막 값
+  let lo=0,hi=dates.length-1,ans=null;
+  while(lo<=hi){ const m=(lo+hi)>>1; if(dates[m]<=day){ ans=vals[m]; lo=m+1; } else hi=m-1; }
+  return ans;
+}
+async function renderMddB(){
+  const statBox=document.getElementById('mddb-stats'), noteBox=document.getElementById('mddb-note');
+  const wrap=document.getElementById('mddb-wrap'), rangeBox=document.getElementById('mddb-range');
+  if(!statBox) return;
+  const empty=msg=>{ if(chartMddb){ chartMddb.destroy(); chartMddb=null; }
+    statBox.innerHTML=''; rangeBox.innerHTML=''; noteBox.innerHTML='';
+    wrap.innerHTML=`<div class="trend-empty">${msg}</div>`; };
+  // 지금 보유 종목 (전체 계좌 합산)
+  const pos={};
+  compute().rows.forEach(r=>{
+    if(!r.found||!(r.qty>0)||!r.hasPrice||!r.code) return;
+    const k=(r.isUS?'us/':'kr/')+r.code;
+    (pos[k]=pos[k]||{code:r.code,name:r.name,isUS:r.isUS,qty:0,val:0}).qty+=r.qty;
+    pos[k].val+=r.val||0;
+  });
+  const list=Object.values(pos);
+  if(!list.length){ empty('보유 종목을 입력하면 지금 구성으로 추정한 MDD가 계산됩니다.'); return; }
+  const tok=++mddbTok;   // 다시 그리기가 겹치면 마지막 호출만 화면에 반영
+  if(!HIST){ await loadHist(); }
+  await Promise.all(list.map(p=>loadHB(p.code,p.isUS)));
+  if(tok!==mddbTok) return;
+  const fxs=(HIST&&HIST['원/달러'])||[];
+  const fxD=fxs.map(x=>x.d), fxV=fxs.map(x=>x.v);
+  const ok=[], miss=[], short=[];
+  list.forEach(p=>{
+    const h=HB[(p.isUS?'us/':'kr/')+p.code];
+    if(!h){ miss.push(p); return; }
+    if(h.d.length<60){ short.push(p); return; }
+    if(p.isUS&&!fxD.length){ miss.push(p); return; }
+    ok.push(Object.assign({h},p));
+  });
+  const totalVal=list.reduce((a,p)=>a+p.val,0), okVal=ok.reduce((a,p)=>a+p.val,0);
+  if(!ok.length){
+    empty(Object.keys(HB).every(k=>HB[k]===null)
+      ? '과거 일별 시세 파일을 아직 불러올 수 없습니다. 시세 파일이 준비되면 자동으로 계산됩니다.'
+      : '보유 종목의 과거 일별 시세가 부족해 추정할 수 없습니다(상장 60거래일 미만 등).');
+    return;
+  }
+  // 기간: 포함 종목이 모두 시세를 가진 날부터, 가장 최근 날까지
+  const lastD=ok.map(p=>p.h.d[p.h.d.length-1]).sort().pop();
+  const commonStart=ok.map(p=>p.h.d[0]).sort().pop();
+  const spanDays=(Date.parse(lastD)-Date.parse(commonStart))/864e5;
+  const ranges=MDDB_RANGES.filter(([,dd])=>spanDays>=dd*0.9||dd===91);
+  if(!ranges.some(r=>r[1]===mddbRange)) mddbRange=ranges[0]?ranges[0][1]:91;
+  rangeBox.innerHTML=ranges.map(([t,dd])=>
+    `<button type="button" class="seg-b ${dd===mddbRange?'on':''}" data-mddb-range="${dd}">${t}</button>`).join('');
+  const fromD=new Date(Date.parse(lastD)-(mddbRange-1)*864e5).toISOString().slice(0,10);
+  const start=fromD>commonStart?fromD:commonStart;
+  // 날짜 축: 국내 종목이 있으면 국내 거래일, 미국만 있으면 미국 거래일
+  const base=ok.find(p=>!p.isUS)||ok[0];
+  const dates=base.h.d.filter(d=>d>=start&&d<=lastD);
+  if(dates.length<20){ empty('추정에 쓸 수 있는 기간이 너무 짧습니다(20거래일 미만).'); return; }
+  /* 미국 종가는 한국 날짜 기준 '전 거래일' 종가를 쓴다(미국장이 한국 시간 새벽에 끝나므로).
+     환율은 그날(없으면 직전) 원/달러 종가. */
+  const prevDay=d=>new Date(Date.parse(d)-864e5).toISOString().slice(0,10);
+  const vals=dates.map(d=>{
+    let v=0;
+    for(const p of ok){
+      const px=asofArr(p.h.d,p.h.c,p.isUS?prevDay(d):d);
+      if(px==null) return null;
+      v+=p.qty*px*(p.isUS?(asofArr(fxD,fxV,d)||0):1);
+    }
+    return v>0?v:null;
+  });
+  const st=ddStats(vals);
+  const yr=dates[0].slice(0,4)!==dates[dates.length-1].slice(0,4), f=yr?ymd:mdShort;
+  let worst=0,worstD=null;
+  for(let i=1;i<vals.length;i++) if(vals[i]&&vals[i-1]){ const r=(vals[i]/vals[i-1]-1)*100; if(r<worst){ worst=r; worstD=dates[i]; } }
+  const first=vals.find(v=>v), lastV=[...vals].reverse().find(v=>v);
+  const ret=first&&lastV?(lastV/first-1)*100:null;
+  // 같은 날짜의 지수 낙폭
+  const K=(HIST&&HIST['코스피'])||[], S=(HIST&&HIST['S&P 500'])||[];
+  const idx=(arr,shift)=>{ const d0=arr.map(x=>x.d), v0=arr.map(x=>x.v);
+    return dates.map(d=>asofArr(d0,v0,shift?prevDay(d):d)); };
+  const kx=ddStats(idx(K,false)), sx=ddStats(idx(S,true));
+  statBox.innerHTML=`
+    <div class="trend-s"><div class="trend-s-l">추정 MDD · ${f(dates[0])}~${f(dates[dates.length-1])}</div>
+      <div class="trend-s-v ${st.mdd<0?'down':''}">${ddTxt(st.mdd)}</div><div class="mdd-s2">${ddSpan(st,dates,f)}</div></div>
+    <div class="trend-s"><div class="trend-s-l">가장 크게 빠진 하루</div>
+      <div class="trend-s-v ${worst<0?'down':''}">${worstD?ddTxt(worst):'—'}</div><div class="mdd-s2">${worstD?f(worstD):''}</div></div>
+    <div class="trend-s"><div class="trend-s-l">이 기간 가격 수익률</div>
+      <div class="trend-s-v ${cls(ret||0)}">${ret==null?'—':(ret>0?'+':'')+ret.toFixed(2)+'%'}</div></div>
+    <div class="trend-s"><div class="trend-s-l">같은 기간 코스피 · S&amp;P 500 MDD</div>
+      <div class="trend-s-v">${kx.last<0?'—':ddTxt(kx.mdd)} · ${sx.last<0?'—':ddTxt(sx.mdd)}</div></div>`;
+  if(!wrap.querySelector('canvas')) wrap.innerHTML='<canvas id="chart-mddb"></canvas>';
+  chartMddb=ddChart(chartMddb,document.getElementById('chart-mddb'),dates,[
+    ['지금 구성 (추정)',st.dd,'#9A3B1C',2.2,null,true],
+    ['코스피',kx.dd,'#8B8276',1.4],
+    ['S&P 500',sx.dd,'#5B7FA3',1.4,[5,4]]],yr?(d=>d.slice(2,7).replace('-','.')):mdShort);
+  const cov=totalVal>0?okVal/totalVal*100:100;
+  const nm=a=>a.slice(0,4).map(p=>esc(p.name||p.code)).join(', ')+(a.length>4?` 외 ${a.length-4}종목`:'');
+  noteBox.innerHTML=[
+    '<b>추정치입니다.</b> 지금 보유 수량을 과거에도 똑같이 들고 있었다고 가정했습니다. 그동안 사고판 것·입출금은 반영하지 않습니다.',
+    `계산에 넣은 종목은 지금 평가금액의 <b>${cov.toFixed(1)}%</b>입니다. 예수금은 빼고 계산했습니다.`,
+    short.length?`상장한 지 얼마 안 돼 시세가 60거래일 미만인 종목은 뺐습니다: ${nm(short)}`:'',
+    miss.length?`과거 시세를 찾지 못한 종목은 뺐습니다: ${nm(miss)}`:'',
+    commonStart>fromD?`모든 종목의 시세가 있는 ${ymd(commonStart)}부터 계산했습니다.`:'',
+    ok.some(p=>p.isUS)?'미국 종목은 한국 날짜 기준 전 거래일 종가에 그날 원/달러 환율을 곱했습니다(환율 변동 포함).':'',
+    '종가 기준이라 장중 저점은 빠지고, 배당·분배금은 들어가지 않습니다(배당락일 하락이 낙폭에 포함됨).'
   ].filter(Boolean).map(t=>'※ '+t).join('<br>');
 }
 
@@ -3274,6 +3506,8 @@ document.addEventListener('click',e=>{
   // 수익률 흐름 기간 탭 / 표 펼치기
   const rr=e.target.closest('[data-ret-range]');
   if(rr){ retRange=+rr.dataset.retRange; renderReturn(); return; }
+  const mb=e.target.closest('[data-mddb-range]');
+  if(mb){ mddbRange=+mb.dataset.mddbRange; renderMddB(); return; }
   if(e.target.closest('[data-ret-all]')){ retAll=!retAll; renderReturn(); return; }
   if(e.target.id==='btn-trend-clear'){
     const n=(state.hist||[]).length;
