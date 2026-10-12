@@ -182,6 +182,10 @@ input::placeholder{color:#BFB6A6;font-weight:500}
 .holding-row{margin-bottom:8px}
 .holding-row input,.holding-row select{padding:9px 12px;font-size:14px}
 .cur-wrap{position:relative}
+/* 숫자 바로 뒤에 붙는 단위 (주) — 위치는 JS(placeUnits)가 글자 폭을 재서 맞춘다 */
+.unit-wrap{display:block;position:relative}
+.input-unit{position:absolute;top:50%;transform:translateY(-50%);left:0;pointer-events:none;
+  font-size:14px;font-weight:700;color:var(--ink-mute);white-space:nowrap;visibility:hidden}
 .cur-wrap input{padding-left:24px}
 .cur-mark{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:800;
   color:var(--ink-mute);pointer-events:none}
@@ -899,7 +903,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
           <div class="search-menu" data-buymenu="1"></div>
           <div class="hold-nm" id="buy-nm"></div>
         </div>
-        <div><input type="number" id="buy-qty" placeholder="매수 수량" min="0" step="any"></div>
+        <div><span class="unit-wrap"><input type="number" id="buy-qty" data-unit="주" placeholder="매수 수량" min="0" step="any"></span></div>
         <div class="cur-wrap"><span class="cur-mark" id="buy-mark">₩</span>
           <input type="number" id="buy-avg" placeholder="매수 단가" min="0" step="any"></div>
       </div>
@@ -1792,6 +1796,31 @@ function openMenu(input){
   menu.classList.add('on');
 }
 
+/* ---------- 입력칸 숫자 뒤 단위 ----------
+   input에 data-unit이 있으면 입력한 숫자 바로 뒤에 단위(주)를 붙여 보여 준다.
+   글자 폭은 같은 글꼴을 입힌 숨은 span으로 잰다(숫자 글꼴 설정까지 그대로 반영). */
+let unitMeasure=null;
+function placeUnits(){
+  if(!unitMeasure){ unitMeasure=document.createElement('span'); unitMeasure.style.cssText='position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;'; document.body.appendChild(unitMeasure); }
+  document.querySelectorAll('.unit-wrap input[data-unit]').forEach(inp=>{
+    let tag=inp.parentNode.querySelector('.input-unit');
+    if(!tag){ tag=document.createElement('span'); tag.className='input-unit'; tag.textContent=inp.dataset.unit; inp.after(tag); }
+    const cs=getComputedStyle(inp);
+    // 값이 비었거나, 숨어 있거나, 숫자가 이미 칸을 넘쳐 잘려 보이면 단위를 감춘다
+    if(inp.value===''||!inp.offsetWidth||inp.scrollWidth>inp.clientWidth+1){ tag.style.visibility='hidden'; return; }
+    ['fontFamily','fontSize','fontWeight','fontVariantNumeric','letterSpacing'].forEach(k=>{ unitMeasure.style[k]=cs[k]; });
+    unitMeasure.textContent=inp.value;
+    const w=unitMeasure.getBoundingClientRect().width;
+    const left=parseFloat(cs.paddingLeft)+parseFloat(cs.borderLeftWidth)+w+4-inp.scrollLeft;
+    tag.style.left=Math.round(left)+'px';
+    tag.style.fontSize=cs.fontSize;
+    // 마우스 화면의 숫자칸은 오른쪽 안쪽에 위·아래 화살표(약 16px)가 뜬다 → 그 자리까지 오면 감춘다
+    const spin=inp.type==='number'&&matchMedia('(hover: hover) and (pointer: fine)').matches?16:0;
+    const limit=inp.clientWidth-parseFloat(cs.paddingRight)+(spin?-spin:8);
+    tag.style.visibility=left+tag.offsetWidth<limit?'visible':'hidden';
+  });
+}
+
 /* ---------- 렌더 ---------- */
 function renderRows(){
   const box=document.getElementById('holdings');
@@ -1836,7 +1865,7 @@ function renderRows(){
         <div class="search-menu" data-menu="${i}"></div>
         ${r.found?`<div class="hold-nm" title="${esc(r.name)}">${r.isUS?'<span class="us-tag">US</span>':''}${esc(r.name)}</div>`:''}
       </div>
-      <div><input type="number" data-i="${i}" data-k="qty" value="${esc(h.qty??'')}" placeholder="0" min="0" step="any"></div>
+      <div><span class="unit-wrap"><input type="number" data-i="${i}" data-k="qty" data-unit="주" value="${esc(h.qty??'')}" placeholder="0" min="0" step="any"></span></div>
       <div class="cur-wrap"><span class="cur-mark">${mark}</span>
         <input type="number" data-i="${i}" data-k="avg" value="${esc(h.avg??'')}" placeholder="0" min="0" step="any"></div>
       <div class="row-buy"${buy&&r.hasAvg?' data-l="매입금액"':''}>${buy}</div>
@@ -1864,6 +1893,7 @@ function renderRows(){
       <div class="hg-body">${list.map(rowHtml).join('')}</div>
     </details>`;
   }).join('');
+  placeUnits();
 }
 /* ---------- 계좌 관리 ---------- */
 /* 계좌 드롭다운. 맨 끝에 '새 계좌 추가' 항목을 붙여 어디서든 바로 만들 수 있게 한다 */
@@ -3609,6 +3639,7 @@ document.addEventListener('toggle',e=>{
     state.fold=state.fold||{};
     state.fold[d.dataset.fold]=!d.open;
     save();
+    if(d.open) placeUnits();   // 접혀 있던 계좌를 열면 단위 위치를 다시 잰다
   }
 },true);
 
@@ -3699,7 +3730,7 @@ function renderBuyPreview(){
 }
 function openBuy(){
   const p=document.getElementById('buy-panel');
-  renderBuyAccts(); p.hidden=false; renderBuyPreview();
+  renderBuyAccts(); p.hidden=false; renderBuyPreview(); placeUnits();
   p.scrollIntoView({behavior:'smooth',block:'nearest'});
   document.getElementById('buy-code').focus();
 }
@@ -3741,7 +3772,7 @@ document.getElementById('buy-cancel').onclick=closeBuy;
 document.getElementById('buy-ok').onclick=commitBuy;
 ['buy-code','buy-qty','buy-avg'].forEach(id=>{
   const el=document.getElementById(id);
-  el.addEventListener('input',()=>{ if(id==='buy-code') openMenu(el); renderBuyPreview(); });
+  el.addEventListener('input',()=>{ if(id==='buy-code') openMenu(el); renderBuyPreview(); placeUnits(); });
   el.addEventListener('keydown',ev=>{
     if(ev.key!=='Enter') return;
     ev.preventDefault();
@@ -5399,6 +5430,8 @@ renderAccts();
 renderCash();
 showTab(state.tab||'hold');   // 안에서 render() 까지 부른다
 loadAll();
+{ let ut; window.addEventListener('resize',()=>{ clearTimeout(ut); ut=setTimeout(placeUnits,200); }); }
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(placeUnits);   // 웹폰트가 늦게 뜨면 폭을 다시 잰다
 </script>
 </body>
 </html>
