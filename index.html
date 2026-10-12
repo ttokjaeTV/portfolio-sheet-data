@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>포트폴리오 관리 도구 | 똑재TV</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<title>포트폴리오 관리 도구 · 똑재TV</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
@@ -18,6 +18,9 @@
 body{font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);
   color:var(--ink);padding:32px 24px;line-height:1.5;-webkit-font-smoothing:antialiased;font-weight:500}
 .container{max-width:1200px;margin:0 auto}
+.hub-back{display:inline-block;margin-bottom:12px;font-size:13px;font-weight:600;color:var(--ink-mute);text-decoration:none}
+.hub-back:hover{color:var(--accent)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 header{display:flex;justify-content:space-between;align-items:center;margin-bottom:48px;gap:16px}
 .logo{display:flex;align-items:center;gap:12px}
@@ -810,6 +813,9 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 <body>
 <div class="container">
 
+<a href="https://ttokjaetv.github.io/" class="hub-back">← 똑재TV 계산기 모음</a>
+<h1 class="sr-only">포트폴리오 관리 도구</h1>
+
 <header>
   <div class="logo">
     <div class="logo-icon">똑</div>
@@ -943,7 +949,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="step-label"><div class="step-line"></div><span class="step-text">캡처로 불러오기 (선택)</span></div>
   <div class="card-desc">
     증권사 앱 잔고 화면을 캡처해 올리면 종목과 수량을 자동으로 읽어옵니다.
-    <b>캡처를 여러 장 한 번에 올릴 수 있고</b>, 캡처마다 계좌가 자동으로 나뉩니다. 같은 종류 계좌가 겹치면 일반계좌2·연금저축펀드2 처럼 번호를 붙여 만들어 드립니다.<br>
+    <b>캡처를 여러 장 한 번에 올릴 수 있고</b>, 캡처마다 계좌가 자동으로 나뉩니다. 같은 종류 계좌가 겹치면 일반계좌2·연금저축2 처럼 번호를 붙여 만들어 드립니다.<br>
     표가 옆으로 잘려 <b>수량과 매입가가 한 화면에 안 나오면</b> 좌우로 나눠 두 장을 올리세요. 같은 계좌·같은 종목이면 빈칸끼리 채워 한 건으로 합칩니다.
     읽은 결과는 바로 반영하지 않고 <b>검수 화면에서 확인한 뒤</b> 추가합니다.<br>캡처에 <span class="need">보유수량</span>·<span class="need">매입단가</span> 열이 함께 나오게 찍으시면 수량과 단가까지 자동으로 채워집니다.<br>
     <b>미국 주식·ETF는 증권사 앱에서 표시 통화를 달러($)로 바꾼 뒤 캡처해 주세요.</b>
@@ -1040,7 +1046,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   </div>
   <div class="card" style="margin-bottom:0">
     <div class="chart-title">계좌별 비중</div>
-    <div class="chart-subtitle">평가금액 기준 · 같은 종류 계좌는 합쳐서 봅니다 (연금저축펀드1·2·3 → 연금저축펀드)</div>
+    <div class="chart-subtitle">평가금액 기준 · 같은 종류 계좌는 합쳐서 봅니다 (연금저축1·2·3 → 연금저축)</div>
     <div class="chart-container"><canvas id="chart-acct"></canvas></div>
   </div>
 </div>
@@ -1049,7 +1055,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="step-label"><div class="step-line"></div><span class="step-text">IRP 위험자산 한도</span></div>
   <div class="card-desc">
     IRP와 DC형 퇴직연금은 위험자산을 전체의 70%까지만 담을 수 있습니다. 나머지 30% 이상은 안전자산이어야 합니다.<br>
-    <b>연금저축펀드는 이 규제를 받지 않습니다.</b> 그래서 아래는 IRP만 계산합니다.
+    (적격 TDF 등 일부 안전자산 인정 상품은 100%까지 담을 수 있습니다. 아래 계산은 70% 기준입니다.)<br>
+    <b>연금저축은 이 규제를 받지 않습니다.</b> 그래서 아래는 IRP만 계산합니다.
   </div>
   <div id="gauge-wrap"></div>
 </div>
@@ -1155,7 +1162,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <div class="detail-head">
       <div class="chart-title" style="margin:0">종목별 배당</div>
       <label class="merge-toggle">
-        <span class="merge-label">같은 성격 계좌 묶어 보기<span class="merge-sub">연금저축펀드1·2 → 연금저축펀드</span></span>
+        <span class="merge-label">같은 성격 계좌 묶어 보기<span class="merge-sub">연금저축1·2 → 연금저축</span></span>
         <span class="toggle-switch">
           <input type="checkbox" id="chk-div-merge">
           <span class="toggle-slider"></span>
@@ -1223,12 +1230,14 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   <div class="step-label"><div class="step-line"></div><span class="step-text">최대 낙폭 (MDD)</span></div>
   <div class="card-desc">
     <b>MDD</b>는 고점에서 저점까지 가장 크게 떨어졌던 비율입니다. 같은 수익률이라도 중간에 얼마나 흔들렸는지를 보여 줍니다.
-    <b>①</b>은 실제로 쌓인 내 기록으로, <b>②</b>는 지금 들고 있는 종목·수량을 과거 1년에 그대로 대입해 <b>추정</b>합니다.
+    아래는 이 도구에 실제로 쌓인 내 기록으로 계산합니다.
   </div>
-  <div class="mdd-sub">① 내 실제 기록 <span class="mdd-tag">기간은 위 '수익률 흐름' 탭과 같음</span></div>
+  <div class="mdd-sub">내 실제 기록 <span class="mdd-tag">기간은 위 '수익률 흐름' 탭과 같음</span></div>
   <div class="trend-stats" id="mdd-stats"></div>
   <div class="trend-canvas mdd-canvas" id="mdd-wrap"><canvas id="chart-mdd"></canvas></div>
   <div class="ret-note" id="mdd-note"></div>
+  <!-- ② 지금 구성 추정: 과거 일별 시세 파일(Water-Calc/data/hist)이 아직 없어 숨김. 파일이 생기면 hidden 과 MDDB_ON 을 함께 푼다 -->
+  <div id="mddb-block" hidden>
   <div class="mdd-hr"></div>
   <div class="mdd-sub">② 지금 구성으로 들고 있었다면 <span class="mdd-tag est">추정</span></div>
   <div class="ret-head">
@@ -1237,6 +1246,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   </div>
   <div class="trend-canvas mdd-canvas" id="mddb-wrap"><canvas id="chart-mddb"></canvas></div>
   <div class="ret-note" id="mddb-note"></div>
+  </div>
 </div>
 </section>
 
@@ -1250,8 +1260,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 
 <footer>
   ※ 시세는 국내·미국 모두 약 15분 간격으로 갱신되어 최대 15분가량 지연될 수 있고, 장 마감 후에는 종가입니다. 실시간 체결가와 다릅니다.<br>
-  ※ 환율은 하나은행 고시 매매기준율이며, 실제 환전 시 적용 환율과 다릅니다.<br>
-  ※ 본 도구는 세금·수수료를 제외한 단순 계산 도구이며, 특정 종목의 매수·매도를 권유하지 않습니다.<br>
+  ※ 환율: 보유 평가는 하나은행 고시 매매기준율(네이버), 지난 1년 받은 배당은 지급일의 서울외국환중개 매매기준율로 환산합니다. 실제 환전 시 적용 환율과 다릅니다.<br>
+  ※ 배당 세후 금액은 받을 때 떼는 원천징수(국내 종목은 일반계좌만 15.4%, 미국 종목은 계좌와 관계없이 현지 15%)만 반영했습니다. 매매수수료·매매차익 세금·환차손익·종합과세 세액은 넣지 않았으며, 특정 종목의 매수·매도를 권유하지 않습니다.<br>
   ※ 입력한 보유 내역과 업로드한 이미지는 이용자 브라우저 안에서만 처리되며 서버로 전송되지 않습니다.
 </footer>
 
@@ -1259,7 +1269,18 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 
 <script>
 const BASE='https://ttokjaetv.github.io/portfolio-sheet-data/data/';
-const DEFAULT_ACCOUNTS=['연금저축펀드1','연금저축펀드2','IRP','ISA','일반계좌'];
+const DEFAULT_ACCOUNTS=['연금저축1','연금저축2','IRP','ISA','일반계좌'];
+/* 2026-10-12 기본 이름을 '연금저축펀드1·2' → '연금저축1·2' 로 바꿨다.
+   계좌 목록을 직접 고친 적 없는 이용자는 저장 데이터에 계좌 목록이 없고(state.accounts 비어 있음)
+   보유 종목·예수금·메모·기록이 계좌 '이름'으로 묶여 있다. 그런 데이터에 예전 이름이 남아 있으면
+   예전 기본 이름을 그대로 써서 기존 기록이 떨어져 나가지 않게 한다. */
+const LEGACY_DEFAULT_ACCOUNTS=['연금저축펀드1','연금저축펀드2','IRP','ISA','일반계좌'];
+function defaultAccts(){
+  const used=new Set((state.holdings||[]).map(h=>h&&h.acct));
+  [state.cash,state.cashUsd,state.notes].forEach(o=>Object.keys(o||{}).forEach(k=>used.add(k)));
+  (state.hist||[]).forEach(r=>Object.keys((r&&r.acc)||{}).forEach(k=>used.add(k)));
+  return LEGACY_DEFAULT_ACCOUNTS.slice(0,2).some(a=>used.has(a)) ? LEGACY_DEFAULT_ACCOUNTS : DEFAULT_ACCOUNTS;
+}
 const LS_KEY='ttokjae_portfolio_v2';
 /* 계좌는 이용자가 자유롭게 추가·이름변경할 수 있다.
    IRP 70% 한도와 절세계좌 비중은 계좌 이름으로 판별한다. */
@@ -1291,7 +1312,7 @@ function kindColor(a){
   const i=kinds.indexOf(acctKind(a));
   return KIND_COLORS[(i<0?0:i)%KIND_COLORS.length];
 }
-const accts=()=>sortAccts((state.accounts&&state.accounts.length)?state.accounts:DEFAULT_ACCOUNTS);
+const accts=()=>sortAccts((state.accounts&&state.accounts.length)?state.accounts:defaultAccts());
 const isIRP=a=>/IRP|DC형|DC\b|퇴직연금/i.test(a);
 const isTaxAdv=a=>/연금|IRP|ISA|DC\b|퇴직/i.test(a);
 const COLORS=['#D9542B','#E89A6F','#8B6F47','#C4A57B','#5A6B5A','#A03D1F','#9B9387','#7A8B99'];
@@ -1888,7 +1909,7 @@ function renderAccts(){
 function addAccount(){
   const base=accts();
   const suggest=/일반계좌/.test(base.join()) ? `일반계좌${base.filter(a=>/일반계좌/.test(a)).length+1}` : '일반계좌';
-  const name=(prompt('추가할 계좌 이름을 입력하세요.\n예: 연금저축펀드3, IRP2, 일반계좌2',suggest)||'').trim();
+  const name=(prompt('추가할 계좌 이름을 입력하세요.\n예: 연금저축3, IRP2, 일반계좌2',suggest)||'').trim();
   if(!name) return null;
   if(base.includes(name)){ alert('이미 있는 계좌입니다.'); return null; }
   state.accounts=[...base,name];
@@ -2477,6 +2498,8 @@ function renderMddA(rows){
    물타기 계산기(Water-Calc)가 매일 받는 1년치 일봉을 종목별 파일로 내보낸 것을 읽는다.
    파일 형식: {"d":["2025-10-01",...], "c":[종가,...]} (날짜 오름차순, 국내=원·미국=달러 종가) */
 const HISTB_BASE='https://ttokjaetv.github.io/Water-Calc/data/hist/';
+// 2026-10-12: 위 경로의 파일이 아직 없다(404). 계산·요청을 끄고 화면 블록(#mddb-block)도 숨겨 둔다.
+const MDDB_ON=false;
 const MDDB_RANGES=[['1년',365],['6개월',182],['3개월',91]];
 let mddbRange=365, chartMddb=null, HB={}, HB_P={}, mddbTok=0;
 function loadHB(code,isUS){
@@ -2493,6 +2516,7 @@ function asofArr(dates,vals,day){   // 정렬된 날짜 배열에서 day 이하 
   return ans;
 }
 async function renderMddB(){
+  if(!MDDB_ON) return;
   const statBox=document.getElementById('mddb-stats'), noteBox=document.getElementById('mddb-note');
   const wrap=document.getElementById('mddb-wrap'), rangeBox=document.getElementById('mddb-range');
   if(!statBox) return;
@@ -2796,7 +2820,7 @@ function drawDonut(id,prev,data,setter,colorOf,subOf){
 
 /* ---------- 배당 ----------
    배당을 받는 그 시점에 실제로 떼이는 세금만 센다.
-     일반계좌  15.4% 원천징수 (과세 대상 = 과세표준액. 국내상장 해외ETF 는
+     일반계좌  15.4% 원천징수 (과세 대상 = 과세표준액. 국내상장 해외 ETF 는
                분배금 전액이 아니라 과표증분까지만 과세된다)
      연금계좌  과세이연 → 지급 시점 원천징수 없음. 인출할 때 연금소득세를 낸다
      ISA      만기 정산 → 지급 시점 원천징수 없음
@@ -3102,9 +3126,9 @@ function renderDivAcct(list,usSkip,noData){
   if(noData) miss.push(`국내 <b>${noData}종</b>은 배당·분배금 기록이 없습니다. 분배가 거의 없는 성장형 ETF이거나 아직 수집 범위 밖입니다.`);
   document.getElementById('div-tax-note').innerHTML=
     `<b>일반계좌</b>만 배당을 받는 시점에 15.4%를 뗍니다. 과세 대상은 분배금 전액이 아니라 <b>과세표준액</b>입니다
-     — 국내상장 해외ETF는 분배금과 과표증분 중 작은 쪽까지만 과세하기 때문입니다.<br>
+     — 국내상장 해외 ETF는 분배금과 과표증분 중 작은 쪽까지만 과세하기 때문입니다.<br>
      <b>연금저축·IRP</b>는 과세이연이라 지금은 세금이 없고, 연금으로 받을 때 연금소득세를 냅니다.
-     <b>ISA</b>도 지금은 떼지 않고 만기에 순이익 기준으로 정산합니다(일반형 200만원·서민형 400만원 비과세, 초과분 9.9% 분리과세).<br>
+     <b>ISA</b>도 지금은 떼지 않고 만기에 순이익 기준으로 정산합니다(일반형 200만원·서민형·농어민형 400만원 비과세, 초과분 9.9% 분리과세).<br>
      <b>미국 종목</b>은 현지에서 <b>15%</b>를 떼고 그것으로 끝납니다. 국내 세율(14%)보다 높아 추가로 내지 않고
      지방소득세도 붙지 않습니다. 다만 금융소득종합과세 2,000만원 한도에는 그대로 합산됩니다.<br>
      <b>미국 배당의 원화 금액은 두 가지로 셉니다.</b> 지난 1년 <b>실제로 받은 금액</b>(종목별 표의 '실지급', 달력의 이미 받은 달)은
@@ -3386,7 +3410,7 @@ function renderDetail(all,total){
   const fnote = detailFilter
     ? `<b>${esc(detailFilter)}</b>${dnote?` (${esc(dnote)})`:''} 계좌만 보고 있습니다. ` : '';
   note.innerHTML = fnote
-    + '<b>성격이 같은 계좌끼리</b> 같은 종목을 묶어 보여줍니다 — 연금저축펀드1·2 는 합치고, '
+    + '<b>성격이 같은 계좌끼리</b> 같은 종목을 묶어 보여줍니다 — 연금저축1·2 는 합치고, '
     + '연금·ISA·일반은 세금이 달라 따로 둡니다. 매입단가는 수량 가중평균입니다(평단 미입력 로트는 평균에서 뺍니다).'
     + (multi ? ` 이번에 <b>${multi}건</b>이 묶였습니다.` : '')
     + (rows.some(r=>r.isUS) ? '<br>※ 미국 종목의 원화 손익은 매입금액·평가금액을 <b>모두 오늘 환율</b>로 환산한 값입니다(환차손익 미반영). 매수 시점 환율은 저장하지 않습니다.' : '');
