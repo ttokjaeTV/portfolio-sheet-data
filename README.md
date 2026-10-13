@@ -17,7 +17,9 @@
 ## 구조
 
 ```
-index.html                            포트폴리오 관리 도구 (단일 HTML)
+index.html                            포트폴리오 관리 도구 (단일 HTML, ?demo=1 은 예시 데이터)
+og.png                                링크 미리보기 이미지 (1200×630)
+vendor/xlsx.mini.min.js               SheetJS 0.20.3 — 엑셀 양식 내려받기·올리기 (쓸 때만 불러옴)
 scripts/build_etf_prices.py           국내 ETF 시세 → etf_prices.csv
 scripts/build_index_history.py        지수·환율 5년치 일별 종가 → indices_history.csv
 scripts/build_us_symbols.py           미국 티커 → 네이버 코드 매핑 (증분)

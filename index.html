@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>포트폴리오 관리 도구 · 똑재TV</title>
+<meta name="description" content="연금저축·IRP·ISA·일반계좌에 흩어진 국내 ETF와 미국 직투를 한 화면에. 자동 시세, 배당·분배금, IRP 70% 한도, 해외주식 양도차익 250만원 공제, 자산 추이까지. 무료, 로그인 없이 브라우저에서 바로.">
+<link rel="canonical" href="https://ttokjaetv.github.io/portfolio-sheet-data/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="똑재TV 계산기">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:title" content="포트폴리오 관리 도구 · 똑재TV">
+<meta property="og:description" content="흩어진 계좌를 한 화면에 — 자동 시세, 배당·분배금, IRP 한도, 양도차익 250만원 공제까지. 무료, 로그인 없이.">
+<meta property="og:url" content="https://ttokjaetv.github.io/portfolio-sheet-data/">
+<meta property="og:image" content="https://ttokjaetv.github.io/portfolio-sheet-data/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F5EFE6">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -812,13 +825,110 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 @media (max-width: 768px) {
   input[type=text], input[type=number], input[type=search], input[type=tel], input:not([type]), select, textarea { font-size: 16px !important; }
 }
+
+/* ---------- 명의자 · 매입환율 · 양도차익 · 배당 포함 수익률 (2026-10) ---------- */
+.own-box{margin:-4px 0 18px;padding:14px 16px;border:1.5px dashed var(--border);border-radius:14px;background:var(--white)}
+.own-box .merge-toggle{width:100%;justify-content:space-between;gap:14px}
+.own-box .merge-label,.own-box .merge-sub{white-space:normal;min-width:0}
+.own-box .merge-label{flex:1}
+.own-box .toggle-switch{flex:none}
+.beta{display:inline-block;margin-left:4px;padding:1px 7px;border-radius:20px;background:var(--accent-soft);color:var(--accent);font-size:10.5px;font-weight:900;vertical-align:1px}
+.own-names[hidden]{display:none}
+.own-names{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:12px}
+.own-names label{font-size:12.5px;font-weight:800;color:var(--ink-soft);display:flex;align-items:center;gap:8px}
+.own-names input{width:110px;padding:7px 10px;font-size:13px}
+.own-hint{font-size:12px;color:var(--ink-mute);font-weight:600;flex-basis:100%}
+.own-badge{display:inline-block;padding:1px 7px;margin-right:5px;border-radius:6px;font-size:10.5px;font-weight:900;letter-spacing:-.2px;vertical-align:1px;white-space:nowrap}
+.own-badge.o0{background:#E9E1D3;color:var(--dark-warm)}
+.own-badge.o1{background:#DCE6F0;color:var(--blue)}
+.own-seg{display:flex;gap:6px}
+.own-b{flex:1;font-family:inherit;font-size:13px;font-weight:800;padding:8px 10px;border:1.5px solid var(--border);border-radius:10px;background:var(--white);color:var(--ink-mute);cursor:pointer}
+.own-b.on{border-color:var(--dark-warm);background:var(--dark-warm);color:var(--white)}
+.avg-cell{display:flex;flex-direction:column;gap:5px}
+.fx-wrap{position:relative;display:flex;align-items:center}
+.fx-l{position:absolute;left:9px;font-size:10.5px;font-weight:800;color:var(--ink-mute);pointer-events:none}
+.holding-row .fx-wrap input{padding:6px 8px 6px 58px;font-size:12.5px}
+#buy-fx-wrap{grid-column:3}
+.fx-note{color:var(--brown);font-weight:700}
+.cgt-head{display:flex;justify-content:flex-end;margin-bottom:4px}
+.cgt-g+.cgt-g{margin-top:22px;padding-top:18px;border-top:1px dashed var(--border)}
+.cgt-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.cgt-nums div{background:var(--bg-alt);border-radius:10px;padding:10px 12px}
+.cgt-nums span{display:block;font-size:11.5px;font-weight:700;color:var(--ink-mute)}
+.cgt-nums b{font-size:16px;font-weight:900;letter-spacing:-.4px}
+.cgt-form{display:grid;grid-template-columns:150px auto 150px 1fr 160px 1fr auto;gap:10px;align-items:end}
+.cgt-form label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:800;color:var(--ink-soft)}
+.cgt-form label[hidden]{display:none}
+.cgt-form input,.cgt-form select{padding:9px 10px;font-size:13.5px}
+.cgt-form .btn{white-space:nowrap}
+.cgt-err{color:var(--red);font-size:12.5px;font-weight:700;min-height:18px;margin:6px 0 4px}
+.cgt-note{font-size:12px;font-weight:600;color:var(--ink-mute);line-height:1.75;margin-top:14px}
+.cgt-room{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;font-weight:700;margin-bottom:10px}
+.cgt-room b{color:var(--accent)}
+.tr-tbl input.tr-in{width:120px;padding:7px 9px;font-size:13px;text-align:right}
+@media (max-width:768px){
+  .cgt-nums{grid-template-columns:1fr 1fr}
+  .cgt-form{grid-template-columns:1fr 1fr}
+  .cgt-form .wide{grid-column:1/-1}
+  .cgt-form .btn{grid-column:1/-1}
+  .tr-tbl input.tr-in{width:96px}
+  #buy-fx-wrap{grid-column:auto}
+}
+
+.demo-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-bottom:18px;padding:13px 18px;
+  border-radius:14px;background:var(--dark-warm);color:var(--white);font-size:13.5px;font-weight:600}
+.demo-bar[hidden]{display:none}
+.demo-go{color:var(--white);background:var(--accent);padding:8px 14px;border-radius:10px;font-weight:800;text-decoration:none;white-space:nowrap}
+.demo-link{display:inline-block;margin-top:10px;color:var(--accent);font-weight:800;text-decoration:none}
+.demo-link:hover{text-decoration:underline}
+
+.past-box{margin:6px 0 18px;padding:16px 18px;border:1.5px solid var(--border);border-radius:14px;background:var(--white)}
+.past-box[hidden]{display:none}
+.past-t{font-size:14px;font-weight:900;margin-bottom:10px}
+.past-sub{display:block;font-size:12px;font-weight:600;color:var(--ink-mute);margin-top:2px}
+.past-form{display:grid;grid-template-columns:150px 150px 1fr 1fr auto;gap:10px;align-items:end}
+.past-form label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:800;color:var(--ink-soft)}
+.past-form input,.past-form select{padding:9px 10px;font-size:13.5px}
+.past-hint{font-size:12px;font-weight:600;color:var(--ink-mute);line-height:1.75;margin:10px 0}
+@media (max-width:768px){ .past-form{grid-template-columns:1fr 1fr} .past-form .btn{grid-column:1/-1} }
+
+.xl-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:4px 0 14px}
+.xl-b{display:flex;align-items:center;gap:12px;text-align:left;font-family:inherit;padding:14px 16px;border:1.5px solid var(--border);border-radius:14px;background:var(--white);cursor:pointer;color:var(--ink)}
+.xl-b:hover{border-color:var(--accent)}
+.xl-b.on{border-color:var(--dark-warm);background:var(--dark-warm);color:var(--white)}
+.xl-b b{display:block;font-size:14.5px;font-weight:900}
+.xl-b small{display:block;font-size:11.5px;font-weight:600;opacity:.75;margin-top:2px}
+.xl-n{font-size:20px;font-weight:900;color:var(--accent)}
+.xl-tips{font-size:12.5px;font-weight:600;color:var(--ink-mute);line-height:1.8}
+.xl-msg{margin-top:10px;font-size:13px;font-weight:700;min-height:18px}
+.xl-msg.ok{color:var(--green)} .xl-msg.err{color:var(--red)}
+.xl-pv{margin-top:10px;max-height:46vh;overflow:auto;padding:12px 14px;border-radius:12px;background:var(--bg-alt);font-size:13px;line-height:1.7;text-align:left}
+.xl-pv ul{margin:0;padding-left:18px}
+.xl-pv-l{font-size:12px;color:var(--ink-mute);margin:2px 0 6px}
+.xl-pv-skip{margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);font-size:12px;color:#B5651D}
+.xl-pv-bk{margin-top:10px;font-size:12px;font-weight:700;color:var(--ink-mute)}
+@media (max-width:768px){ .xl-steps{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
+<noscript>
+  <div style="max-width:720px;margin:40px auto;padding:24px;border-radius:16px;background:#FBF7F0;border:1.5px solid #E5DCC8;font-family:sans-serif;line-height:1.7;color:#3A2F26">
+    <h1 style="font-size:22px;margin-bottom:8px">포트폴리오 관리 도구</h1>
+    <p>이 도구는 브라우저 안에서 계산하므로 <b>자바스크립트</b>가 켜져 있어야 합니다. 브라우저 설정에서 자바스크립트를 켠 뒤 새로고침해 주세요.</p>
+    <p style="margin-top:10px">연금저축·IRP·ISA·일반계좌에 흩어진 국내 ETF와 미국 주식을 한 화면에 모아 평가손익, 자산 비중, 배당·분배금,
+      IRP 위험자산 70% 한도, 해외주식 양도차익 250만원 공제, 자산 추이를 보여 줍니다. 입력한 내용은 서버로 전송되지 않습니다.</p>
+    <p style="margin-top:10px"><a href="https://ttokjaetv.github.io/" style="color:#D9542B;font-weight:700">똑재TV 계산기 모음으로 →</a></p>
+  </div>
+</noscript>
 <div class="container">
 
 <a href="https://ttokjaetv.github.io/" class="hub-back">← 똑재TV 계산기 모음</a>
 <h1 class="sr-only">포트폴리오 관리 도구</h1>
+
+<div class="demo-bar" id="demo-bar" hidden>
+  <span><b>예시 데이터</b>로 둘러보는 중입니다. 여기서 고친 내용은 저장되지 않고, 내 데이터에도 영향이 없습니다.</span>
+  <a href="./" class="demo-go">내 데이터로 시작하기 →</a>
+</div>
 
 <header>
   <div class="logo">
@@ -858,11 +968,12 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 
 <nav class="tabs" id="tabs" role="tablist">
   <button class="tab on" type="button" data-tab="hold" role="tab"><span class="tab-n">1</span>보유 종목</button>
-  <button class="tab" type="button" data-tab="shot" role="tab"><span class="tab-n">2</span>캡처로 불러오기</button>
+  <button class="tab" type="button" data-tab="shot" role="tab"><span class="tab-n">2</span>불러오기</button>
   <button class="tab" type="button" data-tab="sum" role="tab"><span class="tab-n">3</span>전체 현황</button>
   <button class="tab" type="button" data-tab="detail" role="tab"><span class="tab-n">4</span>종목 상세</button>
   <button class="tab" type="button" data-tab="div" role="tab"><span class="tab-n">5</span>배당</button>
   <button class="tab" type="button" data-tab="trend" role="tab"><span class="tab-n">6</span>자산 추이</button>
+  <button class="tab" type="button" data-tab="cgt" role="tab"><span class="tab-n">7</span>양도차익</button>
 </nav>
 
 <section class="tabpane on" data-pane="hold">
@@ -906,6 +1017,9 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
         <div><span class="unit-wrap"><input type="number" id="buy-qty" data-unit="주" placeholder="매수 수량" min="0" step="any"></span></div>
         <div class="cur-wrap"><span class="cur-mark" id="buy-mark">₩</span>
           <input type="number" id="buy-avg" placeholder="매수 단가" min="0" step="any"></div>
+        <div class="cur-wrap" id="buy-fx-wrap" hidden><span class="cur-mark">₩</span>
+          <input type="number" id="buy-fx" placeholder="매입환율 (선택)" min="0" step="any"
+            title="달러를 살 때 적용된 원/달러 환율. 넣으면 환차손익까지 계산합니다"></div>
       </div>
     </div>
     <div class="buy-prev" id="buy-prev"></div>
@@ -921,7 +1035,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <span>매입금액</span><span>평가금액 / 손익</span><span></span>
   </div>
   <div id="holdings"></div>
-  <div id="holdings-empty" class="empty-note">아직 등록한 종목이 없습니다. 위쪽 <b>추가매수</b> 버튼으로 담아 주세요.</div>
+  <div id="holdings-empty" class="empty-note">아직 등록한 종목이 없습니다. 위쪽 <b>추가매수</b> 버튼으로 담아 주세요.
+    <br><a href="?demo=1" class="demo-link">어떤 화면이 나오는지 예시 데이터로 먼저 둘러보기 →</a></div>
 
   <div class="acct-mgr">
     <div class="acct-mgr-head">
@@ -943,12 +1058,47 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     계좌마다 어느 증권사인지, 계좌번호 뒷자리가 무엇인지 적어두면 나중에 헷갈리지 않습니다.
     예수금은 계좌에 남아 있는 현금(원화)이며 자산 비중과 IRP 안전자산 계산에 반영됩니다.
   </div>
+  <div class="own-box">
+    <label class="merge-toggle">
+      <span class="merge-label">명의자 구분 <span class="beta">시험 기능</span>
+        <span class="merge-sub">부부 계좌를 함께 관리할 때 · 양도차익 250만원 공제와 금융소득 2,000만원 한도를 사람별로 나눠 봅니다</span></span>
+      <span class="toggle-switch"><input type="checkbox" id="chk-owner"><span class="toggle-slider"></span></span>
+    </label>
+    <div class="own-names" id="own-names" hidden>
+      <label>첫째 명의 <input type="text" id="own-n0" maxlength="8" placeholder="본인"></label>
+      <label>둘째 명의 <input type="text" id="own-n1" maxlength="8" placeholder="배우자"></label>
+      <span class="own-hint">각 계좌 카드에서 누구 명의인지 고르세요. 처음에는 모두 첫째 명의입니다.</span>
+    </div>
+  </div>
   <div class="acct-grid" id="cash-grid"></div>
 </div>
 </section>
 
 <section class="tabpane" data-pane="shot">
-<!-- 탭 2 : 캡처 인식 -->
+<!-- 탭 2 : 엑셀 · 캡처로 불러오기 -->
+<div class="card">
+  <div class="step-label"><div class="step-line"></div><span class="step-text">엑셀로 한 번에 넣기</span></div>
+  <div class="card-desc">
+    빈 양식을 받아 채운 뒤 올리면 계좌·보유 종목·과거 자산 추이·양도차익 기록을 한 번에 넣을 수 있습니다.
+    구글 시트로 관리해 오셨다면 시트 내용을 이 양식에 붙여 넣고 올리시면 됩니다.<br>
+    이미 입력한 데이터가 있으면 올리기 전에 <b>무엇이 추가·변경되는지 먼저 보여 드리고</b>, 확인을 눌러야 반영됩니다.
+    반영하기 직전에는 지금 데이터를 백업 파일로 자동 저장합니다.
+  </div>
+  <div class="xl-steps">
+    <button class="xl-b" id="xl-blank" type="button"><span class="xl-n">①</span><span><b>빈 양식 받기</b><small>예시 행이 들어 있는 입력용 엑셀</small></span></button>
+    <button class="xl-b" id="xl-mine" type="button"><span class="xl-n">②</span><span><b>지금 데이터로 받기</b><small>엑셀 백업 · 고쳐서 다시 올려도 됩니다</small></span></button>
+    <button class="xl-b on" id="xl-up" type="button"><span class="xl-n">③</span><span><b>채운 파일 올리기</b><small>.xlsx · .xls · .csv</small></span></button>
+    <input type="file" id="file-xl" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+  </div>
+  <div class="xl-tips">
+    · 종목은 <b>종목코드(국내 6자리)나 티커(미국)</b>로 적는 게 가장 정확합니다. 종목명만 적으면 이름이 정확히 같은 종목만 찾습니다.<br>
+    · 엑셀이 <b>069500을 69500으로</b> 바꿔도 6자리로 되살려 읽습니다. 그래도 종목코드 칸은 텍스트 서식으로 두는 편이 안전합니다.<br>
+    · 미국 종목의 평균매입가는 <b>달러</b>로, 매입환율은 증권사 잔고의 평균 매입환율(원)을 적습니다(선택).<br>
+    · <b>(예시)</b>로 시작하는 행은 읽지 않습니다. 지우지 않아도 됩니다.
+  </div>
+  <div class="xl-msg" id="xl-msg"></div>
+</div>
+
 <div class="card">
   <div class="step-label"><div class="step-line"></div><span class="step-text">캡처로 불러오기 (선택)</span></div>
   <div class="card-desc">
@@ -1018,10 +1168,9 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 <div class="card">
   <div class="step-label"><div class="step-line"></div><span class="step-text">전체 현황</span></div>
   <div class="card-desc">모든 계좌를 원화 기준으로 합친 결과입니다.
-    <b>이 도구는 미국 종목의 환차익·환차손을 지원하지 않습니다.</b>
-    매입금액과 평가금액을 모두 오늘 환율로 환산하므로 여기 손익은 달러로 번 만큼만 본 값입니다.
-    사람마다 매수 시점의 환율이 다르고, 알더라도 분할매수할 때마다 그날 환율을 하나하나 입력하기는 어렵기 때문입니다.
-    환율 변동까지 반영한 원화 손익은 증권사 앱에서 확인하세요.</div>
+    미국 종목은 보유 종목 탭에서 <b>매입환율</b>(증권사 잔고 화면의 평균 매입환율)을 넣으면 원가를 그 환율로 환산해 <b>환차손익까지</b> 반영합니다.
+    넣지 않은 종목은 매입금액과 평가금액을 모두 오늘 환율로 환산하므로, 그 종목의 손익은 달러로 번 만큼만 본 값입니다.
+    <span id="s-fxnote"></span></div>
   <div class="grid-4">
     <div class="stat-card"><div class="stat-label">총 매입원가</div>
       <div class="stat-value" id="s-buy">0원</div><div class="stat-sub" id="s-cnt">0종목</div></div>
@@ -1040,6 +1189,19 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
       <tfoot><tr id="acct-foot"></tr></tfoot>
     </table>
   </div>
+  <div id="owner-sum"></div>
+</div>
+
+<div class="card">
+  <div class="step-label"><div class="step-line"></div><span class="step-text">배당까지 넣은 수익률</span></div>
+  <div class="card-desc">
+    위 수익률은 증권사 앱과 같은 방식이라 두 가지를 놓칩니다.
+    <b>① 꺼내 쓴 배당</b> — 생활비로 쓴 분배금은 평가금액에서 이미 빠져나가 손익에 안 보입니다. 월배당·커버드콜처럼 분배금이 큰 종목은 주가만 보면 손해 같아도 받은 돈까지 합치면 다를 수 있습니다.
+    <b>② 재투자한 배당·차익</b> — 배당이나 익절한 돈으로 다시 사면 증권사는 그 금액을 원금에 더합니다. 내 통장에서 나간 돈은 그대로인데 분모만 커져 수익률이 낮아 보입니다.<br>
+    계좌별로 지금까지의 누적 금액을 넣으면(모르면 비워 두세요) 세 가지 수익률을 나란히 보여드립니다.
+  </div>
+  <div class="table-wrap" id="tr-table"></div>
+  <div class="cgt-note" id="tr-note"></div>
 </div>
 
 <div class="grid-2" style="margin-bottom:32px">
@@ -1206,9 +1368,27 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <div class="trend-stats" id="trend-stats"></div>
     <div class="trend-tools">
       <span id="trend-acct"></span>
+      <button class="btn-ghost" id="btn-past-open" type="button">과거 기록 넣기</button>
       <button class="btn-ghost" id="btn-trend-snap" type="button">지금 값으로 기록</button>
       <button class="btn-ghost" id="btn-trend-clear" type="button">기록 지우기</button>
     </div>
+  </div>
+  <div class="past-box" id="past-box" hidden>
+    <div class="past-t">과거 기록 넣기 <span class="past-sub">도구를 쓰기 전 달의 원금·평가금액을 넣으면 첫날부터 흐름이 그려집니다</span></div>
+    <div class="past-form">
+      <label>기준 월<input type="month" id="past-m"></label>
+      <label>계좌<select id="past-a"></select></label>
+      <label>원금 (원)<input type="number" id="past-buy" placeholder="매입금액 합계" min="0" step="1000"></label>
+      <label>평가금액 (원)<input type="number" id="past-val" placeholder="그 달 말 평가금액" min="0" step="1000"></label>
+      <button class="btn" id="past-add" type="button">넣기</button>
+    </div>
+    <div class="past-hint">
+      증권사 앱의 <b>월말 잔고</b>나 월간 거래내역서에서 매입금액(원금)과 평가금액을 옮겨 적으세요. 그 달의 <b>마지막 날</b> 기록으로 들어갑니다.
+      매달이 어려우면 분기마다만 넣어도 됩니다. 빈 달은 앞뒤 기록을 이어 그립니다.
+      계좌별로 넣으면 그날 합계는 계좌 합으로 계산합니다. 여러 달을 한 번에 넣으려면 <b>불러오기 탭의 엑셀 양식</b>이 빠릅니다.<br>
+      손으로 넣은 달의 수익률 흐름은 <b>원금이 늘어난 만큼을 입금으로 보고</b> 추정합니다(그래프의 점선 구간).
+    </div>
+    <div class="table-wrap" id="past-list"></div>
   </div>
   <div class="trend-canvas"><canvas id="chart-trend"></canvas></div>
   <div class="table-wrap" id="trend-table"></div>
@@ -1254,6 +1434,61 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 </div>
 </section>
 
+<section class="tabpane" data-pane="cgt">
+<div class="card">
+  <div class="step-label"><div class="step-line"></div><span class="step-text">해외주식 양도차익 · 250만원 공제</span></div>
+  <div class="card-desc">
+    미국 주식·ETF를 <b>직접</b> 사서 팔아 생긴 차익은 1년(1월 1일 ~ 12월 31일, <b>결제일</b> 기준) 동안 이익과 손실을 합친 뒤
+    <b>250만원</b>까지 기본공제하고, 넘는 부분에 <b>22%</b>(양도소득세 20% + 지방소득세 2%)를 매깁니다. 다음 해 5월에 직접 신고합니다.<br>
+    손실은 <b>같은 해 이익하고만</b> 상계되고 다음 해로 넘어가지 않습니다. 기본공제는 <b>사람 단위</b>이고,
+    국내주식 양도소득(대주주 등 과세 대상)이 있으면 그것과 <b>합쳐서 한 번만</b> 받습니다.<br>
+    국내 상장 해외 ETF(예: TIGER 미국S&amp;P500)는 여기 해당하지 않습니다 — 매매차익이 배당소득(15.4%)으로 과세됩니다.
+  </div>
+  <div class="cgt-head">
+    <div class="seg" id="cgt-year"></div>
+  </div>
+  <div id="cgt-gauge"></div>
+</div>
+
+<div class="card">
+  <div class="step-label"><div class="step-line"></div><span class="step-text">실현손익 기록</span></div>
+  <div class="card-desc">
+    판 종목의 <b>원화 실현손익</b>을 적어 두세요. 증권사 앱의 <b>'해외주식 양도소득 조회'</b>(또는 양도세 예상·계산) 화면 숫자를 그대로 옮기면 됩니다.
+    그 화면은 사고판 날의 환율로 각각 원화 환산해 계산하므로 <b>환차손익이 이미 들어가 있습니다</b>.
+    달러 손익만 보고 적으면 환율이 오른 해에는 세금을 적게, 내린 해에는 많게 잡게 됩니다.
+  </div>
+  <div class="cgt-form">
+    <label>결제일<input type="date" id="cg-d"></label>
+    <label id="cg-own-l" hidden>명의자<select id="cg-own"></select></label>
+    <label>구분<select id="cg-kind"><option value="us">해외주식</option><option value="kr">국내주식(과세분)</option></select></label>
+    <label class="wide">종목<input type="text" id="cg-name" placeholder="예: AAPL, 테슬라" maxlength="40"></label>
+    <label>실현손익 (원)<input type="number" id="cg-gain" placeholder="손실은 -로" step="1"></label>
+    <label class="wide">메모<input type="text" id="cg-memo" placeholder="선택" maxlength="40"></label>
+    <button class="btn" id="cg-add" type="button">기록 추가</button>
+  </div>
+  <div class="cgt-err" id="cg-err"></div>
+  <div class="table-wrap" id="cgt-list"></div>
+</div>
+
+<div class="card">
+  <div class="step-label"><div class="step-line"></div><span class="step-text">올해 세금 없이 더 팔 수 있는 수량</span></div>
+  <div class="card-desc">
+    남은 공제 여력을 <b>주당 원화 차익</b>으로 나눠, 지금 시세로 팔았을 때 세금이 붙지 않는 수량을 계산합니다(일반계좌의 미국 종목만).
+    주당 원화 차익 = 현재가 × 오늘 환율 − 평균단가 × <b>매입환율</b>입니다.
+    매입환율을 넣지 않은 종목은 원가도 오늘 환율로 환산해 <b>환차손익이 빠진</b> 값이라 참고만 하세요.<br>
+    여력은 종목끼리 <b>나눠 쓰는</b> 한도입니다. 한 종목을 팔고 나면 다른 종목의 수량도 줄어듭니다.
+    증권사는 보통 <b>이동평균법</b>으로 취득가를 잡으므로(선입선출을 고를 수 있는 곳도 있음) 실제 차익과 다를 수 있습니다.
+  </div>
+  <div id="cgt-plan"></div>
+  <div class="cgt-note">
+    ※ 연말 매도는 <b>결제일</b>이 그 해 안에 들어와야 그 해 실적이 됩니다. 미국 주식은 매도 다음 영업일에 결제되고 연말에는 휴장이 끼므로,
+    거래하는 증권사가 11~12월에 올리는 <b>양도세 반영 매도 마감일</b> 공지를 꼭 확인하세요.<br>
+    ※ 2026년 한시 제도인 <b>국내시장 복귀계좌(RIA)</b> 양도소득 공제는 반영하지 않았습니다. 해당되면 실제 세액은 더 줄어듭니다.<br>
+    ※ 참고용 계산이며 세무 자문이 아닙니다. 신고 전에는 국세청 안내와 증권사 양도소득 자료로 확인하세요.
+  </div>
+</div>
+</section>
+
 <div class="ask-back" id="ask-back" hidden>
   <div class="ask-box">
     <div class="ask-title" id="ask-title"></div>
@@ -1265,7 +1500,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 <footer>
   ※ 시세는 국내·미국 모두 약 15분 간격으로 갱신되어 최대 15분가량 지연될 수 있고, 장 마감 후에는 종가입니다. 실시간 체결가와 다릅니다.<br>
   ※ 환율: 보유 평가는 하나은행 고시 매매기준율(네이버), 지난 1년 받은 배당은 지급일의 서울외국환중개 매매기준율로 환산합니다. 실제 환전 시 적용 환율과 다릅니다.<br>
-  ※ 배당 세후 금액은 받을 때 떼는 원천징수(국내 종목은 일반계좌만 15.4%, 미국 종목은 계좌와 관계없이 현지 15%)만 반영했습니다. 매매수수료·매매차익 세금·환차손익·종합과세 세액은 넣지 않았으며, 특정 종목의 매수·매도를 권유하지 않습니다.<br>
+  ※ 배당 세후 금액은 받을 때 떼는 원천징수(국내 종목은 일반계좌만 15.4%, 미국 종목은 계좌와 관계없이 현지 15%)만 반영했습니다. 매매수수료·종합과세 세액은 넣지 않았고, 환차손익은 매입환율을 넣은 미국 종목만 반영했습니다. 양도차익 탭의 세액은 참고용 단순 계산이며, 특정 종목의 매수·매도를 권유하지 않습니다.<br>
   ※ 입력한 보유 내역과 업로드한 이미지는 이용자 브라우저 안에서만 처리되며 서버로 전송되지 않습니다.
 </footer>
 
@@ -1317,6 +1552,16 @@ function kindColor(a){
   return KIND_COLORS[(i<0?0:i)%KIND_COLORS.length];
 }
 const accts=()=>sortAccts((state.accounts&&state.accounts.length)?state.accounts:defaultAccts());
+/* ---------- 명의자 (시험 기능) ----------
+   계좌마다 본인·배우자 중 누구 명의인지 정한다. 양도소득 기본공제(250만원)와
+   금융소득 종합과세 한도(2,000만원)는 사람 단위라, 부부 합산 장부에서는 명의별로 나눠 봐야 맞다.
+   기능을 끄면(state.ownerOn=false) 모든 계좌를 한 사람 것으로 본다. */
+const ownerOn=()=>!!state.ownerOn;
+function ownerNames(){ const n=state.ownerNames||[]; return [(n[0]||'').trim()||'본인',(n[1]||'').trim()||'배우자']; }
+function ownerOf(a){ return ownerOn()?((+((state.owners||{})[a])===1)?1:0):0; }
+const ownerName=i=>ownerNames()[i?1:0];
+// 지금 쓰이는 명의자 목록. 기능을 껐거나 배우자 계좌가 없으면 [0] 하나다.
+function ownersUsed(){ return ownerOn()&&accts().some(a=>ownerOf(a)===1)?[0,1]:[0]; }
 const isIRP=a=>/IRP|DC형|DC\b|퇴직연금/i.test(a);
 const isTaxAdv=a=>/연금|IRP|ISA|DC\b|퇴직/i.test(a);
 const COLORS=['#D9542B','#E89A6F','#8B6F47','#C4A57B','#5A6B5A','#A03D1F','#9B9387','#7A8B99'];
@@ -1718,8 +1963,43 @@ function drawIdx(){
 }
 
 /* ---------- 저장 ---------- */
-function save(){ try{ localStorage.setItem(LS_KEY,JSON.stringify(state)); }catch(e){} }
+/* ?demo=1 로 열면 예시 데이터로 채운다. 이 모드에서는 아무것도 저장하지 않는다
+   (이용자의 실제 데이터를 덮어쓰지 않게 localStorage 를 읽지도 쓰지도 않는다). */
+const DEMO=/[?&]demo=1(&|$)/.test(location.search);
+function save(){ if(DEMO) return; try{ localStorage.setItem(LS_KEY,JSON.stringify(state)); }catch(e){} }
+function demoState(){
+  const ym=[]; for(let y=2025,m=4;y<2026||m<=9;m++){ if(m>12){m=1;y++;} ym.push([y,m]); }
+  const last=(y,m)=>new Date(Date.UTC(y,m,0)).toISOString().slice(0,10);
+  // 매달 약 200만원씩 넣고, 시장 따라 오르내린 예시 흐름
+  const g=[.010,.024,.031,.018,-.006,.022,.041,.035,.012,-.021,.004,.033,.047,.058,.052,.071,.083,.094];
+  const hist=ym.map(([y,m],i)=>{ const buy=52000000+i*2000000;
+    return {d:last(y,m),buy,val:Math.round(buy*(1+g[i])),cash:0,n:10,acc:{},man:1}; });
+  return {
+    accounts:['연금저축1','IRP','ISA','일반계좌','일반계좌2'],
+    ownerOn:true, ownerNames:['본인','배우자'], owners:{'일반계좌2':1},
+    notes:{'연금저축1':'예시증권 1234','IRP':'예시증권 5678','ISA':'예시증권 중개형','일반계좌':'해외주식','일반계좌2':'배우자 명의'},
+    holdings:[
+      {acct:'연금저축1',code:'458730',qty:900,avg:12100},
+      {acct:'연금저축1',code:'360750',qty:400,avg:20500},
+      {acct:'IRP',code:'148070',qty:80,avg:103200},
+      {acct:'IRP',code:'133690',qty:60,avg:142000},
+      {acct:'ISA',code:'441640',qty:1200,avg:12650},
+      {acct:'ISA',code:'005930',qty:20,avg:168000},
+      {acct:'일반계좌',code:'SCHD',qty:300,avg:28.40,fx:1392},
+      {acct:'일반계좌',code:'AAPL',qty:20,avg:236.50,fx:1365},
+      {acct:'일반계좌2',code:'JEPI',qty:150,avg:57.80,fx:1438},
+      {acct:'일반계좌2',code:'069500',qty:50,avg:61000}],
+    cash:{'연금저축1':320000,'IRP':150000,'ISA':85000}, cashUsd:{'일반계좌':210.5},
+    divOut:{'ISA':{w:1650000},'연금저축1':{r:1200000}},
+    realized:[
+      {id:'d1',d:'2026-03-12',o:0,k:'us',name:'AAPL',gain:1820000,memo:'일부 익절'},
+      {id:'d2',d:'2026-06-03',o:0,k:'us',name:'TSLA',gain:-430000,memo:'손절'},
+      {id:'d3',d:'2026-08-20',o:1,k:'us',name:'JEPI',gain:260000,memo:''},
+      {id:'d4',d:'2025-11-27',o:0,k:'us',name:'NVDA',gain:2410000,memo:'연말 공제 채우기'}],
+    hist, events:[], tab:'sum'};
+}
 function load(){
+  if(DEMO){ state=Object.assign({holdings:[],cash:{},cashUsd:{}},demoState()); return; }
   try{
     const raw=localStorage.getItem(LS_KEY);
     if(raw){ const p=JSON.parse(raw); if(p&&Array.isArray(p.holdings)) state=Object.assign({holdings:[],cash:{},cashUsd:{}},p); }
@@ -1742,15 +2022,21 @@ function compute(){
     const plOk=hasAvg&&hasPrice;           // 손익을 계산할 수 있는 행
     const buyC=hasAvg?qty*avg:0;          // 표시통화 기준 매입금액
     const valC=hasPrice?qty*m.price:0;    // 표시통화 기준 평가금액
-    const buy=buyC*fx;                    // 원화 환산 (집계용)
+    /* 미국 종목은 '매입환율'(선택)을 넣으면 원가를 그 환율로 환산한다 → 환차손익까지 반영된다.
+       안 넣으면 예전처럼 오늘 환율로 원가를 환산한다(달러로 번 만큼만 보는 값). */
+    const fxBuy=isUS?num(h.fx):0;
+    const hasFx=isUS&&fxBuy>0;
+    const buy=buyC*(hasFx?fxBuy:fx);      // 원화 환산 (집계용)
     const val=valC*fx;
     return {acct:h.acct||accts()[0], code:h.code?String(h.code).toUpperCase():'',
       name:m?m.name:'', found:!!m, isUS, cur:isUS?'USD':'KRW',
       assetClass:m?m.assetClass:'', safe:m?m.safe:false,
       price:m?m.price:0, change:m?m.change:0, qty, avg,
-      hasAvg, hasPrice, plOk,
+      hasAvg, hasPrice, plOk, hasFx, fxBuy,
       buyC, valC, plC:plOk?valC-buyC:0,
-      buy, val, pl:plOk?val-buy:0, ror:plOk?(buy>0?((val-buy)/buy*100):0):null};
+      buy, val, pl:plOk?val-buy:0, ror:plOk?(buy>0?((val-buy)/buy*100):0):null,
+      // 환차손익 = 달러 원가 × (오늘 환율 − 매입환율). 나머지(주가 손익)는 plC × 오늘 환율
+      fxPl:plOk&&hasFx?buyC*(fx-fxBuy):0};
   });
   /* 예수금은 원화 칸과 달러 칸을 따로 받는다.
      cash    = 원화 환산 합계(집계용)
@@ -1846,10 +2132,11 @@ function renderRows(){
     if(err){
       calc=`<span class="sub" style="color:${h.code?'#C0392B':'#8B8276'}">${err}</span>`;
     }else if(r.isUS){
-      buy=r.hasAvg?`<span class="rb-val">${usd(r.buyC)}</span><span class="rb-sub">≈ ${wonShort(r.buy)}원</span>`:noAvgTag;
+      buy=r.hasAvg?`<span class="rb-val">${usd(r.buyC)}</span><span class="rb-sub">${r.hasFx?'':'≈ '}${wonShort(r.buy)}원${r.hasFx?' (매입환율)':''}</span>`:noAvgTag;
       calc=!r.hasPrice?noPxTag
           :`<span class="rc-val">${usd(r.valC)}</span><span class="rc-sub">≈ ${wonShort(r.val)}원</span>`
-          +(r.plOk?`<span class="rc-pl ${cls(r.pl)}">${usdSign(r.plC)}<b class="rc-ror">${pct(r.ror)}</b></span>`:'');
+          +(r.plOk?`<span class="rc-pl ${cls(r.plC)}">${usdSign(r.plC)}<b class="rc-ror">${pct(r.buyC>0?r.plC/r.buyC*100:0)}</b></span>`:'')
+          +(r.plOk&&r.hasFx?`<span class="rc-sub ${cls(r.pl)}" title="원화 손익 = 주가 손익 + 환차손익">원화 ${r.pl>=0?'+':''}${wonShort(r.pl)}원 ${pct(r.ror)} · 환차 ${r.fxPl>=0?'+':''}${wonShort(r.fxPl)}원</span>`:'');
     }else{
       buy=r.hasAvg?`<span class="rb-val">${wonShort(r.buy)}원</span>`:noAvgTag;
       calc=!r.hasPrice?noPxTag
@@ -1866,8 +2153,11 @@ function renderRows(){
         ${r.found?`<div class="hold-nm" title="${esc(r.name)}">${r.isUS?'<span class="us-tag">US</span>':''}${esc(r.name)}</div>`:''}
       </div>
       <div><span class="unit-wrap"><input type="number" data-i="${i}" data-k="qty" data-unit="주" value="${esc(h.qty??'')}" placeholder="0" min="0" step="any"></span></div>
-      <div class="cur-wrap"><span class="cur-mark">${mark}</span>
+      <div class="avg-cell"><div class="cur-wrap"><span class="cur-mark">${mark}</span>
         <input type="number" data-i="${i}" data-k="avg" value="${esc(h.avg??'')}" placeholder="0" min="0" step="any"></div>
+        ${r.isUS?`<div class="fx-wrap" title="매수할 때 적용된 원/달러 환율(증권사 잔고의 '매입환율'). 넣으면 환차손익까지 계산합니다">
+          <span class="fx-l">매입환율</span>
+          <input type="number" data-i="${i}" data-k="fx" value="${esc(h.fx??'')}" placeholder="선택" min="0" step="any"></div>`:''}</div>
       <div class="row-buy"${buy&&r.hasAvg?' data-l="매입금액"':''}>${buy}</div>
       <div class="row-calc${err?' is-err':''}"${err?'':' data-l="평가금액 / 손익"'}>${calc}</div>
       <div><button class="row-del" data-del="${i}" title="삭제">×</button></div>
@@ -1929,7 +2219,8 @@ function renderAccts(){
     const tag = isIRP(a) ? '<span class="tagline">70% 한도</span>'
               : (isTaxAdv(a) ? '<span class="tagline">절세</span>' : '');
     const note=(state.notes||{})[a];
-    return `<span class="acct-chip" data-acct="${i}" style="--kc:${kindColor(a)}"><span class="kind-dot"></span>${esc(a)}${tag}
+    const own=ownerOn()?`<span class="own-badge o${ownerOf(a)}">${esc(ownerName(ownerOf(a)))}</span>`:'';
+    return `<span class="acct-chip" data-acct="${i}" style="--kc:${kindColor(a)}"><span class="kind-dot"></span>${own}${esc(a)}${tag}
       ${note?`<span class="chip-note">${esc(note)}</span>`:''}
       <span class="cnt">${used[a]||0}종목</span>
       <button class="acct-x" data-adel="${i}" title="${esc(a)} 계좌 지우기" aria-label="${esc(a)} 계좌 지우기">×</button></span>`;
@@ -1966,6 +2257,8 @@ function deleteAccount(i){
   delete state.cash[old];
   if(state.cashUsd) delete state.cashUsd[old];
   if(state.notes) delete state.notes[old];
+  if(state.owners) delete state.owners[old];
+  if(state.divOut) delete state.divOut[old];
   if(detailFilter===old) detailFilter='';
   save(); renderAccts(); renderCash(); render();
 }
@@ -1988,6 +2281,8 @@ function editAccount(i){
     if(state.cashUsd&&state.cashUsd[old]!==undefined){
       state.cashUsd[nm]=state.cashUsd[old]; delete state.cashUsd[old]; }
     if(state.notes&&state.notes[old]!==undefined){ state.notes[nm]=state.notes[old]; delete state.notes[old]; }
+    ['owners','divOut'].forEach(k=>{ const o=state[k];
+      if(o&&o[old]!==undefined&&nm!==old){ o[nm]=o[old]; delete o[old]; } });
   }
   save(); renderAccts(); renderCash(); render();
 }
@@ -2045,7 +2340,10 @@ function renderCash(){
       <div class="acct-card-nm">${esc(a)}${tag}
         <button class="acct-x card" data-adel="${accts().indexOf(a)}"
           title="${esc(a)} 계좌 지우기" aria-label="${esc(a)} 계좌 지우기">×</button></div>
-      <label class="label">비고 (증권사 · 계좌번호)</label>
+      ${ownerOn()?`<label class="label">명의자</label>
+      <div class="own-seg" role="radiogroup" aria-label="${esc(a)} 명의자">${[0,1].map(o=>
+        `<button type="button" class="own-b${ownerOf(a)===o?' on':''}" data-own="${esc(a)}" data-o="${o}">${esc(ownerName(o))}</button>`).join('')}</div>`:''}
+      <label class="label"${ownerOn()?' style="margin-top:12px"':''}>비고 (증권사 · 계좌번호)</label>
       <input type="text" data-note="${esc(a)}" value="${esc((state.notes||{})[a]??'')}"
         placeholder="예: 미래에셋 1234, 키움 연금" maxlength="40">
       <label class="label" style="margin-top:12px">예수금</label>
@@ -2112,6 +2410,12 @@ function render(){
   rorEl.textContent=pct(ror); rorEl.className='stat-value '+cls(ror);
   const rsEl=document.getElementById('s-ror-sub');
   if(rsEl) rsEl.textContent='매입원가 대비 · 예수금 제외'+(excl?` · ${excl} 제외`:'');
+  const fxEl=document.getElementById('s-fxnote');
+  if(fxEl){ const u=known.filter(r=>r.isUS), uf=u.filter(r=>r.hasFx);
+    const fxSum=uf.reduce((t,r)=>t+r.fxPl,0);
+    fxEl.innerHTML=!u.length?'':uf.length===u.length
+      ? `미국 종목 전부 매입환율이 들어가 있습니다 — 환차손익 <b class="${cls(fxSum)}">${(fxSum>=0?'+':'')+won(fxSum)}</b> 포함.`
+      : `미국 종목 ${uniq(u)}종목 중 <b>${uniq(uf)}종목</b>만 매입환율이 있습니다${uf.length?` (그 종목 환차손익 ${(fxSum>=0?'+':'')+won(fxSum)} 포함)`:''}.`; }
   const exEl=document.getElementById('s-excl');
   if(exEl){ exEl.hidden=!excl;
     exEl.innerHTML=excl?`<b>${excl}</b>은(는) 매입원가·평가손익·수익률 합계에서 뺐습니다. `
@@ -2182,6 +2486,8 @@ function render(){
     ? `<td class="tl">합계</td><td>${won(cost)}</td><td>${won(val)}</td>
        <td class="${cls(pl)}">${(pl>=0?'+':'')+won(pl)}</td><td class="${cls(ror)}">${pct(ror)}</td><td>100.0%</td>` : '';
 
+  renderOwnerSum(byAcct,val);
+
   const byAsset={};
   priced.forEach(r=>{ byAsset[r.assetClass]=(byAsset[r.assetClass]||0)+r.val; });
   if(cashSum>0) byAsset['현금']=(byAsset['현금']||0)+cashSum;
@@ -2209,9 +2515,209 @@ function render(){
   renderDetail(valid,val);
   renderDividends(valid);
   renderInsight(priced,byAsset,val,byAcct);
+  renderTotalReturn(known);
+  renderCgt(valid);
   snapshot(val,snapBuy,cashSum,uniq(valid),snapAcct(byAcct));
   renderTrend();
   renderReturn();
+}
+
+/* ---------- 배당까지 넣은 수익률 ----------
+   증권사 방식  = 평가손익 ÷ 매입원가
+   배당 포함    = (평가손익 + 꺼내 쓴 배당) ÷ 매입원가
+   내 돈 기준   = (평가금액 + 꺼내 쓴 배당 − 순수 원금) ÷ 순수 원금,  순수 원금 = 매입원가 − 재투자한 배당·차익
+   예수금은 셋 다 넣지 않는다(위 표와 같은 기준). 평단 미입력·시세 없음 종목도 뺀다. */
+let trSig='';
+function renderTotalReturn(known){
+  const box=document.getElementById('tr-table'); if(!box) return;
+  const by={};
+  known.forEach(r=>{ const t=by[r.acct]||(by[r.acct]={cost:0,val:0}); t.cost+=r.buy; t.val+=r.val; });
+  const names=accts().filter(a=>by[a]);
+  const D=state.divOut||{};
+  const calc=(cost,val,w,re)=>{ const base=cost-re;
+    return {b:cost>0?(val-cost)/cost*100:null, t:cost>0?(val-cost+w)/cost*100:null,
+            m:base>0?(val+w-base)/base*100:null, base}; };
+  const cell=v=>v===null?'—':`<span class="${cls(v)}">${pct(v)}</span>`;
+  // 입력칸은 계좌 구성이 바뀔 때만 다시 그린다(입력 중 포커스를 잃지 않게)
+  const sig=names.join('|');
+  if(sig!==trSig||!box.querySelector('table')){
+    trSig=sig;
+    box.innerHTML=names.length?`<table class="data-table narrow tr-tbl">
+      <thead><tr><th class="tl">계좌</th><th>꺼내 쓴 배당<br><span class="th-sub">누적 · 원</span></th>
+        <th>재투자한 배당·차익<br><span class="th-sub">누적 · 원</span></th>
+        <th>증권사 방식</th><th>배당 포함</th><th>내 돈 기준</th></tr></thead>
+      <tbody>${names.map(a=>`<tr data-tr="${esc(a)}"><td class="tl">${esc(a)}</td>
+        <td><input type="number" class="tr-in" data-tro="${esc(a)}" data-trk="w" value="${esc((D[a]||{}).w??'')}" placeholder="0" min="0" step="1000"></td>
+        <td><input type="number" class="tr-in" data-tro="${esc(a)}" data-trk="r" value="${esc((D[a]||{}).r??'')}" placeholder="0" min="0" step="1000"></td>
+        <td data-c="b"></td><td data-c="t"></td><td data-c="m"></td></tr>`).join('')}</tbody>
+      <tfoot><tr><td class="tl">합계</td><td data-c="sw"></td><td data-c="sr"></td><td data-c="b"></td><td data-c="t"></td><td data-c="m"></td></tr></tfoot></table>`
+      :'<div class="empty-note">평단과 시세가 있는 종목이 없습니다.</div>';
+  }
+  let C=0,V=0,W=0,R=0;
+  names.forEach(a=>{ const w=num((D[a]||{}).w), re=num((D[a]||{}).r), t=by[a];
+    C+=t.cost; V+=t.val; W+=w; R+=re;
+    const x=calc(t.cost,t.val,w,re), tr=box.querySelector(`tr[data-tr="${CSS.escape(a)}"]`);
+    if(tr){ tr.querySelector('[data-c="b"]').innerHTML=cell(x.b);
+      tr.querySelector('[data-c="t"]').innerHTML=w?cell(x.t):'<span class="cell-sub">—</span>';
+      tr.querySelector('[data-c="m"]').innerHTML=(w||re)?cell(x.m):'<span class="cell-sub">—</span>'; } });
+  const ft=box.querySelector('tfoot tr');
+  if(ft){ const x=calc(C,V,W,R);
+    ft.querySelector('[data-c="sw"]').textContent=W?won(W):'—';
+    ft.querySelector('[data-c="sr"]').textContent=R?won(R):'—';
+    ft.querySelector('[data-c="b"]').innerHTML=cell(x.b);
+    ft.querySelector('[data-c="t"]').innerHTML=cell(x.t);
+    ft.querySelector('[data-c="m"]').innerHTML=cell(x.m); }
+  const note=document.getElementById('tr-note');
+  if(note) note.innerHTML=(W||R)
+    ? `매입원가 ${won(C)}${R?` 중 <b>${won(R)}</b>은 재투자분이라 내 돈 기준 원금은 <b>${won(C-R)}</b>입니다`:''}.`
+      +(W?` 꺼내 쓴 배당 <b>${won(W)}</b>을 손익에 더했습니다.`:'')
+      +' 생활비로 쓴 배당은 ②에 넣지 마세요 — 꺼내 쓴 수익이지 다시 넣은 원금이 아닙니다.'
+    : '배당 탭의 \'지난 1년 받은 배당\'을 참고해 누적액을 어림해 넣어도 됩니다. 정확한 누적액은 증권사 앱의 배당·분배금 입금 내역에서 확인할 수 있습니다.';
+}
+document.addEventListener('input',e=>{
+  const t=e.target; if(!t.dataset||t.dataset.tro===undefined) return;
+  const D=state.divOut=state.divOut||{};
+  (D[t.dataset.tro]=D[t.dataset.tro]||{})[t.dataset.trk]=t.value;
+  save(); const {rows}=compute();
+  renderTotalReturn(rows.filter(r=>r.found&&r.qty>0&&(!r.isUS||FX>0)&&r.hasPrice&&r.hasAvg));
+});
+
+/* ---------- 해외주식 양도차익 ----------
+   기록은 state.realized = [{id, d:'YYYY-MM-DD'(결제일), o:명의자(0|1), k:'us'|'kr', name, gain:원화 실현손익, memo}]
+   손익은 증권사 양도소득 조회 화면의 원화 금액을 그대로 받는다. 그 숫자는 매수·매도 결제일
+   기준환율로 각각 환산한 차이라(소득세법 시행령 제178조의5) 환차손익이 이미 들어 있다. */
+const CGT_DED=2500000, CGT_RATE=0.22;
+let cgtYear=0;
+function cgtStats(year,o){
+  const rs=(state.realized||[]).filter(r=>String(r.d||'').slice(0,4)===String(year)&&(+r.o||0)===o);
+  const profit=rs.reduce((t,r)=>t+Math.max(0,num(r.gain)),0);
+  const loss=rs.reduce((t,r)=>t+Math.max(0,-num(r.gain)),0);
+  const net=profit-loss;
+  const taxable=Math.max(0,net-CGT_DED);
+  return {rs,profit,loss,net,taxable,tax:Math.floor(taxable*CGT_RATE),
+          room:Math.max(0,CGT_DED-net), hasKR:rs.some(r=>r.k==='kr')};
+}
+function renderCgt(valid){
+  const gbox=document.getElementById('cgt-gauge'); if(!gbox) return;
+  const thisY=+today().slice(0,4);
+  const years=[...new Set([thisY,...(state.realized||[]).map(r=>+String(r.d||'').slice(0,4)).filter(y=>y>2000)])].sort((a,b)=>b-a);
+  if(!cgtYear||!years.includes(cgtYear)) cgtYear=thisY;
+  document.getElementById('cgt-year').innerHTML=years.length>1
+    ? years.map(y=>`<button type="button" class="seg-b${y===cgtYear?' on':''}" data-cgty="${y}">${y}년</button>`).join('') : '';
+
+  const owners=ownersUsed();
+  const all=owners.map(o=>({o,...cgtStats(cgtYear,o)}));
+  gbox.innerHTML=all.map(t=>{
+    const w=Math.max(0,Math.min(100,t.net/CGT_DED*100));
+    const over=t.net>CGT_DED;
+    return `<div class="dgauge cgt-g">
+      <div class="dgauge-row">
+        <span class="dgauge-l">${owners.length>1?`<span class="own-badge o${t.o}">${esc(ownerName(t.o))}</span> `:''}${cgtYear}년 손익통산 후 양도차익</span>
+        <span class="dgauge-v ${over?'up':''}">${(t.net<0?'-':'')+won(Math.abs(t.net))}<span style="font-size:13px;color:#8B8276"> / 250만원</span></span>
+      </div>
+      <div class="dgauge-bar"><div class="dgauge-fill ${over?'over':''}" style="width:${w}%"></div></div>
+      <div class="cgt-nums">
+        <div><span>실현 이익</span><b class="up">+${won(t.profit)}</b></div>
+        <div><span>실현 손실</span><b class="down">${t.loss?'-':''}${won(t.loss)}</b></div>
+        <div><span>예상 세액 (22%)</span><b class="${t.tax?'up':''}">${won(t.tax)}</b></div>
+        <div><span>세금 없이 더 실현 가능</span><b>${won(t.room)}</b></div>
+      </div>
+      <div class="dgauge-sub">${!t.rs.length
+        ? `${cgtYear}년 기록이 없습니다. 아래에서 판 종목의 원화 실현손익을 추가하세요.`
+        : over
+          ? `<span class="dv-warn">공제 250만원을 ${won(t.net-CGT_DED)} 넘었습니다.</span> 넘는 부분에 22%, 약 <b>${won(t.tax)}</b>을 다음 해 5월에 신고·납부합니다.
+             손실 중인 종목을 올해 안에 팔면 그만큼 상계돼 세금이 줄어듭니다.`
+          : t.net<0
+            ? `손실이 이익보다 <b>${won(-t.net)}</b> 많습니다. 올해 안에는 이익을 <b>${won(t.room)}</b>까지 실현해도 세금이 없습니다 — 손실은 다음 해로 넘어가지 않습니다.`
+            : `올해 안에 이익을 <b>${won(t.room)}</b> 더 실현해도 세금이 없습니다.`}
+        ${t.hasKR?'<br>국내주식 과세분이 섞여 있어 예상 세액은 22%로 단순 계산했습니다. 국내 대주주 세율은 과세표준·보유기간에 따라 다릅니다.':''}</div>
+    </div>`;
+  }).join('')+(owners.length>1?'<div class="cgt-note">부부는 공제를 <b>각자</b> 250만원씩 받습니다. 같은 종목도 명의를 나눠 두면 한 해 최대 500만원까지 세금 없이 실현할 수 있지만, 신고도 각자 따로 합니다.</div>':'');
+
+  // 기록 목록
+  const ownL=document.getElementById('cg-own-l'), ownS=document.getElementById('cg-own');
+  ownL.hidden=!ownerOn();
+  if(ownerOn()){ const cur=ownS.value; ownS.innerHTML=[0,1].map(o=>`<option value="${o}">${esc(ownerName(o))}</option>`).join('');
+    if(cur) ownS.value=cur; }
+  const dEl=document.getElementById('cg-d'); if(!dEl.value) dEl.value=today();
+  const list=(state.realized||[]).filter(r=>String(r.d||'').slice(0,4)===String(cgtYear))
+    .slice().sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0);
+  document.getElementById('cgt-list').innerHTML=list.length?`<table class="data-table narrow">
+    <thead><tr><th class="tl">결제일</th>${ownerOn()?'<th class="tl">명의자</th>':''}<th class="tl">종목</th><th>실현손익</th><th class="tl">메모</th><th></th></tr></thead>
+    <tbody>${list.map(r=>`<tr><td class="tl">${esc(r.d)}</td>
+      ${ownerOn()?`<td class="tl"><span class="own-badge o${+r.o||0}">${esc(ownerName(+r.o||0))}</span></td>`:''}
+      <td class="tl">${esc(r.name||'—')}${r.k==='kr'?'<span class="acct-note">국내주식</span>':''}</td>
+      <td class="${cls(num(r.gain))}">${num(r.gain)>=0?'+':'-'}${won(Math.abs(num(r.gain)))}</td>
+      <td class="tl">${esc(r.memo||'')}</td>
+      <td><button class="row-del" data-cgdel="${esc(r.id)}" title="삭제" aria-label="삭제">×</button></td></tr>`).join('')}</tbody></table>`
+    :`<div class="empty-note">${cgtYear}년 실현손익 기록이 없습니다.</div>`;
+
+  // 세금 없이 팔 수 있는 수량
+  const room={}; owners.forEach(o=>room[o]=cgtStats(thisY,o).room);
+  const us=valid.filter(r=>r.isUS&&r.hasAvg&&r.hasPrice&&acctTaxKind(r.acct)==='일반'&&FX>0);
+  const plan=document.getElementById('cgt-plan');
+  if(!us.length){ plan.innerHTML='<div class="empty-note">일반계좌에 담긴 미국 종목이 없습니다.</div>'; return; }
+  // 같은 계좌의 같은 종목은 합친다(로트별로 평단이 다르면 수량 가중)
+  const by=new Map();
+  us.forEach(r=>{ const k=r.acct+'|'+r.code; const g=by.get(k)||{acct:r.acct,code:r.code,name:r.name,price:r.price,qty:0,costW:0,nFx:0,n:0};
+    g.qty+=r.qty; g.costW+=r.buy; g.n++; if(r.hasFx) g.nFx++; by.set(k,g); });
+  const rows=[...by.values()].map(g=>{ const o=ownerOf(g.acct);
+    const per=g.price*FX-g.costW/g.qty;           // 주당 원화 차익
+    const free=per>0?Math.min(g.qty,Math.floor(room[o]/per)):g.qty;
+    return {...g,o,per,free,allGain:per*g.qty}; }).sort((a,b)=>b.allGain-a.allGain);
+  plan.innerHTML=`<div class="cgt-room">${owners.map(o=>`<span>${owners.length>1?esc(ownerName(o))+' ':''}${thisY}년 남은 여력 <b>${won(room[o])}</b></span>`).join('')}</div>
+    <div class="table-wrap"><table class="data-table narrow">
+    <thead><tr><th class="tl">계좌 · 종목</th><th>보유</th><th>주당 원화 차익<br><span class="th-sub">지금 팔면</span></th>
+      <th>세금 없이<br><span class="th-sub">팔 수 있는 수량</span></th><th>전량 매도 시<br><span class="th-sub">원화 차익</span></th></tr></thead>
+    <tbody>${rows.map(g=>`<tr><td class="tl"><span class="chip">${esc(g.acct)}</span>${esc(g.name)}<span class="acct-note">${esc(g.code)}${
+        g.nFx===g.n?' · 매입환율 반영':g.nFx?' · 매입환율 일부만':' · <span class="miss">매입환율 없음 — 환차 미반영</span>'}</span></td>
+      <td>${g.qty.toLocaleString('ko-KR',{maximumFractionDigits:6})}주</td>
+      <td class="${cls(g.per)}">${(g.per>=0?'+':'-')+won(Math.abs(g.per))}</td>
+      <td>${g.per<=0?'<span class="cell-sub">손실 종목 — 팔면 여력이 늘어남</span>'
+        :(g.free>=g.qty?'<b>전량</b>':`<b>${g.free.toLocaleString('ko-KR')}주</b>`)}</td>
+      <td class="${cls(g.allGain)}">${(g.allGain>=0?'+':'-')+won(Math.abs(g.allGain))}</td></tr>`).join('')}</tbody></table></div>`;
+}
+document.addEventListener('click',e=>{
+  const y=e.target.closest('[data-cgty]');
+  if(y){ cgtYear=+y.dataset.cgty; render(); return; }
+  const del=e.target.closest('[data-cgdel]');
+  if(del){ const id=del.dataset.cgdel; const r=(state.realized||[]).find(x=>String(x.id)===id);
+    if(r&&confirm(`${r.d} ${r.name||''} ${won(num(r.gain))} 기록을 지울까요?`)){
+      state.realized=state.realized.filter(x=>String(x.id)!==id); save(); render(); }
+    return; }
+  if(e.target.id==='cg-add'){
+    const d=document.getElementById('cg-d').value, g=document.getElementById('cg-gain').value;
+    const err=document.getElementById('cg-err');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){ err.textContent='결제일을 넣어 주세요.'; return; }
+    if(g===''||!isFinite(+g)){ err.textContent='실현손익(원)을 숫자로 넣어 주세요. 손실은 -로 적습니다.'; return; }
+    err.textContent='';
+    (state.realized=state.realized||[]).push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+      d, o:ownerOn()?+document.getElementById('cg-own').value||0:0,
+      k:document.getElementById('cg-kind').value, name:document.getElementById('cg-name').value.trim(),
+      gain:Math.round(+g), memo:document.getElementById('cg-memo').value.trim()});
+    cgtYear=+d.slice(0,4);
+    ['cg-name','cg-gain','cg-memo'].forEach(id=>document.getElementById(id).value='');
+    save(); render();
+  }
+});
+
+/* 명의자별 합계. 명의자 구분을 켰을 때만 보인다. */
+function renderOwnerSum(byAcct,total){
+  const box=document.getElementById('owner-sum'); if(!box) return;
+  if(!ownerOn()){ box.innerHTML=''; return; }
+  const g=[0,1].map(o=>({o,buy:0,val:0,pl:0,n:0}));
+  accts().forEach(a=>{ const d=byAcct[a]; if(!d||!(d.val||d.buy)) return;
+    const t=g[ownerOf(a)]; t.buy+=d.buy; t.val+=d.val; t.pl+=d.pl; t.n++; });
+  box.innerHTML=`<div class="chart-title" style="margin-top:22px">명의자별</div>
+    <div class="chart-subtitle">계좌 카드에서 정한 명의 기준입니다 · 매입원가는 예수금 제외, 평가금액은 예수금 포함</div>
+    <div class="table-wrap"><table class="data-table narrow">
+    <thead><tr><th class="tl">명의자</th><th>계좌</th><th>매입원가</th><th>평가금액</th><th>평가손익</th><th>수익률</th><th>비중</th></tr></thead>
+    <tbody>${g.map(t=>{ const rr=t.buy>0?t.pl/t.buy*100:0;
+      return `<tr><td class="tl"><span class="own-badge o${t.o}">${esc(ownerName(t.o))}</span></td>
+        <td>${t.n}개</td><td>${won(t.buy)}</td><td>${won(t.val)}</td>
+        <td class="${cls(t.pl)}">${(t.pl>=0?'+':'')+won(t.pl)}</td>
+        <td class="${cls(rr)}">${t.buy>0?pct(rr):'—'}</td>
+        <td>${total>0?(t.val/total*100).toFixed(1):'0.0'}%</td></tr>`; }).join('')}</tbody></table></div>`;
 }
 
 /* ---------- 자산 추이 ---------- */
@@ -2719,13 +3225,72 @@ function renderTrendTable(hist){
   </table>`;
 }
 
+const sortedHist=()=>(state.hist||[]).slice().sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+/* 과거 기록을 손으로 넣는다. 그 달 마지막 날 행으로 들어가고 man:1 표시를 단다.
+   acct 가 '' 이면 전체 합계, 계좌 이름이면 그 계좌 값(합계는 계좌 합으로 다시 낸다).
+   이미 도구가 자동으로 남긴 날이면 덮어쓰지 않고 null 을 준다(호출한 쪽이 묻는다). */
+function putPast(d,acct,buy,val,force){
+  state.hist=state.hist||[];
+  let row=state.hist.find(r=>r.d===d);
+  if(row&&!row.man&&!force) return null;
+  if(!row||!row.man){ if(row) state.hist=state.hist.filter(r=>r!==row);
+    row={d,buy:0,val:0,cash:0,n:0,acc:{},man:1}; state.hist.push(row); }
+  if(acct){
+    row.acc=row.acc||{}; row.acc[acct]=[Math.round(buy),Math.round(val)];
+    if(!row.tot){ const a=Object.values(row.acc); row.buy=a.reduce((t,x)=>t+x[0],0); row.val=a.reduce((t,x)=>t+x[1],0); }
+  }else{ row.buy=Math.round(buy); row.val=Math.round(val); row.tot=1; }
+  delete row.r; delete row.px;
+  state.hist.sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+  return row;
+}
+const monthEnd=ym=>{ const [y,m]=ym.split('-').map(Number); return new Date(Date.UTC(y,m,0)).toISOString().slice(0,10); };
+function renderPastList(){
+  const sel=document.getElementById('past-a'); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">전체 합계</option>'+accts().map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  if(cur&&accts().includes(cur)) sel.value=cur;
+  const man=sortedHist().filter(r=>r.man).reverse();
+  document.getElementById('past-list').innerHTML=man.length?`<table class="data-table narrow">
+    <thead><tr><th class="tl">날짜</th><th>원금</th><th>평가금액</th><th>수익률</th><th class="tl">계좌별</th><th></th></tr></thead>
+    <tbody>${man.map(r=>{ const rr=r.buy>0?(r.val-r.buy)/r.buy*100:0; const ac=Object.keys(r.acc||{});
+      return `<tr><td class="tl">${esc(r.d)}</td><td>${won(r.buy)}</td><td>${won(r.val)}</td>
+        <td class="${cls(rr)}">${pct(rr)}</td><td class="tl">${ac.length?esc(ac.join(', ')):'<span class="cell-sub">합계만</span>'}</td>
+        <td><button class="row-del" data-pastdel="${esc(r.d)}" title="지우기" aria-label="${esc(r.d)} 기록 지우기">×</button></td></tr>`; }).join('')}</tbody></table>`
+    :'';
+}
+document.addEventListener('click',e=>{
+  if(e.target.id==='btn-past-open'){ const b=document.getElementById('past-box'); b.hidden=!b.hidden;
+    if(!b.hidden){ const m=document.getElementById('past-m');
+      if(!m.value){ const d=new Date(); d.setMonth(d.getMonth()-1); m.value=d.toISOString().slice(0,7); } } return; }
+  if(e.target.id==='past-add'){
+    const m=document.getElementById('past-m').value, a=document.getElementById('past-a').value;
+    const buy=num(document.getElementById('past-buy').value), val=num(document.getElementById('past-val').value);
+    if(!/^\d{4}-\d{2}$/.test(m)){ alert('기준 월을 골라 주세요.'); return; }
+    if(!(val>0)||!(buy>0)){ alert('원금과 평가금액을 넣어 주세요.'); return; }
+    const d=monthEnd(m);
+    if(d>=today()){ alert('지난달까지만 넣을 수 있습니다. 이번 달은 도구가 매일 자동으로 기록합니다.'); return; }
+    let row=putPast(d,a,buy,val,false);
+    if(!row){ if(!confirm(`${d}에는 도구가 자동으로 남긴 기록이 있습니다. 직접 넣은 값으로 바꿀까요?`)) return;
+      row=putPast(d,a,buy,val,true); }
+    document.getElementById('past-buy').value=''; document.getElementById('past-val').value='';
+    // 다음 칸을 넣기 쉽게 한 달 앞으로 옮긴다
+    const [y,mm]=m.split('-').map(Number); const nx=new Date(Date.UTC(y,mm-2,1)); document.getElementById('past-m').value=nx.toISOString().slice(0,7);
+    save(); renderTrend(); renderReturn(); return;
+  }
+  const pd=e.target.closest('[data-pastdel]');
+  if(pd){ const d=pd.dataset.pastdel;
+    if(confirm(`${d} 직접 넣은 기록을 지울까요?`)){ state.hist=(state.hist||[]).filter(r=>!(r.d===d&&r.man)); save(); renderTrend(); renderReturn(); } }
+});
 function renderTrend(){
-  let hist=(state.hist||[]).slice();
+  let hist=(state.hist||[]).slice().sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+  renderPastList();
   const box=document.getElementById('chart-trend');
   const statBox=document.getElementById('trend-stats');
   const logBox=document.getElementById('trend-log');
-  const wrap=box?box.parentElement:null;
-  if(!box||!wrap) return;
+  // 기록이 하루치뿐이면 canvas 자리를 안내문으로 바꾼다. 그 뒤에 기록이 늘어도(과거 기록 넣기) 다시 그릴 수 있게
+  // canvas 가 아니라 감싸는 칸을 기준으로 찾는다.
+  const wrap=box?box.parentElement:document.querySelector('[data-pane="trend"] .trend-canvas');
+  if(!wrap) return;
 
   const evs=(state.events||[]).slice().reverse().slice(0,12);
   logBox.innerHTML=evs.map(e=>{
@@ -2784,7 +3349,7 @@ function renderTrend(){
 
   // 계좌를 건드린 날은 점을 크게 찍는다. 자산이 뛴 게 시장 때문인지 입금 때문인지 갈라 보려는 것이다.
   const evDay=new Set((state.events||[]).map(e=>e.d));
-  renderTrendTable((state.hist||[]));
+  renderTrendTable(sortedHist());
   const evText={};
   (state.events||[]).forEach(e=>{
     const t=e.k==='add'?`계좌 추가: ${e.a}`:e.k==='del'?`계좌 삭제: ${e.a}`:`이름 변경: ${e.a} → ${e.b}`;
@@ -2794,13 +3359,19 @@ function renderTrend(){
   const g=el.getContext('2d').createLinearGradient(0,0,0,240);
   g.addColorStop(0,'rgba(217,84,43,.22)'); g.addColorStop(1,'rgba(217,84,43,0)');
   if(chartTrend) chartTrend.destroy();
+  /* 손으로 넣은 월말 기록과 매일 쌓인 기록이 섞이면 칸 간격이 실제 날짜와 어긋난다.
+     그래서 x축을 날짜(밀리초) 숫자축으로 그린다. */
+  const ts=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10));
+  const span=(ts(last.d)-ts(first.d))/864e5;
+  const fmtX=v=>{ const d=new Date(v); const y=String(d.getUTCFullYear()).slice(2), m=String(d.getUTCMonth()+1).padStart(2,'0'), dd=String(d.getUTCDate()).padStart(2,'0');
+    return span>150?`${y}.${m}`:`${m}.${dd}`; };
   chartTrend=new Chart(el,{type:'line',
-    data:{labels:hist.map(r=>r.d),datasets:[
-      {label:'평가금액',data:hist.map(r=>r.val),borderColor:'#D9542B',borderWidth:2,
+    data:{datasets:[
+      {label:'평가금액',data:hist.map(r=>({x:ts(r.d),y:r.val})),borderColor:'#D9542B',borderWidth:2,
        backgroundColor:g,fill:true,tension:.15,
-       pointRadius:hist.map(r=>evDay.has(r.d)?5:0),
+       pointRadius:hist.map(r=>evDay.has(r.d)?5:(r.man?3:0)),
        pointBackgroundColor:'#3A2F26',pointBorderColor:'#fff',pointBorderWidth:2,pointHoverRadius:5},
-      {label:'매입금액',data:hist.map(r=>r.buy),borderColor:'#8B8276',borderWidth:1.5,
+      {label:'매입금액',data:hist.map(r=>({x:ts(r.d),y:r.buy})),borderColor:'#8B8276',borderWidth:1.5,
        borderDash:[5,4],fill:false,tension:.15,pointRadius:0,pointHoverRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,
       interaction:{mode:'index',intersect:false},
@@ -2808,18 +3379,18 @@ function renderTrend(){
         legend:{position:'bottom',labels:{boxWidth:12,font:{size:11,weight:'700'},color:'#8B8276'}},
         tooltip:{backgroundColor:'#3A2F26',padding:10,displayColors:false,
           callbacks:{
-            title:c=>c[0].label,
+            title:c=>{ const r=hist[c[0].dataIndex]||{}; return (r.d||'')+(r.man?' · 직접 넣은 기록':''); },
             label:c=>c.dataset.label+' '+won(c.parsed.y),
             afterBody:c=>{
               const r=hist[c[0].dataIndex]||{};
               const pl=(r.val||0)-(r.buy||0);
               const rr=r.buy>0?pl/r.buy*100:0;
               return [`수익금 ${(pl>=0?'+':'')+won(pl)} (${rr>=0?'+':''}${rr.toFixed(1)}%)`]
-                .concat(evText[c[0].label]||[]);
+                .concat(evText[r.d]||[]);
             }}}},
       scales:{
-        x:{grid:{display:false},ticks:{maxTicksLimit:7,font:{size:10},color:'#8A7B6C',
-          callback(i){ const d=this.getLabelForValue(i); return d?d.slice(5).replace('-','.'):''; }}},
+        x:{type:'linear',min:ts(first.d),max:ts(last.d),grid:{display:false},
+          ticks:{maxTicksLimit:7,font:{size:10},color:'#8A7B6C',callback:v=>fmtX(v)}},
         y:{position:'right',grid:{color:'rgba(58,47,38,.07)'},
           ticks:{maxTicksLimit:5,font:{size:10},color:'#8A7B6C',callback:v=>wonShort(v)+'원'}}}}});
 }
@@ -3175,25 +3746,24 @@ function renderDivAcct(list,usSkip,noData){
 function renderDivGauge(list){
   const LIMIT=20000000;
   /* 미국 배당은 현지 15% 로 원천징수가 끝나지만 금융소득종합과세 한도에는 그대로 들어간다.
-     연금·ISA 만 빠진다. */
-  const gen=list.filter(x=>x.kind==='일반'||x.kind==='미국');
-  const base=gen.reduce((s,x)=>s+x.taxBase,0);          // 확정
-  const unk=gen.reduce((s,x)=>s+x.taxUnknown,0);        // 미확인 (최대 이만큼 더)
-  const nUnk=gen.filter(x=>x.taxUnknown>0).length;
-  const max=base+unk;
-  /* 고배당 분리과세분. 신고 때 신청하면 이 몫은 한도 계산에서 빠진다.
-     신청은 본인이 하는 것이라 자동으로 빼지 않고, 같은 막대 안에서 색만 나눈다. */
-  const hi=gen.filter(x=>x.hiDiv).reduce((s,x)=>s+x.taxBase,0);
-  const nHi=gen.filter(x=>x.hiDiv).length;
-  const plain=Math.max(0,base-hi);
-  const w0=Math.min(100,plain/LIMIT*100);
-  const w1=Math.min(100-w0,hi/LIMIT*100);
-  const w2=Math.min(100-w0-w1,unk/LIMIT*100);
-  const over=base>LIMIT, mayOver=!over&&max>LIMIT;
-  document.getElementById('div-gauge').innerHTML=
-    `<div class="dgauge">
-       <div class="dgauge-row">
-         <span class="dgauge-l">일반계좌·미국 직투 배당 과세표준</span>
+     연금·ISA 만 빠진다. 한도는 사람 단위라 명의자 구분을 켜면 명의별로 막대를 따로 그린다. */
+  const genAll=list.filter(x=>x.kind==='일반'||x.kind==='미국');
+  const owners=ownersUsed();
+  const one=(gen,who)=>{
+    const base=gen.reduce((s,x)=>s+x.taxBase,0);          // 확정
+    const unk=gen.reduce((s,x)=>s+x.taxUnknown,0);        // 미확인 (최대 이만큼 더)
+    const nUnk=gen.filter(x=>x.taxUnknown>0).length;
+    const max=base+unk;
+    /* 고배당 분리과세분. 신고 때 신청하면 이 몫은 한도 계산에서 빠진다.
+       신청은 본인이 하는 것이라 자동으로 빼지 않고, 같은 막대 안에서 색만 나눈다. */
+    const hi=gen.filter(x=>x.hiDiv).reduce((s,x)=>s+x.taxBase,0);
+    const plain=Math.max(0,base-hi);
+    const w0=Math.min(100,plain/LIMIT*100);
+    const w1=Math.min(100-w0,hi/LIMIT*100);
+    const w2=Math.min(100-w0-w1,unk/LIMIT*100);
+    const over=base>LIMIT, mayOver=!over&&max>LIMIT;
+    return `<div class="dgauge-row">
+         <span class="dgauge-l">${who?`<span class="own-badge o${who.o}">${esc(who.name)}</span> `:''}일반계좌·미국 직투 배당 과세표준</span>
          <span class="dgauge-v ${over?'up':''}">${won(base)}${unk>0?`<span style="font-size:13px;color:#8B8276"> ~ ${won(max)}</span>`:''}
            <span style="font-size:13px;color:#8B8276">/ 2,000만원</span></span>
        </div>
@@ -3203,7 +3773,7 @@ function renderDivGauge(list){
                    title="고배당 분리과세 대상 ${won(hi)}"></div>`:''}
          ${unk>0?`<div class="dgauge-fill unk" style="width:${w2}%"></div>`:''}
        </div>
-       <div class="dgauge-sub">
+       <div class="dgauge-sub" style="margin-bottom:${who?'14px':'0'}">
          ${over
            ? `<span class="dv-warn">한도를 ${won(base-LIMIT)} 넘습니다.</span> 초과분이 다른 종합소득과 합산돼 6~45% 누진세율로 과세됩니다.`
              +(hi>0?(plain<=LIMIT
@@ -3212,7 +3782,16 @@ function renderDivGauge(list){
            : mayOver
              ? `확인된 과표로는 한도까지 <b>${won(LIMIT-base)}</b> 남았습니다.
                 다만 <b>과표 미확인 ${nUnk}종</b>을 전액과세로 보면 한도를 넘을 수 있습니다.`
-             : `한도까지 <b>${won(LIMIT-base)}</b> 남았습니다. 2,000만원까지는 원천징수(국내 15.4%·미국 15%)로 끝납니다.`}<br>
+             : `한도까지 <b>${won(LIMIT-base)}</b> 남았습니다. 2,000만원까지는 원천징수(국내 15.4%·미국 15%)로 끝납니다.`}
+       </div>`;
+  };
+  const bars=owners.map(o=>one(genAll.filter(x=>ownerOf(x.r.acct)===o),
+    owners.length>1?{o,name:ownerName(o)}:null)).join('');
+  const unk=genAll.reduce((s,x)=>s+x.taxUnknown,0), nUnk=genAll.filter(x=>x.taxUnknown>0).length;
+  const hi=genAll.filter(x=>x.hiDiv).reduce((s,x)=>s+x.taxBase,0), nHi=genAll.filter(x=>x.hiDiv).length;
+  document.getElementById('div-gauge').innerHTML=
+    `<div class="dgauge">${bars}
+       <div class="dgauge-sub">
          ${unk>0?`옅은 칸은 <b>과표를 아직 모르는 ${nUnk}종</b>입니다. 분배금 전액이 과세된다고 가정한 상한이라,
                   실제로는 이보다 낮습니다 — 커버드콜·채권형은 과표가 분배금보다 훨씬 작습니다.<br>`:''}
          ${hi>0?`파란 칸은 <b>고배당 분리과세 대상 ${nHi}종 ${won(hi)}</b>입니다.
@@ -3220,6 +3799,7 @@ function renderDivGauge(list){
                   2,000만원 초과분도 20~30%로 끝납니다(신청하지 않으면 그대로 합산됩니다).
                   다만 <b>건강보험료는 줄지 않습니다</b> — 세율만 낮추고 소득 자체를 줄이는 제도가 아닙니다.<br>`:''}
          이 막대는 <b>일반계좌 배당만</b> 셉니다. 연금저축·IRP·ISA는 금융소득 종합과세 대상이 아닙니다.
+         ${owners.length>1?'한도는 <b>사람마다 따로</b> 2,000만원입니다. 계좌 카드에서 정한 명의 기준으로 나눴습니다. ':''}
          실제 판정에는 예금·채권 이자와 다른 금융기관 배당까지 합산되므로, 여기 숫자만으로 단정하지 마세요.
          ${HIDIV_STAMP?`<br><span style="font-size:12px;color:#8B8276">고배당기업 명단은 거래소 KIND 공시 기준 ${esc(HIDIV_STAMP)} 수집분입니다.
            기업이 스스로 공시하는 자율공시라, 요건을 채웠어도 공시하지 않은 기업은 이 명단에 없습니다.</span>`:''}
@@ -3381,10 +3961,11 @@ function mergeLots(rows,byKind){
     const k=byKind ? acctKind(r.acct)+'|'+r.code : r.code;
     const g=map.get(k);
     const add=(g,r)=>{ if(r.hasAvg){ g.qtyK+=r.qty; g.buyCK+=r.buyC; g.buyK+=r.buy;
-                          if(r.hasPrice){ g.plC+=r.valC-r.buyC; g.pl+=r.val-r.buy; } }
+                          if(r.hasPrice){ g.plC+=r.valC-r.buyC; g.pl+=r.val-r.buy; g.fxPl+=r.fxPl||0;
+                            if(r.hasFx) g.nFx++; else if(r.isUS) g.nNoFx++; } }
                         else g.qtyNoAvg+=r.qty; };
     if(!g){ const n={...r,acct:byKind?acctKind(r.acct):r.acct,
-                     lots:1,accts:new Set([r.acct]),qtyK:0,buyCK:0,buyK:0,qtyNoAvg:0,plC:0,pl:0};
+                     lots:1,accts:new Set([r.acct]),qtyK:0,buyCK:0,buyK:0,qtyNoAvg:0,plC:0,pl:0,fxPl:0,nFx:0,nNoFx:0};
             add(n,r); map.set(k,n); return; }
     g.qty+=r.qty; g.buyC+=r.buyC; g.valC+=r.valC;
     g.buy+=r.buy; g.val+=r.val; g.lots++; g.accts.add(r.acct); add(g,r);
@@ -3443,7 +4024,8 @@ function renderDetail(all,total){
     + '<b>성격이 같은 계좌끼리</b> 같은 종목을 묶어 보여줍니다 — 연금저축1·2 는 합치고, '
     + '연금·ISA·일반은 세금이 달라 따로 둡니다. 매입단가는 수량 가중평균입니다(평단 미입력 로트는 평균에서 뺍니다).'
     + (multi ? ` 이번에 <b>${multi}건</b>이 묶였습니다.` : '')
-    + (rows.some(r=>r.isUS) ? '<br>※ 미국 종목의 원화 손익은 매입금액·평가금액을 <b>모두 오늘 환율</b>로 환산한 값입니다(환차손익 미반영). 매수 시점 환율은 저장하지 않습니다.' : '');
+    + (rows.some(r=>r.isUS) ? '<br>※ 미국 종목은 보유 종목 탭에서 <b>매입환율</b>을 넣은 종목만 원화 손익에 환차손익이 들어갑니다. '
+      +'넣지 않은 종목은 매입금액·평가금액을 <b>모두 오늘 환율</b>로 환산한 값입니다(달러로 번 만큼만 본 손익).' : '');
 
   body.innerHTML=rows.slice().sort((a,b)=>b.val-a.val).map(r=>{
     const miss=t=>`<span class="miss">${t}</span>`;
@@ -3473,7 +4055,9 @@ function renderDetail(all,total){
       <td>${r.hasAvg?money(r,r.buyCK,r.buyK,false):miss('평단 미입력')}</td>
       <td>${r.hasPrice?money(r,r.valC,r.val,false):miss('시세 없음')}</td>
       <td class="${r.plOk?cls(r.pl):''}">${r.plOk?`${money(r,r.plC,r.pl,true)}
-        <span class="cell-sub ${cls(r.ror)}">${pct(r.ror)}</span>`:'—'}</td>
+        <span class="cell-sub ${cls(r.ror)}">${pct(r.ror)}</span>${r.isUS&&r.nFx
+          ?`<span class="cell-sub ${cls(r.fxPl)}" title="달러 원가 × (오늘 환율 − 매입환율)">환차 ${r.fxPl>=0?'+':''}${won(r.fxPl)}${r.nNoFx?' (일부만)':''}</span>`
+          :(r.isUS?'<span class="cell-sub">환차 미반영</span>':'')}`:'—'}</td>
       <td>${total>0?(r.val/total*100).toFixed(1):'0.0'}%</td></tr>`;
   }).join('');
 }
@@ -3662,6 +4246,32 @@ document.addEventListener('focusout',e=>{
   }
 });
 
+/* 명의자 구분 켜기·끄기, 이름, 계좌별 지정 */
+function syncOwnerUI(){
+  const on=ownerOn();
+  document.getElementById('chk-owner').checked=on;
+  document.getElementById('own-names').hidden=!on;
+  const n=state.ownerNames||[];
+  ['own-n0','own-n1'].forEach((id,i)=>{ const el=document.getElementById(id);
+    if(document.activeElement!==el) el.value=n[i]||''; });
+}
+document.getElementById('chk-owner').onchange=e=>{
+  state.ownerOn=e.target.checked; state.owners=state.owners||{};
+  save(); syncOwnerUI(); renderCash(); render();
+};
+['own-n0','own-n1'].forEach((id,i)=>document.getElementById(id).addEventListener('input',e=>{
+  state.ownerNames=state.ownerNames||['',''];
+  state.ownerNames[i]=e.target.value.trim(); save();
+  // 카드 버튼 글자만 바꾼다(입력 중 포커스를 잃지 않게 카드 전체를 다시 그리지 않는다)
+  document.querySelectorAll(`.own-b[data-o="${i}"]`).forEach(b=>b.textContent=ownerName(i));
+  clearTimeout(window.__ownT); window.__ownT=setTimeout(render,400);
+}));
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-own]');
+  if(!b) return;
+  (state.owners=state.owners||{})[b.dataset.own]=+b.dataset.o;
+  save(); renderCash(); render();
+});
 document.getElementById('chk-div-merge').onchange=e=>{
   state.divMerge=e.target.checked; save(); render();
 };
@@ -3685,7 +4295,8 @@ const roundAvg=(v,isUS)=>Number(v.toFixed(isUS?4:2));
 function buyEls(){
   return {code:document.getElementById('buy-code'), qty:document.getElementById('buy-qty'),
           avg:document.getElementById('buy-avg'), prev:document.getElementById('buy-prev'),
-          nm:document.getElementById('buy-nm'), mark:document.getElementById('buy-mark')};
+          nm:document.getElementById('buy-nm'), mark:document.getElementById('buy-mark'),
+          fx:document.getElementById('buy-fx'), fxw:document.getElementById('buy-fx-wrap')};
 }
 function renderBuyAccts(){
   const box=document.getElementById('buy-accts');
@@ -3702,6 +4313,7 @@ function renderBuyPreview(){
   const m=lookup((e.code.value||'').trim());
   const isUS=!!(m&&m.cur==='USD');
   e.mark.textContent=isUS?'$':'₩';
+  e.fxw.hidden=!isUS;
   e.nm.innerHTML=m?`${isUS?'<span class="us-tag">US</span>':''}${esc(m.name)}`:'';
   e.nm.title=m?m.name:'';
   const qty=num(e.qty.value), avg=num(e.avg.value);
@@ -3726,7 +4338,20 @@ function renderBuyPreview(){
     e.prev.innerHTML=`<b>${esc(buyAcct)}</b>에 이미 있는 <b>${esc(m.name)}</b>와 합칩니다.`
       +`<br>${q0.toLocaleString('ko-KR')}주 · ${unit(a0)}<span class="arw">→</span>`
       +`<b>${q1.toLocaleString('ko-KR')}주 · ${unit(a1)}</b>`;
+    if(isUS){ const f=mergeFx(h,qty,avg,num(e.fx.value));
+      e.prev.innerHTML+=f.note?`<br><span class="fx-note">${f.note}</span>`:''; }
   }
+}
+/* 추가매수로 합칠 때 매입환율도 '달러 매입금액' 가중평균으로 합친다.
+   (원화 원가 합계 ÷ 달러 원가 합계 = 평균 매입환율. 증권사 잔고의 평균 매입환율과 같은 정의)
+   한쪽이라도 환율을 모르면 합친 값도 알 수 없으므로 비운다. */
+function mergeFx(h,qty,avg,fx){
+  const f0=num(h.fx), c0=num(h.qty)*num(h.avg), c1=qty*avg;
+  if(f0>0&&fx>0) return {fx:+((c0*f0+c1*fx)/(c0+c1)).toFixed(2),
+    note:`매입환율 ${f0.toLocaleString('ko-KR')}원 → <b>${((c0*f0+c1*fx)/(c0+c1)).toLocaleString('ko-KR',{maximumFractionDigits:2})}원</b> (달러 매입금액 가중평균)`};
+  if(f0>0&&!(fx>0)) return {fx:0,note:'기존 로트에는 매입환율이 있는데 이번 매수에는 없어 합친 뒤에는 <b>매입환율이 비워집니다</b>. 이번 환율도 넣어 주세요.'};
+  if(!(f0>0)&&fx>0) return {fx:0,note:'기존 로트에 매입환율이 없어 합친 평균 환율을 알 수 없습니다. 합친 뒤 증권사 잔고의 평균 매입환율을 직접 넣어 주세요.'};
+  return {fx:0,note:''};
 }
 function openBuy(){
   const p=document.getElementById('buy-panel');
@@ -3736,7 +4361,7 @@ function openBuy(){
 }
 function closeBuy(){
   const e=buyEls();
-  e.code.value=''; e.qty.value=''; e.avg.value='';
+  e.code.value=''; e.qty.value=''; e.avg.value=''; e.fx.value='';
   closeMenus();
   document.getElementById('buy-panel').hidden=true;
 }
@@ -3750,13 +4375,16 @@ function commitBuy(){
     return;
   }
   const isUS=m.cur==='USD';
+  const fx=isUS?num(e.fx.value):0;
   const i=findHolding(buyAcct,m.code);
   if(i<0||!holdAvgKnown(state.holdings[i])){
     // 새 종목이거나, 기존 로트가 평단 미입력이면 따로 담는다(원가 0 으로 평균이 희석되지 않게)
-    state.holdings.push({acct:buyAcct,code:m.code,qty,avg});
+    const h={acct:buyAcct,code:m.code,qty,avg}; if(fx>0) h.fx=fx;
+    state.holdings.push(h);
   }else{
     const h=state.holdings[i], q0=num(h.qty), a0=num(h.avg);
     const q1=q0+qty;
+    if(isUS){ const f=mergeFx(h,qty,avg,fx); if(f.fx>0) h.fx=f.fx; else delete h.fx; }
     h.avg=q1>0?roundAvg((q0*a0+qty*avg)/q1,isUS):avg;
     h.qty=Number(q1.toFixed(8));
   }
@@ -3770,7 +4398,7 @@ document.getElementById('btn-add').onclick=()=>{
 document.getElementById('buy-close').onclick=closeBuy;
 document.getElementById('buy-cancel').onclick=closeBuy;
 document.getElementById('buy-ok').onclick=commitBuy;
-['buy-code','buy-qty','buy-avg'].forEach(id=>{
+['buy-code','buy-qty','buy-avg','buy-fx'].forEach(id=>{
   const el=document.getElementById(id);
   el.addEventListener('input',()=>{ if(id==='buy-code') openMenu(el); renderBuyPreview(); placeUnits(); });
   el.addEventListener('keydown',ev=>{
@@ -3794,22 +4422,16 @@ document.addEventListener('click',e=>{
 });
 
 document.getElementById('btn-clear').onclick=()=>{
-  if(!confirm('입력한 내용을 모두 지웁니다. 계속할까요?')) return;
+  if(!confirm('보유 종목·예수금·비고·배당 누적액을 모두 지웁니다.\n자산 추이와 양도차익 기록, 계좌 목록은 남깁니다.\n\n지우기 전에 지금 데이터를 백업 파일로 내려받습니다. 계속할까요?')) return;
+  if(!DEMO) exportJSON('포트폴리오_지우기전백업');
   state={holdings:[],cash:{},cashUsd:{},notes:{},accounts:state.accounts,merge:state.merge,divMerge:state.divMerge,divNet:state.divNet,
-         hist:state.hist,events:state.events};   // 추이 기록은 남긴다
-  save(); renderCash(); render();
+         ownerOn:state.ownerOn,ownerNames:state.ownerNames,owners:state.owners,realized:state.realized,
+         hist:state.hist,events:state.events,tab:state.tab};   // 추이·양도차익 기록은 남긴다
+  trSig=''; save(); renderCash(); render();
 };
 
 /* ---------- 파일 저장 / 불러오기 ---------- */
-document.getElementById('btn-export').onclick=()=>{
-  const blob=new Blob([JSON.stringify({app:'ttokjae-portfolio',version:2,
-    savedAt:new Date().toISOString(),data:state},null,2)],{type:'application/json'});
-  const a=document.createElement('a');
-  const d=new Date(), p=n=>String(n).padStart(2,'0');
-  a.href=URL.createObjectURL(blob);
-  a.download=`포트폴리오_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}.json`;
-  a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-};
+document.getElementById('btn-export').onclick=()=>exportJSON('포트폴리오');
 /* 여러 갈래 중 하나를 고르게 한다. 고른 값을 Promise 로 준다 (취소는 null) */
 function askChoice(title,desc,opts){
   return new Promise(res=>{
@@ -3839,7 +4461,10 @@ function mergeHist(mine,theirs){
   return Object.keys(by).sort().map(d=>by[d]).slice(-1200);
 }
 
-document.getElementById('btn-import').onclick=()=>document.getElementById('file-json').click();
+document.getElementById('btn-import').onclick=()=>{
+  if(DEMO){ alert('예시 데이터 화면에서는 불러올 수 없습니다. 위쪽 \'내 데이터로 시작하기\'를 눌러 주세요.'); return; }
+  document.getElementById('file-json').click();
+};
 document.getElementById('file-json').onchange=e=>{
   const f=e.target.files[0]; if(!f) return;
   const rd=new FileReader();
@@ -3869,7 +4494,9 @@ document.getElementById('file-json').onchange=e=>{
       }else if(!confirm('현재 입력 내용을 파일 내용으로 바꿉니다. 계속할까요?')) return;
 
       state={holdings:d.holdings,cash:d.cash||{},cashUsd:d.cashUsd||{},notes:d.notes||{},
-             accounts:d.accounts,merge:!!d.merge,divMerge:!!d.divMerge,divNet:!!d.divNet,tab:state.tab,hist,events};
+             accounts:d.accounts,merge:!!d.merge,divMerge:!!d.divMerge,divNet:!!d.divNet,tab:state.tab,hist,events,
+             ownerOn:!!d.ownerOn,ownerNames:d.ownerNames,owners:d.owners||{},realized:d.realized||[],divOut:d.divOut||{}};
+      trSig=''; syncOwnerUI();
       document.getElementById('chk-div-merge').checked=!!state.divMerge;
       document.getElementById('chk-div-net').checked=!!state.divNet;
       save(); renderCash(); render();
@@ -3889,6 +4516,273 @@ function mergeEvents(a,b){
   });
   return out.sort((x,y)=>x.d<y.d?-1:1).slice(-500);
 }
+
+/* ---------- 엑셀 양식 · 업로드 ----------
+   시트 6개: 안내 · 계좌 · 보유종목 · 자산추이 · 양도차익 · 배당누적
+   열 순서가 바뀌어도 머리글 글자로 찾는다. '(예시)'로 시작하는 행은 읽지 않는다.
+   읽은 내용은 바로 넣지 않고 무엇이 바뀌는지 미리 보여 준 뒤, 백업을 내려받고 반영한다. */
+const XL_SHEETS={
+  acct:{name:'계좌',head:['계좌명','명의자','비고 (증권사·계좌번호)','예수금 (원)','예수금 (달러)'],w:[16,10,24,14,14]},
+  hold:{name:'보유종목',head:['계좌','종목코드·티커','종목명 (참고용)','보유수량','평균매입가','매입환율 (미국·선택)'],w:[14,16,30,12,14,18]},
+  hist:{name:'자산추이',head:['날짜 (YYYY-MM 또는 YYYY-MM-DD)','계좌 (비우면 전체 합계)','원금 (매입금액)','평가금액'],w:[26,22,18,18]},
+  cgt:{name:'양도차익',head:['결제일','명의자','구분 (해외주식/국내주식)','종목','실현손익 (원)','메모'],w:[14,10,22,18,16,24]},
+  div:{name:'배당누적',head:['계좌','꺼내 쓴 배당 누적 (원)','재투자한 배당·차익 누적 (원)'],w:[14,22,26]}
+};
+let XL_P=null;
+function ensureXLSX(){
+  if(window.XLSX&&XLSX.utils) return Promise.resolve(XLSX);
+  if(!XL_P) XL_P=loadScript(ROOT+'vendor/xlsx.mini.min.js')
+    .catch(()=>loadScript('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js'))
+    .then(()=>{ if(!window.XLSX) throw new Error('엑셀 모듈을 불러오지 못했습니다'); return XLSX; })
+    .catch(e=>{ XL_P=null; throw e; });
+  return XL_P;
+}
+function xlMsg(t,kind){ const el=document.getElementById('xl-msg'); el.className='xl-msg'+(kind?' '+kind:''); el.innerHTML=t||''; }
+function stamp(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}`; }
+// 종목코드 칸은 텍스트로 넣는다(0184E0 이 지수 표기로, 069500 이 69500 으로 바뀌지 않게)
+function xlSheet(X,key,rows){
+  const def=XL_SHEETS[key];
+  const ws=X.utils.aoa_to_sheet([def.head,...rows]);
+  ws['!cols']=def.w.map(w=>({wch:w}));
+  if(key==='hold') for(let r=1;r<=rows.length;r++){ const ad=X.utils.encode_cell({r,c:1});
+    if(ws[ad]){ ws[ad].t='s'; ws[ad].v=String(ws[ad].v); ws[ad].z='@'; } }
+  return ws;
+}
+function xlBook(X,blank){
+  const wb=X.utils.book_new();
+  const guide=[['포트폴리오 관리 도구 · 엑셀 양식'],[''],
+    ['시트','채우는 법'],
+    ['계좌','계좌 이름과 명의자(본인/배우자), 비고, 예수금을 적습니다. 이름에 IRP·연금·ISA가 들어가면 그 성격으로 계산합니다.'],
+    ['보유종목','계좌마다 지금 들고 있는 종목을 한 줄씩. 종목코드(국내 6자리)나 티커(미국)로 적는 게 가장 정확합니다. 미국 종목 평균매입가는 달러입니다.'],
+    ['자산추이','지난 달들의 월말 원금·평가금액. 날짜를 2025-06처럼 월까지만 적으면 그 달 마지막 날로 들어갑니다. 계좌를 비우면 전체 합계입니다.'],
+    ['양도차익','미국 주식 등을 판 기록. 증권사 \'해외주식 양도소득 조회\' 화면의 원화 실현손익(환율 반영)을 그대로 적습니다. 손실은 마이너스.'],
+    ['배당누적','지금까지 꺼내 쓴 배당, 재투자한 배당·차익의 누적액(선택). \'배당까지 넣은 수익률\' 계산에 씁니다.'],
+    [''],['(예시)로 시작하는 행은 읽지 않습니다. 필요 없는 시트는 비워 두셔도 됩니다.'],
+    ['계좌번호·주민번호 같은 개인정보는 적지 마세요. 파일은 이용자의 브라우저 안에서만 읽히고 서버로 전송되지 않습니다.']];
+  const g=X.utils.aoa_to_sheet(guide); g['!cols']=[{wch:12},{wch:110}];
+  X.utils.book_append_sheet(wb,g,'안내');
+  const oName=a=>ownerName(ownerOf(a));
+  const acct=blank?[['(예시) 연금저축1','본인','예시증권 1234',300000,''],['(예시) 일반계좌','배우자','해외주식',0,150.5]]
+    :accts().map(a=>[a,oName(a),(state.notes||{})[a]||'',num(state.cash[a])||'',num((state.cashUsd||{})[a])||'']);
+  const hold=blank?[['(예시) 연금저축1','458730','TIGER 미국배당다우존스',500,12100,''],['(예시) 일반계좌','SCHD','Schwab US Dividend Equity ETF',100,27.5,1385]]
+    :state.holdings.filter(h=>h.code).map(h=>{ const m=lookup(h.code);
+      return [h.acct||accts()[0],String(h.code).toUpperCase(),m?m.name:'',num(h.qty)||'',num(h.avg)||'',num(h.fx)||'']; });
+  const hist=blank?[['(예시) 2025-06','',50000000,52300000],['(예시) 2025-06','연금저축1',20000000,21500000]]
+    :sortedHist().flatMap(r=>{ const out=[[r.d,'',Math.round(r.buy),Math.round(r.val)]];
+      if(r.man) Object.entries(r.acc||{}).forEach(([a,v])=>out.push([r.d,a,v[0],v[1]])); return out; });
+  const cgt=blank?[['(예시) 2026-03-12','본인','해외주식','AAPL',1820000,'일부 익절'],['(예시) 2026-06-03','본인','해외주식','TSLA',-430000,'']]
+    :(state.realized||[]).slice().sort((a,b)=>a.d<b.d?-1:1).map(r=>[r.d,ownerName(+r.o||0),r.k==='kr'?'국내주식':'해외주식',r.name||'',num(r.gain),r.memo||'']);
+  const div=blank?[['(예시) ISA',1650000,''],['(예시) 연금저축1','',1200000]]
+    :Object.entries(state.divOut||{}).filter(([a,v])=>num(v.w)||num(v.r)).map(([a,v])=>[a,num(v.w)||'',num(v.r)||'']);
+  [['acct',acct],['hold',hold],['hist',hist],['cgt',cgt],['div',div]].forEach(([k,rows])=>
+    X.utils.book_append_sheet(wb,xlSheet(X,k,rows),XL_SHEETS[k].name));
+  return wb;
+}
+async function xlDownload(blank){
+  try{ xlMsg('엑셀 모듈을 준비하는 중…'); const X=await ensureXLSX();
+    X.writeFile(xlBook(X,blank),blank?'포트폴리오_입력양식.xlsx':`포트폴리오_${stamp()}.xlsx`);
+    xlMsg(blank?'빈 양식을 내려받았습니다. 채운 뒤 ③으로 올려 주세요.':'지금 데이터를 엑셀로 내려받았습니다.','ok');
+  }catch(e){ xlMsg('엑셀 파일을 만들지 못했습니다: '+esc(e.message),'err'); }
+}
+/* ---- 읽기 ---- */
+function xlCellStr(v){
+  if(v===null||v===undefined) return '';
+  if(v instanceof Date){ const d=new Date(v.getTime()-v.getTimezoneOffset()*6e4); return d.toISOString().slice(0,10); }
+  return String(v).trim();
+}
+function xlDate(v,monthToEnd){
+  const t=xlCellStr(v).replace(/[./]/g,'-').replace(/\s+/g,'');
+  let m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m=t.match(/^(\d{4})-(\d{1,2})$/)||t.match(/^(\d{4})년(\d{1,2})월?$/);
+  if(m&&monthToEnd) return monthEnd(`${m[1]}-${m[2].padStart(2,'0')}`);
+  return '';
+}
+const xlNum=v=>{ if(typeof v==='number') return v; const t=xlCellStr(v).replace(/[,원$\s₩]/g,''); return t===''?null:(isFinite(+t)?+t:NaN); };
+// 시트를 [{머리글키:값}] 으로. 머리글 행은 위쪽 10줄 안에서 찾는다.
+function xlRows(X,wb,key,cols){
+  const nm=XL_SHEETS[key].name;
+  const ws=wb.Sheets[nm]||wb.Sheets[Object.keys(wb.Sheets).find(k=>k.replace(/\s/g,'')===nm)];
+  if(!ws) return null;
+  const aoa=X.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+  let hi=-1, map={};
+  for(let i=0;i<Math.min(10,aoa.length)&&hi<0;i++){
+    const row=aoa[i].map(c=>xlCellStr(c).replace(/\s/g,''));
+    const m={}; let hit=0;
+    for(const k in cols){ const j=row.findIndex(c=>cols[k].some(w=>c.includes(w))); if(j>=0){ m[k]=j; hit++; } }
+    if(hit>=2){ hi=i; map=m; }
+  }
+  if(hi<0) return [];
+  return aoa.slice(hi+1).map((r,i)=>{ const o={_row:hi+2+i}; for(const k in map) o[k]=r[map[k]]; return o; })
+    .filter(o=>Object.keys(map).some(k=>xlCellStr(o[k])!=='')&&!/^\(?예시\)?/.test(xlCellStr(o[Object.keys(map)[0]])));
+}
+function xlCode(v,name){
+  let c=xlCellStr(v).toUpperCase().replace(/\s/g,'');
+  if(/^\d{1,5}$/.test(c)) c=c.padStart(6,'0');           // 엑셀이 앞자리 0 을 떼어 낸 경우
+  if(/^A\d{6}$/.test(c)) c=c.slice(1);                   // 증권사 내보내기의 A069500 형식
+  if(c&&lookup(c)) return lookup(c);
+  // 코드가 없거나 틀리면 이름이 정확히 같은 종목을 찾는다(대소문자·공백 무시)
+  const want=String(name||v||'').toUpperCase().replace(/\s/g,'');
+  if(!want) return null;
+  for(const k in KR) if(KR[k].name.toUpperCase().replace(/\s/g,'')===want) return KR[k];
+  for(const k in US) if(US[k].name.toUpperCase().replace(/\s/g,'')===want) return US[k];
+  return null;
+}
+function xlOwner(v){ const t=xlCellStr(v); if(!t) return 0;
+  const n=ownerNames(); if(t===n[1]||/배우자|아내|남편|^2$|둘째/.test(t)) return 1; return 0; }
+function xlParse(X,wb){
+  const skip=[], P={acct:[],hold:[],hist:[],cgt:[],div:[]}, seen={};
+  const A=xlRows(X,wb,'acct',{a:['계좌명','계좌'],o:['명의'],note:['비고','증권사'],cw:['예수금(원)','원화예수금'],cu:['예수금(달러)','달러']});
+  const H=xlRows(X,wb,'hold',{a:['계좌'],code:['종목코드','티커','코드'],name:['종목명'],qty:['수량'],avg:['평균','매입가','평단'],fx:['환율']});
+  const T=xlRows(X,wb,'hist',{d:['날짜','기준'],a:['계좌'],buy:['원금','매입'],val:['평가']});
+  const C=xlRows(X,wb,'cgt',{d:['결제일','날짜'],o:['명의'],k:['구분'],name:['종목'],gain:['손익','차익'],memo:['메모']});
+  const D=xlRows(X,wb,'div',{a:['계좌'],w:['꺼내'],r:['재투자']});
+  if(!A&&!H&&!T&&!C&&!D) throw new Error('양식의 시트(계좌·보유종목·자산추이·양도차익)를 찾지 못했습니다. ①의 빈 양식을 받아 채워 주세요.');
+  (A||[]).forEach(r=>{ const a=xlCellStr(r.a); if(!a){ return; }
+    const cw=xlNum(r.cw), cu=xlNum(r.cu);
+    P.acct.push({a,o:xlOwner(r.o),note:xlCellStr(r.note),cw:Number.isNaN(cw)?null:cw,cu:Number.isNaN(cu)?null:cu}); });
+  (H||[]).forEach(r=>{ const a=xlCellStr(r.a)||accts()[0];
+    const m=xlCode(r.code,r.name), q=xlNum(r.qty), av=xlNum(r.avg), fx=xlNum(r.fx);
+    const lab=xlCellStr(r.code)||xlCellStr(r.name);
+    if(!m){ skip.push(`보유종목 ${r._row}행: '${lab}' 종목을 찾을 수 없습니다`); return; }
+    if(!(q>0)){ skip.push(`보유종목 ${r._row}행: ${m.name} 수량이 비었거나 0입니다`); return; }
+    if(av!==null&&!(av>=0)){ skip.push(`보유종목 ${r._row}행: ${m.name} 평균매입가가 숫자가 아닙니다`); return; }
+    const isUS=m.cur==='USD';
+    if(isUS&&av>1000) skip.push(`보유종목 ${r._row}행: ${m.name} 평균매입가 ${av.toLocaleString()} — 미국 종목은 달러로 적어야 합니다. 원화로 적으셨다면 고쳐 주세요(그대로 넣었습니다)`);
+    P.hold.push({acct:a,code:m.code,name:m.name,qty:q,avg:av===null?'':av,fx:isUS&&fx>0?fx:''}); });
+  (T||[]).forEach(r=>{ const d=xlDate(r.d,true), b=xlNum(r.buy), v=xlNum(r.val);
+    if(!d){ skip.push(`자산추이 ${r._row}행: 날짜를 읽지 못했습니다 ('${xlCellStr(r.d)}')`); return; }
+    if(!(b>0)||!(v>0)){ skip.push(`자산추이 ${r._row}행: 원금·평가금액이 비었습니다`); return; }
+    if(d===today()) return;   // 오늘 치는 도구가 자동으로 남긴다(엑셀 백업을 그대로 다시 올린 경우)
+    if(d>today()){ skip.push(`자산추이 ${r._row}행: ${d}는 오늘 이후라 건너뜁니다`); return; }
+    P.hist.push({d,a:xlCellStr(r.a),buy:b,val:v}); });
+  (C||[]).forEach(r=>{ const d=xlDate(r.d,false), g=xlNum(r.gain);
+    if(!d){ skip.push(`양도차익 ${r._row}행: 결제일을 읽지 못했습니다`); return; }
+    if(g===null||Number.isNaN(g)){ skip.push(`양도차익 ${r._row}행: 실현손익이 숫자가 아닙니다`); return; }
+    P.cgt.push({d,o:xlOwner(r.o),k:/국내/.test(xlCellStr(r.k))?'kr':'us',name:xlCellStr(r.name),gain:Math.round(g),memo:xlCellStr(r.memo)}); });
+  (D||[]).forEach(r=>{ const a=xlCellStr(r.a); if(!a) return; const w=xlNum(r.w), re=xlNum(r.r);
+    P.div.push({a,w:w>0?w:'',r:re>0?re:''}); });
+  return {P,skip};
+}
+/* ---- 미리보기 ---- */
+function xlPlan(P){
+  const curAcc=accts(), fileAcc=[...new Set([...P.acct.map(x=>x.a),...P.hold.map(x=>x.acct)])];
+  const plan={newAcc:fileAcc.filter(a=>!curAcc.includes(a)), accUpd:[], add:[], upd:[], same:0, mine:[], hist:{add:0,upd:0,auto:0}, cgt:{add:0,dup:0}, div:P.div.length};
+  P.acct.forEach(x=>{ if(!curAcc.includes(x.a)) return; const ch=[];
+    if(x.note&&x.note!==((state.notes||{})[x.a]||'')) ch.push('비고');
+    if(x.cw!==null&&x.cw!==num(state.cash[x.a])) ch.push('원화 예수금');
+    if(x.cu!==null&&x.cu!==num((state.cashUsd||{})[x.a])) ch.push('달러 예수금');
+    if(x.o!==((+((state.owners||{})[x.a])===1)?1:0)) ch.push('명의자');
+    if(ch.length) plan.accUpd.push(x.a+' ('+ch.join('·')+')'); });
+  const key=(a,c)=>a+'|'+String(c).toUpperCase();
+  const cur={}; state.holdings.forEach(h=>{ if(h.code) (cur[key(h.acct||curAcc[0],h.code)]=cur[key(h.acct||curAcc[0],h.code)]||[]).push(h); });
+  const fileKeys=new Set();
+  P.hold.forEach(x=>{ const k=key(x.acct,x.code); fileKeys.add(k); const c=cur[k];
+    if(!c){ plan.add.push(x); return; }
+    const q=c.reduce((t,h)=>t+num(h.qty),0), a0=num(c[0].avg), f0=num(c[0].fx);
+    if(c.length===1&&q===x.qty&&a0===num(x.avg)&&f0===num(x.fx)) plan.same++;
+    else plan.upd.push({...x,q0:q,a0,f0}); });
+  Object.keys(cur).forEach(k=>{ if(!fileKeys.has(k)) cur[k].forEach(h=>{ const m=lookup(h.code); plan.mine.push({acct:h.acct||curAcc[0],name:m?m.name:h.code,qty:num(h.qty)}); }); });
+  const hd={}; (state.hist||[]).forEach(r=>hd[r.d]=r);
+  new Set(P.hist.map(x=>x.d)).forEach(d=>{ const r=hd[d]; if(!r) plan.hist.add++; else if(r.man) plan.hist.upd++; else plan.hist.auto++; });
+  const sig=r=>[r.d,+r.o||0,r.name||'',Math.round(num(r.gain))].join('|');
+  const have=new Set((state.realized||[]).map(sig));
+  P.cgt.forEach(r=>{ if(have.has(sig(r))) plan.cgt.dup++; else plan.cgt.add++; });
+  return plan;
+}
+function xlPreviewHtml(plan,skip){
+  const li=(t,n)=>n?`<li>${t}</li>`:'';
+  const fmt=x=>`${esc(x.acct)} · ${esc(x.name)} ${x.qty.toLocaleString('ko-KR',{maximumFractionDigits:6})}주`;
+  const list=(arr,f,max=8)=>arr.length?`<div class="xl-pv-l">${arr.slice(0,max).map(f).join('<br>')}${arr.length>max?`<br>… 외 ${arr.length-max}건`:''}</div>`:'';
+  return `<div class="xl-pv"><ul>
+    ${li(`새 계좌 <b>${plan.newAcc.length}</b>개: ${esc(plan.newAcc.join(', '))}`,plan.newAcc.length)}
+    ${li(`계좌 정보 변경 <b>${plan.accUpd.length}</b>개: ${esc(plan.accUpd.join(', '))}`,plan.accUpd.length)}
+    ${li(`보유 종목 추가 <b>${plan.add.length}</b>건`+list(plan.add,fmt),plan.add.length)}
+    ${li(`보유 종목 변경 <b>${plan.upd.length}</b>건`+list(plan.upd,x=>`${esc(x.acct)} · ${esc(x.name)} ${x.q0.toLocaleString('ko-KR')}주 → <b>${x.qty.toLocaleString('ko-KR',{maximumFractionDigits:6})}주</b>${num(x.avg)!==x.a0?` · 평단 ${x.a0||'—'} → <b>${x.avg||'—'}</b>`:''}${num(x.fx)!==x.f0?` · 매입환율 ${x.f0||'—'} → <b>${x.fx||'—'}</b>`:''}`),plan.upd.length)}
+    ${li(`그대로인 종목 ${plan.same}건`,plan.same)}
+    ${li(`<b>파일에 없는</b> 지금 종목 <b>${plan.mine.length}</b>건 — 아래에서 남길지 지울지 고릅니다`+list(plan.mine,fmt),plan.mine.length)}
+    ${li(`자산 추이 새 날짜 <b>${plan.hist.add}</b>일`,plan.hist.add)}
+    ${li(`직접 넣은 자산 추이 덮어쓰기 ${plan.hist.upd}일`,plan.hist.upd)}
+    ${li(`도구가 자동으로 남긴 날과 겹쳐 건너뛸 자산 추이 ${plan.hist.auto}일`,plan.hist.auto)}
+    ${li(`양도차익 기록 추가 <b>${plan.cgt.add}</b>건`,plan.cgt.add)}
+    ${li(`이미 있는 양도차익 기록(건너뜀) ${plan.cgt.dup}건`,plan.cgt.dup)}
+    ${li(`배당 누적액 ${plan.div}개 계좌`,plan.div)}
+  </ul>${skip.length?`<div class="xl-pv-skip"><b>확인이 필요한 행 ${skip.length}건</b><br>${skip.slice(0,12).map(esc).join('<br>')}${skip.length>12?`<br>… 외 ${skip.length-12}건`:''}</div>`:''}</div>`;
+}
+function exportJSON(prefix){
+  const blob=new Blob([JSON.stringify({app:'ttokjae-portfolio',version:2,savedAt:new Date().toISOString(),data:state},null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`${prefix||'포트폴리오'}_${stamp()}.json`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function xlApply(P,plan,mode){
+  const keepMine=mode==='merge';
+  // 계좌
+  let list=accts();
+  if(!keepMine){ const fileAcc=[...new Set([...P.acct.map(x=>x.a),...P.hold.map(x=>x.acct)])]; if(fileAcc.length) list=fileAcc; }
+  plan.newAcc.forEach(a=>{ if(!list.includes(a)) list.push(a); });
+  state.accounts=list;
+  state.notes=state.notes||{}; state.owners=state.owners||{}; state.cashUsd=state.cashUsd||{};
+  P.acct.forEach(x=>{ if(x.note) state.notes[x.a]=x.note;
+    if(x.cw!==null) state.cash[x.a]=x.cw; if(x.cu!==null) state.cashUsd[x.a]=x.cu;
+    state.owners[x.a]=x.o; });
+  if(P.acct.some(x=>x.o===1)||P.cgt.some(x=>x.o===1)) state.ownerOn=true;
+  // 보유 종목: 파일에 나온 (계좌·종목)은 파일 값으로 바꾸고, 나머지는 모드에 따라 남기거나 지운다
+  const key=(a,c)=>a+'|'+String(c).toUpperCase();
+  const fileKeys=new Set(P.hold.map(x=>key(x.acct,x.code)));
+  state.holdings=state.holdings.filter(h=>h.code&&!fileKeys.has(key(h.acct||accts()[0],h.code))&&(keepMine||false));
+  P.hold.forEach(x=>{ const h={acct:x.acct,code:x.code,qty:x.qty,avg:x.avg}; if(x.fx) h.fx=x.fx; state.holdings.push(h); });
+  if(!state.holdings.length) state.holdings.push({acct:accts()[0],code:'',qty:'',avg:''});
+  // 자산 추이: 날짜별로 넣는다. 자동 기록이 있는 날은 건드리지 않는다
+  P.hist.filter(x=>!x.a).forEach(x=>putPast(x.d,'',x.buy,x.val,false));
+  P.hist.filter(x=>x.a).forEach(x=>putPast(x.d,x.a,x.buy,x.val,false));
+  // 양도차익: 같은 기록은 한 번만
+  const sig=r=>[r.d,+r.o||0,r.name||'',Math.round(num(r.gain))].join('|');
+  state.realized=state.realized||[]; const have=new Set(state.realized.map(sig));
+  P.cgt.forEach((r,i)=>{ if(have.has(sig(r))) return; have.add(sig(r));
+    state.realized.push({id:Date.now().toString(36)+i,...r}); });
+  // 배당 누적
+  state.divOut=state.divOut||{}; P.div.forEach(x=>state.divOut[x.a]={w:x.w,r:x.r});
+  trSig='';
+  save(); syncOwnerUI(); renderCash(); render();
+}
+async function xlUpload(f){
+  if(DEMO){ alert('예시 데이터 화면에서는 불러올 수 없습니다. 위쪽 \'내 데이터로 시작하기\'를 눌러 주세요.'); return; }
+  try{
+    xlMsg('파일을 읽는 중…'); const X=await ensureXLSX();
+    if(!Object.keys(KR).length){ xlMsg('시세 목록을 아직 불러오지 못해 종목을 찾을 수 없습니다. 잠시 뒤 다시 올려 주세요.','err'); return; }
+    const buf=await f.arrayBuffer();
+    let wb;
+    if(/\.csv$/i.test(f.name)){
+      // 한국어 엑셀이 저장한 CSV 는 대개 EUC-KR(CP949)이다. UTF-8 로 안 읽히면 EUC-KR 로 다시 읽는다.
+      let text; try{ text=new TextDecoder('utf-8',{fatal:true}).decode(buf); }catch(_){ text=new TextDecoder('euc-kr').decode(buf); }
+      wb=X.read(text.replace(/^\uFEFF/,''),{type:'string',cellDates:true});
+      // CSV 는 시트가 하나뿐이다. 머리글로 어떤 시트인지 알아낸다.
+      const only=wb.Sheets[wb.SheetNames[0]], head=X.utils.sheet_to_json(only,{header:1})[0]||[];
+      const h=head.join('|');
+      const k=/결제일|실현손익/.test(h)?'cgt':/평가금액/.test(h)&&/날짜/.test(h)?'hist':/종목/.test(h)?'hold':/꺼내/.test(h)?'div':'acct';
+      wb.Sheets[XL_SHEETS[k].name]=only;
+    }else wb=X.read(buf,{type:'array',cellDates:true});
+    const {P,skip}=xlParse(X,wb);
+    const total=P.acct.length+P.hold.length+P.hist.length+P.cgt.length+P.div.length;
+    if(!total){ xlMsg('읽을 수 있는 행이 없습니다.'+(skip.length?'<br>'+skip.slice(0,8).map(esc).join('<br>'):''),'err'); return; }
+    const plan=xlPlan(P);
+    const hasData=state.holdings.some(h=>h.code)||(state.hist||[]).length||(state.realized||[]).length;
+    const opts=[{label:'합치기',value:'merge',primary:true,desc:'파일에 나온 종목만 파일 값으로 바꾸고, 파일에 없는 지금 종목은 그대로 둡니다.'}];
+    if(plan.mine.length) opts.push({label:'파일 기준으로 맞추기',value:'replace',
+      desc:`파일에 없는 지금 종목 ${plan.mine.length}건을 지웁니다. 계좌 목록도 파일대로 맞춥니다. 자산 추이·양도차익 기록은 지우지 않습니다.`});
+    const v=await askChoice(hasData?'이렇게 반영됩니다':'이 내용을 넣을까요?',
+      `<b>${esc(f.name)}</b>에서 읽은 내용입니다.`+xlPreviewHtml(plan,skip)
+      +(hasData?'<div class="xl-pv-bk">반영 직전에 지금 데이터를 백업 파일(.json)로 내려받습니다.</div>':''),opts);
+    if(v===null){ xlMsg('취소했습니다. 아무것도 바뀌지 않았습니다.'); return; }
+    if(hasData) exportJSON('포트폴리오_엑셀반영전백업');
+    xlApply(P,plan,v);
+    xlMsg(`반영했습니다. 보유 종목 ${P.hold.length}건 · 자산 추이 ${new Set(P.hist.map(x=>x.d)).size}일 · 양도차익 ${plan.cgt.add}건`
+      +(skip.length?` · 확인이 필요한 행 ${skip.length}건은 위 미리보기에 적힌 대로 처리했습니다`:''),'ok');
+  }catch(e){ xlMsg('파일을 읽지 못했습니다: '+esc(e.message),'err'); }
+}
+document.getElementById('xl-blank').onclick=()=>xlDownload(true);
+document.getElementById('xl-mine').onclick=()=>xlDownload(false);
+document.getElementById('xl-up').onclick=()=>document.getElementById('file-xl').click();
+document.getElementById('file-xl').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) xlUpload(f); };
 
 /* ---------- 캡처 OCR ---------- */
 const drop=document.getElementById('drop'), fileImg=document.getElementById('file-img');
@@ -5399,7 +6293,7 @@ document.getElementById('btn-review-cancel').onclick=()=>{
 /* ---------- 탭 ----------
    숨은 칸에서는 캔버스 크기가 0 이라 차트가 찌그러진다.
    탭을 바꾼 뒤 render() 를 다시 불러 그 탭의 차트를 새로 그린다. */
-const TABS=['hold','shot','sum','detail','div','trend'];
+const TABS=['hold','shot','sum','detail','div','trend','cgt'];
 function showTab(id){
   if(!TABS.includes(id)) id='hold';
   document.querySelectorAll('.tab').forEach(b=>{
@@ -5423,9 +6317,11 @@ document.getElementById('tabs').addEventListener('click',e=>{
 
 /* ---------- 시작 ---------- */
 load();
+if(DEMO){ document.getElementById('demo-bar').hidden=false; document.title='예시 · '+document.title; }
 if(!state.holdings.length) state.holdings.push({acct:accts()[0],code:'',qty:'',avg:''});
 document.getElementById('chk-div-merge').checked=!!state.divMerge;
 document.getElementById('chk-div-net').checked=!!state.divNet;
+syncOwnerUI();
 renderAccts();
 renderCash();
 showTab(state.tab||'hold');   // 안에서 render() 까지 부른다
