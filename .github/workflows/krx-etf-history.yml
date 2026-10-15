@@ -1,0 +1,69 @@
+name: KRX ETF 월말 이력 수집
+
+# 백테스트용 국내 ETF 실제 종가·NAV·기초지수 (scripts/build_krx_etf_history.py)
+# 지금은 수동 실행 전용. 계산기 방식을 정한 뒤 월 1회 예약을 붙인다.
+on:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "있는 달도 전부 다시 받기 (1이면 전체)"
+        required: false
+        default: "0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: krx-etf-history
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: pykrx 설치
+        # 배당 워크플로와 같은 버전에 묶는다. 1.2.9 는 로그인 ID 를 stdout 에 찍는다.
+        run: pip install --quiet "pykrx==1.2.8" pandas
+
+      - name: KRX ETF 월말 시세 수집
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
+          FULL: ${{ github.event.inputs.full }}
+        # 계정 값은 스크립트가 출력하지 않는다. stdout 은 통째로 버리고 stderr 진행 로그만 남긴다.
+        run: |
+          set -o pipefail
+          python scripts/build_krx_etf_history.py > /dev/null 2> >(tee /tmp/krx_err.log >&2)
+
+      - name: 실행 요약
+        if: always()
+        run: |
+          {
+            echo "### KRX ETF 월말 이력 — stderr 마지막 40줄"
+            echo '```'
+            tail -n 40 /tmp/krx_err.log 2>/dev/null | grep -viE 'KRX_ID|KRX_PW|로그인 ID' || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 변경분만 커밋
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/history/
+          if git diff --cached --quiet; then
+            echo "변경 없음"; exit 0
+          fi
+          git commit -m "KRX ETF 월말 이력: $(TZ=Asia/Seoul date '+%Y-%m-%d')"
+          for i in 1 2 3; do
+            git push && exit 0
+            echo "push 거절 — pull --rebase 후 재시도 ($i/3)"
+            git pull --rebase origin master || exit 1
+          done
+          exit 1
