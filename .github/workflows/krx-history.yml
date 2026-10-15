@@ -1,10 +1,14 @@
-name: KRX ETF 월말 이력 수집
+name: KRX 월말 이력 수집
 
-# 백테스트용 국내 ETF 실제 종가·NAV·기초지수 (scripts/build_krx_etf_history.py)
+# 백테스트용 국내 ETF·개별주식 월말 실제 종가 (scripts/build_krx_history.py)
 # 지금은 수동 실행 전용. 계산기 방식을 정한 뒤 월 1회 예약을 붙인다.
 on:
   workflow_dispatch:
     inputs:
+      target:
+        description: "받을 대상 (etf / stock / etf stock)"
+        required: false
+        default: "etf stock"
       full:
         description: "있는 달도 전부 다시 받기 (1이면 전체)"
         required: false
@@ -14,13 +18,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: krx-etf-history
+  group: krx-history
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
 
     steps:
       - uses: actions/checkout@v4
@@ -32,7 +36,7 @@ jobs:
         # 배당 워크플로와 같은 버전에 묶는다. 1.2.9 는 로그인 ID 를 stdout 에 찍는다.
         run: pip install --quiet "pykrx==1.2.8" pandas
 
-      - name: KRX ETF 월말 시세 수집
+      - name: KRX 월말 시세 수집
         env:
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
@@ -40,13 +44,13 @@ jobs:
         # 계정 값은 스크립트가 출력하지 않는다. stdout 은 통째로 버리고 stderr 진행 로그만 남긴다.
         run: |
           set -o pipefail
-          python scripts/build_krx_etf_history.py > /dev/null 2> >(tee /tmp/krx_err.log >&2)
+          python scripts/build_krx_history.py ${{ github.event.inputs.target }} > /dev/null 2> >(tee /tmp/krx_err.log >&2)
 
       - name: 실행 요약
         if: always()
         run: |
           {
-            echo "### KRX ETF 월말 이력 — stderr 마지막 40줄"
+            echo "### KRX 월말 이력 — stderr 마지막 40줄"
             echo '```'
             tail -n 40 /tmp/krx_err.log 2>/dev/null | grep -viE 'KRX_ID|KRX_PW|로그인 ID' || true
             echo '```'
@@ -60,7 +64,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "변경 없음"; exit 0
           fi
-          git commit -m "KRX ETF 월말 이력: $(TZ=Asia/Seoul date '+%Y-%m-%d')"
+          git commit -m "KRX 월말 이력: $(TZ=Asia/Seoul date '+%Y-%m-%d')"
           for i in 1 2 3; do
             git push && exit 0
             echo "push 거절 — pull --rebase 후 재시도 ($i/3)"
