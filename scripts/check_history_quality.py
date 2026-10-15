@@ -100,34 +100,30 @@ def scan_etf_dist(series, flags):
 def etf_basis(etf):
     """네이버 ETF 가격이 분배금 보정값인지 종목별로 판정 → kr_etf_basis.csv
 
-    야후 실제 종가(close)·수정종가(adjclose)와 겹치는 달을 비교해 더 가까운 쪽으로 정한다.
-    분배금이 없던 종목은 둘이 같으므로 '구분없음'."""
+    KRX 실제 종가(kr_etf_krx/)와 겹치는 달을 비교한다. 네이버가 분배금을 소급 보정하면
+    과거로 갈수록 네이버가 KRX 보다 낮다. 분배금이 없던 종목은 둘이 같아 '구분없음'.
+    (야후 close 는 일부 달에 보정값이 섞여 기준으로 쓰지 않는다 — 2026-10 실측 17% 불일치)"""
     out = []
     for code, s in sorted(etf.items()):
-        p = f"{ROOT}/kr_etf_raw/{code}.csv"
+        p = f"{ROOT}/kr_etf_krx/{code}.csv"
         if not os.path.exists(p):
-            out.append((code, "야후없음", "", ""))
+            out.append((code, "KRX없음", ""))
             continue
-        dc, da = [], []
+        diffs = []
         for row in list(csv.reader(open(p, encoding="utf-8")))[1:]:
-            m, c, a = row[0], row[1], row[2] if len(row) > 2 else ""
-            if m in s and c and a:
-                dc.append(abs(s[m] / float(c) - 1))
-                da.append(abs(s[m] / float(a) - 1))
-        if len(dc) < 3:
-            out.append((code, "판정불가", "", ""))
+            if row[0] in s and row[2]:
+                diffs.append(s[row[0]] / float(row[2]) - 1)
+        if len(diffs) < 3:
+            out.append((code, "판정불가", ""))
             continue
-        mc, ma = sorted(dc)[len(dc) // 2], sorted(da)[len(da) // 2]
-        if abs(mc - ma) < 0.002:
-            tag = "구분없음"
-        else:
-            tag = "분배금보정" if ma < mc else "실제종가"
-        out.append((code, tag, f"{mc:.4f}", f"{ma:.4f}"))
+        worst = min(diffs)                      # 가장 크게 낮은 달
+        tag = "분배금보정" if worst < -0.003 else "구분없음"
+        out.append((code, tag, f"{worst:.4f}"))
     with open(f"{ROOT}/kr_etf_basis.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["종목코드", "네이버가격", "실제종가와차이", "수정종가와차이"])
+        w.writerow(["종목코드", "네이버가격", "KRX대비_최대차이"])
         w.writerows(out)
-    return Counter(t for _, t, _, _ in out)
+    return Counter(t for _, t, _ in out)
 
 
 def main():

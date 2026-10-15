@@ -241,43 +241,6 @@ def kr_aggregate(items):
     return len(rows), n
 
 
-# ── 국내 ETF 실제 종가 ──────────────────────────────────────
-#
-# ★ 네이버 국내 차트는 ETF 가격을 '분배금까지 소급 보정'해서 준다(개별주식은 분할만 보정).
-#   KODEX 200 2014-12: 네이버 19,621 = 야후 수정종가 19,654 ≠ 실제 종가 24,670 (2026-10 실측)
-#   삼성전자 2014-12: 네이버 26,540 = 야후 실제 종가 26,540
-#   그래서 네이버 ETF 가격에 분배금을 다시 더하면 이중 계산이 된다.
-#   분배금을 현금으로 받는 시뮬레이션(생활비)에는 실제 종가가 필요해 야후 close 를 따로 받는다.
-
-def etf_universe():
-    with open("data/etf_prices.csv", encoding="utf-8") as f:
-        return [(r["종목코드"], r["종목코드"] + ".KS") for r in csv.DictReader(f)]
-
-
-def etf_job(code, ysym):
-    cpath = f"{CACHE}/kr_etf/{code}.json"
-    if cached_today(cpath):
-        return code, "skip"
-    time.sleep(SLEEP)
-    res = _result(YH.format(ysym, "1mo").replace("&events=div%7Csplit", ""))
-    rows = []
-    if res:
-        off = res.get("meta", {}).get("gmtoffset", 0) or 0
-        q = (res.get("indicators", {}).get("quote") or [{}])[0].get("close") or []
-        a = (res.get("indicators", {}).get("adjclose") or [{}])[0].get("adjclose") or []
-        month = {}
-        for t, c, ac in zip(res.get("timestamp") or [], q, a or [None] * len(q)):
-            if c:
-                month[month_of(t, off)] = (round(c, 4), round(ac, 4) if ac else "")
-        rows = [[m, c, ac] for m, (c, ac) in sorted(month.items())]
-    save_json(cpath, {"m": rows})
-    if rows:
-        write_csv(f"{ROOT}/kr_etf_raw/{code}.csv", ["월", "종가", "수정종가"],
-                  [(m, fmt(c), fmt(ac) if ac != "" else "") for m, c, ac in rows])
-        return code, "yahoo"
-    return code, "none"
-
-
 def main():
     if len(sys.argv) < 2:
         raise SystemExit(__doc__)
@@ -286,9 +249,6 @@ def main():
         items, job, sub = us_universe(), us_job, "us"
     elif kind == "kr_split":
         items, job, sub = kr_universe(), kr_job, "kr"
-    elif kind == "kr_etf_raw":
-        items, job, sub = etf_universe(), etf_job, "kr_etf"
-        os.makedirs(f"{ROOT}/kr_etf_raw", exist_ok=True)
     else:
         raise SystemExit(f"알 수 없는 대상: {kind}")
     os.makedirs(f"{CACHE}/{sub}", exist_ok=True)
