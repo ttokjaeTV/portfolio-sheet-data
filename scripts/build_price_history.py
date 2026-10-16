@@ -36,6 +36,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from winsafe import to_filename
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta, timezone
 
@@ -175,8 +176,8 @@ def job_monthly(kind, code, rc, end):
 
 
 def safe(t):
-    """파일명용. BRK.B → BRK.B 그대로 두되 경로 구분자만 막는다."""
-    return t.replace("/", "_")
+    """파일명용. BRK.B 는 그대로, 경로 구분자와 Windows 예약어(CON·PRN…)만 피한다 — winsafe.py"""
+    return to_filename(t)
 
 
 # ── 유니버스 ──────────────────────────────────────────────

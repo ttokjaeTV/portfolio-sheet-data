@@ -21,6 +21,8 @@ import math
 import os
 from collections import Counter
 
+from winsafe import from_filename
+
 ROOT = os.environ.get("HISTORY_DIR", "data/history")
 
 
@@ -38,7 +40,7 @@ def mnum(m):
 def scan_prices(kind, flags):
     series = {}
     for p in glob.glob(f"{ROOT}/{kind}/*.csv"):
-        code = os.path.basename(p)[:-4]
+        code = from_filename(os.path.basename(p)[:-4])
         s = load(p)
         series[code] = dict(s)
         if not s:

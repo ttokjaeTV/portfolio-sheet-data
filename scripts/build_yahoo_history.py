@@ -37,6 +37,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from winsafe import to_filename
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 
@@ -176,7 +177,7 @@ def us_universe():
 
 
 def us_job(t, rc):
-    cpath = f"{CACHE}/us/{t.replace('/', '_')}.json"
+    cpath = f"{CACHE}/us/{to_filename(t)}.json"
     if cached_today(cpath):
         return t, "skip"
     time.sleep(SLEEP)
@@ -188,7 +189,7 @@ def us_job(t, rc):
     y["src"] = src
     save_json(cpath, y)
     if y["m"]:
-        write_csv(f"{ROOT}/us/{t.replace('/', '_')}.csv", ["월", "종가"],
+        write_csv(f"{ROOT}/us/{to_filename(t)}.csv", ["월", "종가"],
                   [(m, fmt(c)) for m, c in y["m"]])
     return t, src
 
@@ -196,7 +197,7 @@ def us_job(t, rc):
 def us_aggregate(items):
     divs, splits, srcs = [], [], []
     for t, _ in items:
-        p = f"{CACHE}/us/{t.replace('/', '_')}.json"
+        p = f"{CACHE}/us/{to_filename(t)}.json"
         if not os.path.exists(p):
             continue
         y = json.load(open(p, encoding="utf-8"))
@@ -254,7 +255,7 @@ def main():
     os.makedirs(f"{CACHE}/{sub}", exist_ok=True)
     os.makedirs(f"{ROOT}/us", exist_ok=True)
 
-    todo = [it for it in items if not cached_today(f"{CACHE}/{sub}/{it[0].replace('/', '_')}.json")]
+    todo = [it for it in items if not cached_today(f"{CACHE}/{sub}/{to_filename(it[0])}.json")]
     if LIMIT:
         todo = todo[:LIMIT]
     print(f"{kind}: 전체 {len(items)} · 이번 {len(todo)}", file=sys.stderr)
