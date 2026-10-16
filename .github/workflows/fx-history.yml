@@ -1,0 +1,48 @@
+name: 원달러 환율 월말 이력 수집
+
+# 백테스트용 원/달러 월말 환율 (scripts/build_fx_history.py)
+# FRED(미 연준 H.10) 는 Claude 샌드박스에서 막혀 Actions 러너에서 받는다.
+# 지금은 수동 실행 전용. 계산기 방식을 정한 뒤 월 1회 예약을 붙인다.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fx-history
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 환율 이력 수집
+        run: |
+          set -o pipefail
+          python scripts/build_fx_history.py 2> >(tee /tmp/fx_err.log >&2)
+
+      - name: 실행 요약
+        if: always()
+        run: |
+          { echo "### 원달러 환율 이력 — 로그"; echo '```'; tail -n 30 /tmp/fx_err.log 2>/dev/null || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 변경분만 커밋
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/history/usdkrw_month.csv
+          if git diff --cached --quiet; then echo "변경 없음"; exit 0; fi
+          git commit -m "원달러 환율 이력: $(TZ=Asia/Seoul date '+%Y-%m-%d')"
+          for i in 1 2 3; do
+            git push && exit 0
+            echo "push 거절 — pull --rebase 후 재시도 ($i/3)"
+            git pull --rebase origin master || exit 1
+          done
+          exit 1
