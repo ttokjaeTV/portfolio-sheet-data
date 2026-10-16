@@ -43,7 +43,6 @@ from datetime import datetime, timedelta, timezone
 
 KST = timezone(timedelta(hours=9))
 UA = {"User-Agent": "Mozilla/5.0"}
-YH = "https://query1.finance.yahoo.com/v8/finance/chart/{}?range=max&interval={}&events=div%7Csplit"
 NAVER = ("https://api.stock.naver.com/chart/foreign/item/{}/month"
          "?startDateTime=199001010000&endDateTime={}0000")
 
@@ -90,23 +89,23 @@ def _result(url):
 def yahoo(sym, interval):
     """→ {"m": [[월, 종가], ...], "div": [[월, 금액]], "split": [[월, "a:b"]]} 또는 None
 
-    ★ range=max&interval=1mo 는 막대가 약 500개를 넘으면 야후가 말없이 3개월 간격으로
-      줄여 보낸다(KO·AA·USB 등 1985년 이전 상장 776종, 2026-10 실측).
-      간격이 벌어져 있으면 2000-01-01 을 경계로 두 번 나눠 다시 받는다."""
-    res = _result(YH.format(sym, interval))
+    ★★ range=max 를 쓰지 말 것 (2026-10-16 실측).
+       range=max&interval=1mo 는 야후가 막대 수에 맞춰 간격을 멋대로 바꾼다.
+         - 상장 오래된 종목(KO·AAPL 등) → 3개월봉
+         - 상장 짧은 종목(JEPI·QQQM 등)  → **주봉**. 그달 마지막 주봉의 종가가 다음 달 초까지 걸쳐
+           월말 종가가 1~2% 틀어진다(JEPI 2020-08: 52.95 ← 실제 54.19).
+       period1=0&period2=지금 으로 요청하면 모든 종목이 1mo 로 온다.
+       응답의 meta.dataGranularity 가 요청과 다르면 버리고 오류로 처리한다."""
+    far = int(time.time()) + 86400 * 2
+    url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
+           f"?period1=0&period2={far}&interval={interval}&events=div%7Csplit")
+    res = _result(url)
     if not res:
         return None
+    got = (res.get("meta") or {}).get("dataGranularity")
+    if got and got != interval:
+        raise ValueError(f"{sym} 간격 {got} ≠ 요청 {interval}")
     parts = [res]
-    ts = res.get("timestamp") or []
-    if interval == "1mo" and len(ts) > 2:
-        gaps = sorted(b - a for a, b in zip(ts, ts[1:]))
-        if gaps[len(gaps) // 2] > 45 * 86400:
-            base = ("https://query1.finance.yahoo.com/v8/finance/chart/{}"
-                    "?period1={}&period2={}&interval=1mo&events=div%7Csplit")
-            cut, far = 946684800, int(time.time()) + 86400 * 2   # 2000-01-01 UTC
-            got = [_result(base.format(sym, 0, cut)), _result(base.format(sym, cut, far))]
-            if all(got):
-                parts = got
 
     month, divd, spl = {}, {}, {}
     for res in parts:
