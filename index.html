@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<script src="https://ttokjaetv.github.io/member-lock.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>포트폴리오 관리 도구 · 똑재TV</title>
 <meta name="description" content="연금저축·IRP·ISA·일반계좌에 흩어진 국내 ETF와 미국 직투를 한 화면에. 자동 시세, 배당·분배금, IRP 70% 한도, 해외주식 양도차익 250만원 공제, 자산 추이까지. 무료, 로그인 없이 브라우저에서 바로.">
@@ -949,8 +950,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     파일로 내려받아 두면 다른 기기에서도 그대로 불러올 수 있습니다.
   </div>
   <div class="savebar-btns">
-    <button class="btn" id="btn-export">💾 파일로 저장</button>
-    <button class="btn ghost" id="btn-import">📂 파일 불러오기</button>
+    <button class="btn" id="btn-export" data-member-click="파일 저장·불러오기·엑셀">💾 파일로 저장</button>
+    <button class="btn ghost" id="btn-import" data-member-click="파일 저장·불러오기·엑셀">📂 파일 불러오기</button>
     <input type="file" id="file-json" accept="application/json,.json" hidden>
   </div>
 </div>
@@ -968,12 +969,12 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
 
 <nav class="tabs" id="tabs" role="tablist">
   <button class="tab on" type="button" data-tab="hold" role="tab"><span class="tab-n">1</span>보유 종목</button>
-  <button class="tab" type="button" data-tab="shot" role="tab"><span class="tab-n">2</span>불러오기</button>
+  <button class="tab" type="button" data-tab="shot" role="tab" data-member-click="불러오기"><span class="tab-n">2</span>불러오기</button>
   <button class="tab" type="button" data-tab="sum" role="tab"><span class="tab-n">3</span>전체 현황</button>
-  <button class="tab" type="button" data-tab="detail" role="tab"><span class="tab-n">4</span>종목 상세</button>
-  <button class="tab" type="button" data-tab="div" role="tab"><span class="tab-n">5</span>배당</button>
-  <button class="tab" type="button" data-tab="trend" role="tab"><span class="tab-n">6</span>자산 추이</button>
-  <button class="tab" type="button" data-tab="cgt" role="tab"><span class="tab-n">7</span>양도차익</button>
+  <button class="tab" type="button" data-tab="detail" role="tab" data-member-click="종목 상세"><span class="tab-n">4</span>종목 상세</button>
+  <button class="tab" type="button" data-tab="div" role="tab" data-member-click="배당 달력"><span class="tab-n">5</span>배당</button>
+  <button class="tab" type="button" data-tab="trend" role="tab" data-member-click="자산 추이"><span class="tab-n">6</span>자산 추이</button>
+  <button class="tab" type="button" data-tab="cgt" role="tab" data-member-click="해외 양도차익"><span class="tab-n">7</span>양도차익</button>
 </nav>
 
 <section class="tabpane on" data-pane="hold">
@@ -1062,7 +1063,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
     <label class="merge-toggle">
       <span class="merge-label">명의자 구분 <span class="beta">시험 기능</span>
         <span class="merge-sub">부부 계좌를 함께 관리할 때 · 양도차익 250만원 공제와 금융소득 2,000만원 한도를 사람별로 나눠 봅니다</span></span>
-      <span class="toggle-switch"><input type="checkbox" id="chk-owner"><span class="toggle-slider"></span></span>
+      <span class="toggle-switch"><input type="checkbox" id="chk-owner" data-member-click="명의 2인"><span class="toggle-slider"></span></span>
     </label>
     <div class="own-names" id="own-names" hidden>
       <label>첫째 명의 <input type="text" id="own-n0" maxlength="8" placeholder="본인"></label>
@@ -1086,7 +1087,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--ink-mute);font-size:12p
   </div>
   <div class="xl-steps">
     <button class="xl-b" id="xl-blank" type="button"><span class="xl-n">①</span><span><b>빈 양식 받기</b><small>예시 행이 들어 있는 입력용 엑셀</small></span></button>
-    <button class="xl-b" id="xl-mine" type="button"><span class="xl-n">②</span><span><b>지금 데이터로 받기</b><small>엑셀 백업 · 고쳐서 다시 올려도 됩니다</small></span></button>
+    <button class="xl-b" id="xl-mine" type="button" data-member-click="파일 저장·불러오기·엑셀"><span class="xl-n">②</span><span><b>지금 데이터로 받기</b><small>엑셀 백업 · 고쳐서 다시 올려도 됩니다</small></span></button>
     <button class="xl-b on" id="xl-up" type="button"><span class="xl-n">③</span><span><b>채운 파일 올리기</b><small>.xlsx · .xls · .csv</small></span></button>
     <input type="file" id="file-xl" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
   </div>
@@ -1521,6 +1522,9 @@ function defaultAccts(){
   return LEGACY_DEFAULT_ACCOUNTS.slice(0,2).some(a=>used.has(a)) ? LEGACY_DEFAULT_ACCOUNTS : DEFAULT_ACCOUNTS;
 }
 const LS_KEY='ttokjae_portfolio_v2';
+/* 멤버십 잠금: 비회원은 종목 10개까지 새로 담을 수 있다(이미 저장된 종목은 몇 개든 그대로 보인다) */
+const FREE_HOLD_MAX=10;
+const holdCount=()=>(state.holdings||[]).filter(h=>h&&h.code).length;
 /* 계좌는 이용자가 자유롭게 추가·이름변경할 수 있다.
    IRP 70% 한도와 절세계좌 비중은 계좌 이름으로 판별한다. */
 // 같은 계열끼리 모아 번호순으로 놓는다.
@@ -1878,6 +1882,7 @@ function loadHist(){
 }
 
 async function openIdx(name){
+  if (window.TJLock && !TJLock.allow('지수 5년 흐름')) return;
   IDX_NAME=name; IDX_DAYS=250;
   let box=document.getElementById('idx-back');
   if(!box){
@@ -2229,6 +2234,8 @@ function renderAccts(){
 }
 function addAccount(){
   const base=accts();
+  // 멤버십 잠금: 비회원은 계좌 1개. 이미 저장된 계좌는 그대로 두고 새로 만드는 것만 막는다
+  if (base.length>=1 && window.TJLock && !TJLock.allow('계좌 여러 개')) return null;
   const suggest=/일반계좌/.test(base.join()) ? `일반계좌${base.filter(a=>/일반계좌/.test(a)).length+1}` : '일반계좌';
   const name=(prompt('추가할 계좌 이름을 입력하세요.\n예: 연금저축3, IRP2, 일반계좌2',suggest)||'').trim();
   if(!name) return null;
@@ -4377,6 +4384,7 @@ function commitBuy(){
   const isUS=m.cur==='USD';
   const fx=isUS?num(e.fx.value):0;
   const i=findHolding(buyAcct,m.code);
+  if(i<0&&holdCount()>=FREE_HOLD_MAX&&window.TJLock&&!TJLock.allow('종목 10개 초과')) return;
   if(i<0||!holdAvgKnown(state.holdings[i])){
     // 새 종목이거나, 기존 로트가 평단 미입력이면 따로 담는다(원가 0 으로 평균이 희석되지 않게)
     const h={acct:buyAcct,code:m.code,qty,avg}; if(fx>0) h.fx=fx;
@@ -4773,6 +4781,12 @@ async function xlUpload(f){
       `<b>${esc(f.name)}</b>에서 읽은 내용입니다.`+xlPreviewHtml(plan,skip)
       +(hasData?'<div class="xl-pv-bk">반영 직전에 지금 데이터를 백업 파일(.json)로 내려받습니다.</div>':''),opts);
     if(v===null){ xlMsg('취소했습니다. 아무것도 바뀌지 않았습니다.'); return; }
+    // 멤버십 잠금: 새 계좌, 또는 종목이 10개를 넘게 늘어나면 막는다(지금 데이터는 그대로)
+    if(window.TJLock&&TJLock.locked()){
+      const after=P.hold.length+(v==='merge'?plan.mine.length:0);
+      const lab=plan.newAcc.length?'계좌 여러 개':(after>FREE_HOLD_MAX&&after>holdCount()?'종목 10개 초과':'');
+      if(lab&&!TJLock.allow(lab)){ xlMsg('취소했습니다. 아무것도 바뀌지 않았습니다.'); return; }
+    }
     if(hasData) exportJSON('포트폴리오_엑셀반영전백업');
     xlApply(P,plan,v);
     xlMsg(`반영했습니다. 보유 종목 ${P.hold.length}건 · 자산 추이 ${new Set(P.hist.map(x=>x.d)).size}일 · 양도차익 ${plan.cgt.add}건`
@@ -5311,7 +5325,7 @@ function spreadAccounts(){
   ocrShots.forEach((_,si)=>{
     if(pairOf[si]!==undefined){ map[si]=map[pairOf[si]]; return; }
     let a=shotAcct[si]||list[0];
-    if(used.has(a)){
+    if(used.has(a)&&!(window.TJLock&&TJLock.locked())){
       let cand=nextAcctName(a,used);
       while(used.has(cand)) cand=nextAcctName(cand,used);
       if(!taken.has(cand)){ list.push(cand); taken.add(cand); logEvent('add',cand); }
@@ -6247,13 +6261,14 @@ document.getElementById('btn-apply').onclick=()=>{
     else if(q||a) fill.push(r);
   });
   let filled=0;
+  const undo=[];                       // 멤버십 잠금으로 막히면 빈칸 채우기를 되돌린다
   fill.forEach(r=>{
     const acct=r.acct||accts()[0];
     const t=state.holdings.find(h=>(h.acct||accts()[0])===acct&&h.code===r.code
       &&((num(r.qty)>0&&!(num(h.qty)>0))||(num(r.avg)>0&&!(num(h.avg)>0))));
     if(t){
-      if(num(r.qty)>0&&!(num(t.qty)>0)) t.qty=r.qty;
-      if(num(r.avg)>0&&!(num(t.avg)>0)) t.avg=r.avg;
+      if(num(r.qty)>0&&!(num(t.qty)>0)){ undo.push([t,'qty',t.qty]); t.qty=r.qty; }
+      if(num(r.avg)>0&&!(num(t.avg)>0)){ undo.push([t,'avg',t.avg]); t.avg=r.avg; }
       filled++;
     }else if(num(r.qty)>0){
       add.push(r);                       // 수량만 있으면 그대로 넣는다. 매입가는 나중에 채운다
@@ -6261,6 +6276,9 @@ document.getElementById('btn-apply').onclick=()=>{
   });
   if(!add.length&&!filled){
     alert('추가할 항목이 없습니다.\n수량이 비어 있으면 넣을 수 없습니다.'); return;
+  }
+  if(add.length&&holdCount()+add.length>FREE_HOLD_MAX&&window.TJLock&&!TJLock.allow('종목 10개 초과')){
+    undo.reverse().forEach(([t,k,v])=>{ t[k]=v; }); return;
   }
   add.forEach(r=>state.holdings.push({acct:r.acct||accts()[0],code:r.code,qty:r.qty,avg:r.avg}));
   save();
@@ -6294,8 +6312,15 @@ document.getElementById('btn-review-cancel').onclick=()=>{
    숨은 칸에서는 캔버스 크기가 0 이라 차트가 찌그러진다.
    탭을 바꾼 뒤 render() 를 다시 불러 그 탭의 차트를 새로 그린다. */
 const TABS=['hold','shot','sum','detail','div','trend','cgt'];
+// 멤버십 잠금 탭(라벨은 탭 버튼의 data-member-click 과 같다)
+const LOCK_TABS={shot:'불러오기',detail:'종목 상세',div:'배당 달력',trend:'자산 추이',cgt:'해외 양도차익'};
+let tabLockPrompted=false;
 function showTab(id){
   if(!TABS.includes(id)) id='hold';
+  if(LOCK_TABS[id]&&window.TJLock&&TJLock.locked()){
+    if(!tabLockPrompted){ tabLockPrompted=true; TJLock.prompt(LOCK_TABS[id]); }
+    id='hold';
+  }
   document.querySelectorAll('.tab').forEach(b=>{
     const on=b.dataset.tab===id;
     b.classList.toggle('on',on);
