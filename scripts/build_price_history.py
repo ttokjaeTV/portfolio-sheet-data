@@ -99,6 +99,16 @@ def read_rows(path):
         return [row for row in r if len(row) >= 2]
 
 
+CUR = datetime.now(KST).strftime("%Y-%m")       # 이번 달 — 이력 파일에 넣지 않는다
+
+
+def write_if_changed(path, header, rows):
+    """내용이 같으면 파일을 건드리지 않는다 (불필요한 커밋 방지)"""
+    if [list(r) for r in read_rows(path)] == [[str(a), str(b)] for a, b in rows]:
+        return
+    write_rows(path, header, rows)
+
+
 def write_rows(path, header, rows):
     tmp = path + ".tmp"
     with open(tmp, "w", newline="", encoding="utf-8") as f:
@@ -153,10 +163,13 @@ def job_kr_etf(code, end):
     daily = merge(read_rows(dpath),
                   [(f"{d[:4]}-{d[4:6]}-{d[6:]}", fmt(c)) for d, c in rows])
     write_rows(dpath, ["날짜", "종가"], daily)
-    # 월봉은 일봉 전체에서 다시 만든다 — 그 달 마지막 거래일 종가
+    # 월봉은 일봉 전체에서 다시 만든다 — 그 달 마지막 거래일 종가.
+    # ★ 월봉 파일에는 '끝난 달'만 둔다. 이번 달 값은 계산기가 실시간 시세(etf_prices.csv)로 붙인다.
+    #   그래야 매일·매주 갱신 때 1만 6천 개 파일이 바뀌지 않는다(레포 용량).
     month = {}
     for d, c in daily:
-        month[d[:7]] = c
+        if d[:7] < CUR:
+            month[d[:7]] = c
     write_rows(mpath, ["월", "종가"], sorted(month.items()))
     return code, "ok", len(daily)
 
@@ -170,8 +183,9 @@ def job_monthly(kind, code, rc, end):
     rows = candles(base.format(rc, "month", start, end))
     if not rows:
         return code, "empty", 0
-    merged = merge(read_rows(path), [(f"{d[:4]}-{d[4:6]}", fmt(c)) for d, c in rows])
-    write_rows(path, ["월", "종가"], merged)
+    merged = [r for r in merge(read_rows(path), [(f"{d[:4]}-{d[4:6]}", fmt(c)) for d, c in rows])
+              if r[0] < CUR]                      # 끝난 달만 (이번 달은 실시간 시세로)
+    write_if_changed(path, ["월", "종가"], merged)
     return code, "ok", len(merged)
 
 

@@ -34,6 +34,9 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from winsafe import to_filename  # noqa: E402
+
 KST = timezone(timedelta(hours=9))
 H = "data/history"
 OUT = "data/bt"
@@ -63,13 +66,14 @@ def fmt(v):
 
 
 def write(path, data):
+    """내용이 같으면 파일을 건드리지 않는다"""
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    lines = ["월,금액"] + [f"{m},{fmt(round(data[m], 6))}" for m in sorted(data) if data[m] > 0]
+    text = "\r\n".join(lines) + "\r\n"
+    if os.path.exists(path) and open(path, encoding="utf-8", newline="").read() == text:
+        return
     with open(path, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["월", "금액"])
-        for m in sorted(data):
-            if data[m] > 0:
-                w.writerow([m, fmt(round(data[m], 6))])
+        f.write(text)
 
 
 def month_of(yyyymmdd):
@@ -169,7 +173,7 @@ def main():
     sym = json.load(open("data/us_symbols.json", encoding="utf-8"))
     for r in rows("data/us_prices.csv"):
         t = r["티커"]
-        safe = t.replace("/", "_")
+        safe = to_filename(t)               # Windows 예약어 회피 (winsafe.py) — 계산기 toFilename() 과 같은 규칙
         px = series(f"{H}/us/{safe}.csv")
         if not px:
             stat["미국·가격없음"] += 1
@@ -202,8 +206,19 @@ def main():
         "cols": ["키", "이름", "구분(E=ETF,S=주식)", "시작월", "마지막월", "배당파일", "품질경고", "출처(n=네이버)"],
         "rows": compact,
     }
-    with open(f"{OUT}/index.json", "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+    # ★ 종목 목록이 그대로면 파일을 건드리지 않는다 (매일 실행해도 1MB 파일이 매일 커밋되지 않게)
+    ipath = f"{OUT}/index.json"
+    if os.path.exists(ipath):
+        try:
+            prev = json.load(open(ipath, encoding="utf-8"))
+            if prev.get("rows") == payload["rows"] and prev.get("cols") == payload["cols"]:
+                print("  index.json 변경 없음", file=sys.stderr)
+                payload = None
+        except ValueError:
+            pass
+    if payload:
+        with open(ipath, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
 
     print(f"완료: {len(index)}종목 · {dict(stat)} · 미국 배당 보정 {npatch}건", file=sys.stderr)
     print(f"  삼성전자 보정 배수 {probe}", file=sys.stderr)

@@ -1,0 +1,116 @@
+name: 백테스트 데이터 갱신 (매일·매주·매월)
+
+# 백테스트 계산기(backtest/)용 이력. 세 주기로 나눠 외부 요청과 레포 용량을 줄인다.
+#
+#   매일  (평일 18:47 KST)  국내 배당·분배금(세이브로 최근 분기) · 환율 · data/bt 재생성     — 요청 수십 건
+#   매주  (토   07:23 KST)  + 미국 가격·배당·분할(야후) · 국내 분할 · 품질 점검 · 미국 주요 종목 대조 — 요청 1만 2천 건
+#   매월  (1일  10:07 KST)  + 국내 ETF·주식 가격(네이버) · KRX 월말 시세                — 지난달 확정
+#
+# ★ 종목별 가격 이력에는 '끝난 달'만 있다. 이번 달 가격은 계산기가 etf_prices.csv·kr_stocks.csv·
+#   us_prices.csv(시세 CSV 갱신, 30분마다)와 fx_std.csv 로 붙인다. 그래서 매일·매주 실행해도
+#   종목 파일 1만 6천 개가 바뀌지 않는다 — 스크립트는 내용이 같으면 파일을 건드리지 않는다.
+# ★ 분(分)은 :00 을 피한다 (정각 예약은 건너뛰는 일이 많다). cron 은 UTC.
+on:
+  schedule:
+    - cron: "47 9 * * 1-5"    # 매일
+    - cron: "23 22 * * 5"     # 매주
+    - cron: "7 1 1 * *"       # 매월
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "daily / weekly / monthly"
+        required: false
+        default: "daily"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backtest-data
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 주기 정하기
+        id: mode
+        run: |
+          case "${{ github.event.schedule }}" in
+            "23 22 * * 5") m=weekly ;;
+            "7 1 1 * *")   m=monthly ;;
+            "")            m="${{ github.event.inputs.mode }}" ;;
+            *)             m=daily ;;
+          esac
+          [ -z "$m" ] && m=daily
+          echo "mode=$m" >> "$GITHUB_OUTPUT"
+          echo "### 주기: $m" >> "$GITHUB_STEP_SUMMARY"
+
+      # ── 매일 ────────────────────────────────────────
+      - name: 국내 분배금·배당 (세이브로, 최근 분기)
+        continue-on-error: true
+        run: |
+          python scripts/build_dividend_history.py etf
+          python scripts/build_dividend_history.py stock
+      - name: 원달러 환율 (매매기준율, 끝난 달)
+        continue-on-error: true
+        run: python scripts/build_fx_history.py
+
+      # ── 매주 ────────────────────────────────────────
+      - name: 미국 가격·배당·분할 (야후)
+        if: steps.mode.outputs.mode != 'daily'
+        continue-on-error: true
+        run: python scripts/build_yahoo_history.py us
+      - name: 국내 분할 이력 (야후)
+        if: steps.mode.outputs.mode != 'daily'
+        continue-on-error: true
+        run: python scripts/build_yahoo_history.py kr_split
+
+      # ── 매월 ────────────────────────────────────────
+      - name: 국내 ETF·주식 가격 (네이버)
+        if: steps.mode.outputs.mode == 'monthly'
+        continue-on-error: true
+        run: |
+          python scripts/build_price_history.py kr_etf
+          python scripts/build_price_history.py kr_stock
+      - name: pykrx 설치
+        if: steps.mode.outputs.mode == 'monthly'
+        run: pip install --quiet "pykrx==1.2.8" pandas
+      - name: KRX 월말 시세 (ETF·주식)
+        if: steps.mode.outputs.mode == 'monthly'
+        continue-on-error: true
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
+        run: python scripts/build_krx_history.py etf stock > /dev/null
+
+      # ── 공통 마무리 ──────────────────────────────────
+      - name: 품질 점검 · 미국 주요 종목 대조
+        if: steps.mode.outputs.mode != 'daily'
+        continue-on-error: true
+        run: |
+          python scripts/check_history_quality.py
+          python scripts/check_us_reference.py
+      - name: 백테스트용 데이터 정리 (data/bt)
+        run: python scripts/build_backtest_data.py
+
+      - name: 변경분만 커밋
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/history data/bt
+          if git diff --cached --quiet; then echo "변경 없음"; exit 0; fi
+          echo "바뀐 파일 $(git diff --cached --name-only | wc -l)개" >> "$GITHUB_STEP_SUMMARY"
+          git commit -m "백테스트 데이터 ${{ steps.mode.outputs.mode }}: $(TZ=Asia/Seoul date '+%Y-%m-%d')"
+          for i in 1 2 3; do
+            git push && exit 0
+            echo "push 거절 — pull --rebase 후 재시도 ($i/3)"
+            git pull --rebase origin master || exit 1
+          done
+          exit 1

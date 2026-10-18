@@ -20,6 +20,7 @@ build_dividends.py 는 최근 760일만 받아 연배당을 계산한다. 이 �
 """
 
 import csv
+from collections import defaultdict
 import json
 import os
 import re
@@ -157,6 +158,23 @@ def main():
     t0, fails = time.time(), []
 
     qs = list(quarters(y0, today))
+
+    # ★ 캐시가 없는 환경(GitHub Actions)에서는 이미 레포에 있는 결과 CSV 로 지난 분기 캐시를 채운다.
+    #   그래야 매일 실행 때 1990년부터 다시 받지 않고 최근 분기만 받는다(하루 수십 건).
+    out_csv = f"{ROOT}/{CFG[kind]['out']}"
+    if os.path.exists(out_csv) and not os.listdir(f"{CACHE}/{kind}"):
+        byq = defaultdict(list)
+        with open(out_csv, encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                d = r["기준일"]
+                q = f"{d[:4]}{(int(d[4:6]) - 1) // 3 * 3 + 1:02d}"
+                byq[q].append([r["종목코드"], d, r["지급일"], float(r["주당금액"] or 0), r["구분"], r["종목명"]])
+        # 최근 분기도 채워 둔다 — 다시 받다가 실패하면 기존 값이 남도록(빈 분기로 덮어 이력이 사라지는 사고 방지)
+        for s_, e_ in qs:
+            with open(f"{CACHE}/{kind}/{s_:%Y%m}.json", "w", encoding="utf-8") as f:
+                json.dump(byq.get(f"{s_:%Y%m}", []), f, ensure_ascii=False)
+        print(f"  기존 {out_csv} 로 지난 분기 캐시를 채웠습니다 ({sum(len(v) for v in byq.values())}건)", file=sys.stderr)
+
     for s, e in qs:
         path = f"{CACHE}/{kind}/{s:%Y%m}.json"
         if os.path.exists(path) and e < recent:

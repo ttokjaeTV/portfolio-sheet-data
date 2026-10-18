@@ -42,6 +42,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 
 KST = timezone(timedelta(hours=9))
+CUR = datetime.now(KST).strftime("%Y-%m")        # 이번 달 — 가격 이력에 넣지 않는다
 UA = {"User-Agent": "Mozilla/5.0"}
 NAVER = ("https://api.stock.naver.com/chart/foreign/item/{}/month"
          "?startDateTime=199001010000&endDateTime={}0000")
@@ -188,8 +189,15 @@ def us_job(t, rc):
     y["src"] = src
     save_json(cpath, y)
     if y["m"]:
-        write_csv(f"{ROOT}/us/{to_filename(t)}.csv", ["월", "종가"],
-                  [(m, fmt(c)) for m, c in y["m"]])
+        # ★ 끝난 달만 둔다 — 이번 달은 계산기가 us_prices.csv(30분마다 갱신)로 붙인다.
+        #   내용이 같으면 파일을 건드리지 않는다(매주 실행해도 1만 2천 개 파일이 바뀌지 않게).
+        rows = [(m, fmt(c)) for m, c in y["m"] if m < CUR]
+        path = f"{ROOT}/us/{to_filename(t)}.csv"
+        old = None
+        if os.path.exists(path):
+            old = [l for l in open(path, encoding="utf-8").read().replace("\r", "").split("\n")[1:] if l]
+        if old != [f"{m},{c}" for m, c in rows]:
+            write_csv(path, ["월", "종가"], rows)
     return t, src
 
 

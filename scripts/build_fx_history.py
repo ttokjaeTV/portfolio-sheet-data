@@ -118,7 +118,10 @@ def main():
     sm, nm = month_last(sd), month_last(nd)
 
     rows, gaps = [], []
+    cur = datetime.now(KST).strftime("%Y-%m")
     for m in sorted(set(sm) | set(old)):
+        if m >= cur:          # ★ 끝난 달만 — 이번 달 환율은 계산기가 fx_std.csv(매일 갱신)로 붙인다
+            continue
         if m in sm:
             day, std = sm[m][0], f"{sm[m][1]:.2f}"
         else:
@@ -128,7 +131,7 @@ def main():
         if close:
             gaps.append(float(close) / float(std) - 1)
 
-    if len(rows) < len(old) * 0.9:
+    if len(rows) < len([m for m in old if m < cur]) * 0.9:
         print(f"행 수가 {len(old)} → {len(rows)} 로 줄어 저장하지 않습니다.", file=sys.stderr)
         sys.exit(1)
     os.makedirs(os.path.dirname(OUT), exist_ok=True)

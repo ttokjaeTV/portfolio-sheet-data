@@ -647,7 +647,7 @@ kr_stock,035290,2026-09,jump,0.153
 kr_stock,035510,2006-05,jump,0.113
 kr_stock,035720,1999-12,jump,8.020
 kr_stock,036170,2007-09,split_raw,1.81:1 가격0.521배
-kr_stock,036220,2007-06,gap,140/233
+kr_stock,036220,2007-06,gap,139/232
 kr_stock,036220,2024-03,jump,5.706
 kr_stock,036530,2000-06,jump,0.160
 kr_stock,036530,2000-06,split_raw,10:1 가격0.160배
@@ -686,7 +686,7 @@ kr_stock,101140,2008-09,jump,0.130
 kr_stock,101140,2008-09,split_raw,10:1 가격0.130배
 kr_stock,101140,2008-10,jump,0.198
 kr_stock,101670,2022-09,jump,5.418
-kr_stock,101970,2012-07,gap,53/172
+kr_stock,101970,2012-07,gap,52/171
 kr_stock,101970,2025-03,jump,23.205
 kr_stock,110790,2023-10,split_raw,2:1 가격0.466배
 kr_stock,120030,2010-03,jump,8.770
@@ -702,7 +702,7 @@ kr_stock,187660,2026-02,jump,5.524
 kr_stock,191600,2020-03,jump,0.196
 kr_stock,192410,2018-09,jump,0.069
 kr_stock,192410,2026-03,split_raw,1:2 가격2.034배
-kr_stock,198940,2014-08,gap,77/147
+kr_stock,198940,2014-08,gap,76/146
 kr_stock,198940,2026-05,split_raw,1:2 가격1.452배
 kr_stock,205100,2023-10,split_raw,2:1 가격0.696배
 kr_stock,221800,2023-02,split_raw,4:1 가격0.228배
@@ -855,7 +855,6 @@ us,BTCT,2024-11,jump,9.802
 us,BVC,2026-01,jump,7.702
 us,BYAH,2025-07,jump,0.021
 us,CALC,2026-01,jump,0.137
-us,CAPNR,2001-01,gap,143/310
 us,CAPNR,2011-05,jump,0.009
 us,CAPR,2020-04,jump,5.833
 us,CAPR,2025-12,jump,5.394
@@ -870,7 +869,6 @@ us,CCTG,2025-11,jump,0.150
 us,CD,2024-11,jump,6.265
 us,CDIO,2023-11,jump,6.755
 us,CDT,2026-09,jump,0.032
-us,CDT,2026-10,jump,0.154
 us,CELZ,2016-04,jump,45.455
 us,CELZ,2020-12,jump,17.375
 us,CENN,2021-01,jump,8.594
@@ -928,7 +926,7 @@ us,CYN,2025-02,jump,0.169
 us,CYPH,2025-01,jump,0.195
 us,CYRX,2007-01,jump,5.464
 us,DAIC,2026-08,jump,5.273
-us,DAT,2021-09,gap,45/62
+us,DAT,2021-09,gap,44/61
 us,DBVT,2024-11,jump,5.013
 us,DCX,2025-09,jump,0.092
 us,DCX,2026-09,jump,0.033
@@ -941,11 +939,9 @@ us,DFTX,2019-07,flicker,0.167
 us,DFTX,2020-03,jump,11.200
 us,DGXX,2021-02,jump,5.909
 us,DGXX,2023-01,jump,5.389
-us,DHCNL,2026-04,gap,2/7
 us,DJT,2021-10,jump,6.809
 us,DKI,2025-09,jump,0.164
 us,DKI,2026-05,jump,11.132
-us,DKI,2026-10,jump,0.040
 us,DLPN,2015-10,jump,7.667
 us,DMRA,2023-08,jump,0.196
 us,DOGZ,2026-01,jump,0.099
@@ -1018,7 +1014,6 @@ us,FXHO,2025-10,jump,0.041
 us,GAME,2019-02,jump,5.882
 us,GAME,2019-06,flicker,0.157
 us,GBR,2021-01,jump,5.727
-us,GCDT,2026-10,jump,0.106
 us,GCTK,2024-11,jump,0.145
 us,GCTK,2025-01,jump,0.172
 us,GCTS,2024-04,jump,0.143
@@ -1084,14 +1079,14 @@ us,HYFT,2015-12,jump,0.048
 us,HYFT,2017-01,jump,859.000
 us,HYMC,2022-03,jump,7.419
 us,HYPD,2025-06,jump,6.216
-us,IAE,2007-03,gap,219/236
+us,IAE,2007-03,gap,218/235
 us,IBCA,2025-03,jump,24.832
 us,IBIO,2020-02,jump,8.750
 us,ICON,2025-01,jump,0.177
 us,IDCC,1999-12,jump,7.407
 us,IFRX,2019-06,jump,0.088
 us,IGC,2019-02,jump,6.622
-us,IHD,2011-04,gap,170/187
+us,IHD,2011-04,gap,169/186
 us,IMMP,2026-03,jump,0.125
 us,IMNN,2013-01,jump,0.184
 us,IMTE,2018-05,jump,7.703
@@ -1139,12 +1134,11 @@ us,JZXN,2024-04,jump,0.116
 us,KALA,2022-12,jump,7.212
 us,KALA,2025-09,jump,0.136
 us,KAZR,2025-07,jump,0.046
-us,KCA.U,2022-04,gap,13/55
-us,KCAC.U,2020-06,gap,30/77
+us,KCA.U,2022-04,gap,12/54
+us,KCAC.U,2020-06,gap,29/76
 us,KDP,2018-07,jump,0.197
 us,KIDZ,2026-06,jump,0.169
 us,KNDI,2007-07,jump,7.157
-us,KNDI,2026-10,jump,0.052
 us,KOD,2022-02,jump,0.147
 us,KODK,2020-07,flicker,9.798
 us,KOSS,2021-01,flicker,18.605
@@ -1271,7 +1265,6 @@ us,NUWE,2026-06,jump,0.113
 us,NVDS,2023-08,jump,0.183
 us,NVNO,2025-08,jump,0.173
 us,NVR,1993-10,jump,27.000
-us,NWGL,2026-10,jump,0.156
 us,NXPL,2003-01,jump,5.000
 us,NXPL,2009-08,flicker,0.080
 us,NXPL,2009-09,flicker,8.083
@@ -1446,7 +1439,6 @@ us,SDOT,2026-06,jump,12.853
 us,SERV,2024-07,jump,8.985
 us,SES,2024-12,jump,6.257
 us,SFHG,2024-12,jump,0.101
-us,SHFS,2026-10,jump,0.101
 us,SHPH,2022-09,jump,0.119
 us,SION,2026-08,jump,0.128
 us,SKYA,2025-01,jump,0.190
@@ -1517,7 +1509,6 @@ us,SXTC,2022-05,jump,9.813
 us,SXTC,2025-02,jump,11.000
 us,SXTC,2026-01,jump,0.019
 us,SXTC,2026-07,jump,0.029
-us,SXTC,2026-10,jump,0.023
 us,TACK,2026-04,jump,0.102
 us,TANH,2015-10,jump,0.196
 us,TAOP,2006-11,jump,5.347
@@ -1565,14 +1556,12 @@ us,UVE,2005-11,jump,12.000
 us,VCIG,2026-03,jump,0.155
 us,VCIG,2026-05,jump,8.897
 us,VCIG,2026-07,jump,0.117
-us,VCIG,2026-10,jump,0.172
 us,VELO,2025-02,jump,0.167
 us,VEON,1998-08,jump,0.190
 us,VHC,2001-07,jump,0.137
 us,VIP,2021-09,jump,0.169
 us,VIVK,2012-06,jump,9.425
 us,VIVK,2025-12,jump,0.081
-us,VIVK,2026-10,jump,0.196
 us,VIVO,2020-08,jump,5.272
 us,VIVO,2025-03,jump,5.362
 us,VMAR,2025-12,jump,0.163
@@ -1588,13 +1577,10 @@ us,VVOS,2023-11,jump,7.632
 us,WBUY,2023-12,jump,0.087
 us,WBX,2025-07,jump,16.258
 us,WCT,2025-03,jump,0.064
-us,WCT,2026-10,jump,0.049
 us,WETO,2026-07,jump,0.103
 us,WETO,2026-09,jump,0.184
-us,WFF,2026-10,jump,0.064
 us,WHLR,2023-10,jump,0.193
 us,WHLR,2026-07,jump,0.095
-us,WHLR,2026-10,jump,0.126
 us,WHLRL,2021-09,gap,50/61
 us,WKHS,2020-06,jump,7.012
 us,WKSP,2002-11,jump,0.143
@@ -1640,7 +1626,6 @@ us,YMAT,2026-05,jump,5.502
 us,YYAI,2022-06,jump,0.156
 us,YYAI,2025-10,jump,0.022
 us,YYAI,2026-07,jump,0.016
-us,ZBAO,2026-10,jump,0.190
 us,ZCMD,2026-05,jump,0.077
 us,ZCMD,2026-06,jump,0.068
 us,ZDAI,2024-11,jump,0.166

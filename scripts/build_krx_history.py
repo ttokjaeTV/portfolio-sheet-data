@@ -195,7 +195,9 @@ def run(kind):
     for y, m in month_iter(start, today):
         key = f"{y:04d}-{m:02d}"
         path = f"{snap}/{key}.csv"
-        if os.path.exists(path) and not FULL and key not in (cur, prev):
+        if key >= cur:                     # ★ 이번 달은 넣지 않는다 — 계산기가 실시간 시세로 붙인다
+            continue
+        if os.path.exists(path) and not FULL and key != prev:
             seen = True
             continue
         d = last_day(y, m, today)
@@ -223,6 +225,10 @@ def run(kind):
         done += 1
         print(f"  {kind} {key} {rows[0][0]} {len(rows)}종목 ({time.time()-t0:.0f}s)", file=sys.stderr)
 
+    # 이전 실행이 남긴 이번 달(미완성) 스냅숏은 지운다
+    for p in glob.glob(f"{snap}/*.csv"):
+        if os.path.basename(p)[:-4] >= cur:
+            os.remove(p)
     n, gone = pivot(kind)
     first = sorted(glob.glob(f"{snap}/*.csv"))
     print(f"완료 {kind}: 새로 받은 달 {done} · 종목 {n} (상장폐지·이름변경 {gone}) · "
