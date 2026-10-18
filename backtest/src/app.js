@@ -469,9 +469,14 @@ function render(r, hs, range, amt) {
   $('r-gain').textContent = (gain >= 0 ? '+' : '') + fmtWon(gain);
   $('r-gain').className = 'stat-value ' + cls(gain);
   $('r-gain-sub').textContent = `원금 대비 ${pct(gain / r.invested)}`;
-  $('r-cagr').textContent = pct(r.cagr);
-  $('r-cagr').className = 'stat-value ' + cls(r.cagr);
-  $('r-cagr-sub').textContent = r.irr != null && amt.monthly ? `내 돈 기준 연 ${pct(r.irr)}` : '상품 자체 성과(배당 포함)';
+  // 현금 수령이면 받은 배당은 재투자되지 않으므로 '실제 내 돈' 수익률(IRR)이 대표값, 시간가중(재투자 가정)은 보조
+  const cashHead = !S.reinvest && r.irr != null && r.totalDiv > 0;
+  const head = cashHead ? r.irr : r.cagr;
+  $('r-cagr-label').textContent = cashHead ? '실제 내 돈 기준 연수익률' : '연평균 수익률';
+  $('r-cagr').textContent = pct(head);
+  $('r-cagr').className = 'stat-value ' + cls(head);
+  $('r-cagr-sub').textContent = cashHead ? `배당 재투자 가정 시 연 ${pct(r.cagr)} (시간가중)`
+    : r.irr != null && amt.monthly ? `내 돈 기준 연 ${pct(r.irr)}` : '상품 자체 성과(배당 포함)';
   $('r-mdd').textContent = pctPlain(r.mdd);
   const rec = recovery(r);
   $('r-mdd-sub').textContent = r.mdd > -0.001 ? '빠진 적 없음' : `${r.mddAt} 바닥 · ${rec ? `${spanText(rec.gap)} 만에 회복` : '아직 회복 전'}`;
@@ -524,11 +529,14 @@ function drawCharts(r) {
 }
 function drawTables(r, hs) {
   const tot = r.perAsset.reduce((s, a) => s + a.value, 0);
-  $('asset-table').innerHTML = `<thead><tr><th>종목</th><th>목표 비중</th><th>가격 변동</th><th>받은 배당</th><th>마지막 평가액</th></tr></thead><tbody>` +
+  const usdAny = r.perAsset.some(a => a.ccy === 'USD');
+  // 원화 환산이면 미국 종목 가격 변동도 원화 기준(환율 포함) — 평가액·배당 열과 같은 기준. 환율 고정이면 달러 기준
+  const pxHead = !usdAny ? '가격 변동' : S.fxKRW ? '가격 변동<span class="sub">원화 기준</span>' : '가격 변동<span class="sub">달러 기준</span>';
+  $('asset-table').innerHTML = `<thead><tr><th>종목</th><th>목표 비중</th><th>${pxHead}</th><th>받은 배당</th><th>마지막 평가액</th></tr></thead><tbody>` +
     r.perAsset.map((a, i) => {
       const it = U.get(a.key);
       return `<tr><td class="name">${escapeHtml(it.label)}<span class="sub">${it.mk === 'K' ? '국내' : '미국'} ${it.kind} · ${escapeHtml(it.code)}</span></td>
-        <td>${pctPlain(a.w, 0)}</td><td class="${cls(a.priceRet)}">${pct(a.priceRet)}</td><td>${fmtWon(a.div)}</td>
+        <td>${pctPlain(a.w, 0)}</td><td class="${cls(a.priceRet)}">${pct(a.priceRet)}${a.ccy === 'USD' && S.fxKRW ? `<span class="sub">달러 기준 ${pct(a.priceRetLocal)}</span>` : ''}</td><td>${fmtWon(a.div)}</td>
         <td>${fmtWon(a.value)}<span class="sub">지금 비중 ${tot ? pctPlain(a.value / tot) : '-'}</span></td></tr>`;
     }).join('') + '</tbody>';
   $('year-table').innerHTML = `<thead><tr><th>연도</th><th>수익률</th><th>연말 금액</th><th>넣은 돈(누적)</th><th>받은 배당</th></tr></thead><tbody>` +
@@ -540,6 +548,8 @@ function drawInsight(r, hs, rec) {
   const who = names.length === 1 ? names[0] : `${names[0]} 등 ${names.length}종목`;
   $('insight-title').textContent = `${S.start}부터 ${spanText(r.n)}, 넣은 돈 ${fmtWon(r.invested)} → ${fmtWon(r.finalValue)}`;
   let d = `${escapeHtml(who)}에 투자했다면 연평균 <strong>${pct(r.cagr)}</strong>(배당 포함, 상품 자체 성과)였습니다. `;
+  if (!S.reinvest && r.irr != null && r.totalDiv > 0)
+    d += `다만 이 숫자는 배당을 바로 재투자했다고 가정한 값이고, 배당을 현금으로 받아 쌓아 두면 <strong>실제 내 돈 기준으로는 연 ${pct(r.irr)}</strong>입니다. `;
   if (r.mdd < -0.001) d += `하지만 그 사이 고점 대비 <strong>${pctPlain(r.mdd)}</strong>까지 빠진 적이 있고(${r.mddAt}), ${rec ? `원래 수준을 되찾는 데 <strong>${spanText(rec.gap)}</strong>이 걸렸습니다` : '아직 그 고점을 되찾지 못했습니다'}. `;
   if (r.worst) d += `최악의 해는 ${r.worst.year}년(${pct(r.worst.ret)})이었습니다. `;
   d += '<br><br>최종 금액만큼 중요한 건 <strong>그 하락 구간을 실제로 버틸 수 있었는지</strong>입니다. 같은 종목도 기간을 바꾸면 결과가 크게 달라지니, 위의 빠른 기간 버튼으로 하락장 전후도 꼭 돌려 보세요.';
@@ -582,7 +592,7 @@ function copyText() {
   const names = S.holdings.filter(h => U.has(h.key)).map(h => `${U.get(h.key).label} ${h.w}%`).join(', ');
   return [`[백테스트] ${names}`, `${S.start} ~ ${S.end} · ${$('group-desc').textContent}`,
     `넣은 돈 ${v('r-invested')} → 최종 ${v('r-final')} (${v('r-gain-sub')})`,
-    `연평균 ${v('r-cagr')} · 최대 낙폭 ${v('r-mdd')} · 최악의 해 ${v('r-worst')} (${v('r-worst-sub')})`,
+    `${v('r-cagr-label')} ${v('r-cagr')}${S.reinvest ? '' : ` · ${v('r-cagr-sub')}`} · 최대 낙폭 ${v('r-mdd')} · 최악의 해 ${v('r-worst')} (${v('r-worst-sub')})`,
     `받은 배당 ${v('r-div')}`, location.href].join('\n');
 }
 async function copy(s, btn) {

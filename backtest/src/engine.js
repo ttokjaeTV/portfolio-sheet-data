@@ -13,8 +13,10 @@
  *   소수 주 매수 허용, 매매 수수료·세금 없음(세전).
  *
  * 성과 지표
- *   연평균 수익률(시간가중) : 돈을 넣고 뺀 시점과 무관한 '상품 자체' 성과. 배당은 받은 것으로 계산.
- *   내 돈 기준 연 수익률    : 실제로 넣은 돈의 흐름(초기·적립)으로 구한 IRR. 적립식 비교용.
+ *   연평균 수익률(시간가중) : 돈을 넣고 뺀 시점과 무관한 '상품 자체' 성과. 배당은 받는 즉시 재투자한 것과 같다.
+ *   내 돈 기준 연 수익률    : 실제로 넣은 돈의 흐름(초기·적립) → 끝 달 최종 금액(보유 + 쌓인 배당 현금)으로 구한 IRR.
+ *                             현금 수령이면 배당 현금이 이자 없이 쌓여 있다고 보므로 시간가중보다 낮게 나온다.
+ *                             거치식·재투자는 시간가중과 같다. 항상 계산한다.
  *   최대 낙폭(MDD)          : 시간가중 지수 기준 고점 대비 최대 하락.
  */
 (function (root) {
@@ -124,7 +126,7 @@
     const years = n / 12;
     const twr = idx[n];
     const cagr = Math.pow(twr, 1 / years) - 1;
-    const irrM = (o.monthly > 0 || cash > 0) ? irrMonthly(flows) : null;
+    const irrM = irrMonthly(flows);
     const irr = irrM == null ? null : Math.pow(1 + irrM, 12) - 1;
 
     // 최대 낙폭
@@ -166,8 +168,9 @@
       yearly: years_, worst, best,
       totalDiv, last12Div: last12, monthlyDivAvg: last12 / Math.min(12, n),
       perAsset: o.assets.map((a, i) => ({
-        key: a.key, name: a.name, w: W[i], value: sh[i] * krwPrice(i, n), div: divByAsset[i],
-        priceRet: P[i][n] / P[i][0] - 1,
+        key: a.key, name: a.name, ccy: a.ccy, w: W[i], value: sh[i] * krwPrice(i, n), div: divByAsset[i],
+        priceRet: krwPrice(i, n) / krwPrice(i, 0) - 1,   // 원화 기준 (fxMode 'fixed'면 = 달러 기준)
+        priceRetLocal: P[i][n] / P[i][0] - 1,            // 상장 통화 기준 (미국 = 달러)
       })),
       fx0, fxN: needFx ? fxArr[n] : null,
     };

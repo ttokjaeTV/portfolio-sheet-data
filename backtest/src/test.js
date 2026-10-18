@@ -81,6 +81,31 @@ for (const code of ['069500', '360750', '458730', '161510']) {
   check('JEPI 시간가중 수익률은 재투자 여부와 무관', c.cagr, r.cagr, 1e-9);
 }
 
+// 6-2) 내 돈 기준(IRR) — 재투자 거치식이면 시간가중과 같고, 현금 수령이면 쌓인 현금이 놀아서 더 낮다
+{
+  const a = asset('U:SCHD');
+  const opt = { ...base, fxMode: 'krw', assets: [a], start: '2014-12', end: '2024-12' };
+  const r = BT.simulate({ ...opt, reinvest: true }), c = BT.simulate({ ...opt, reinvest: false });
+  const rd = BT.simulate({ ...opt, reinvest: true, initial: 0, monthly: 500000 }), cd = BT.simulate({ ...opt, reinvest: false, initial: 0, monthly: 500000 });
+  console.log(`  SCHD 거치식(원화) 재투자: 시간가중 ${(r.cagr * 100).toFixed(2)}% · 내 돈 ${(r.irr * 100).toFixed(2)}%`);
+  console.log(`  SCHD 거치식(원화) 현금수령: 시간가중 ${(c.cagr * 100).toFixed(2)}% · 내 돈 ${(c.irr * 100).toFixed(2)}%`);
+  console.log(`  SCHD 적립식(원화) 재투자: 시간가중 ${(rd.cagr * 100).toFixed(2)}% · 내 돈 ${(rd.irr * 100).toFixed(2)}%`);
+  console.log(`  SCHD 적립식(원화) 현금수령: 시간가중 ${(cd.cagr * 100).toFixed(2)}% · 내 돈 ${(cd.irr * 100).toFixed(2)}%`);
+  check('재투자 거치식 내 돈 기준 = 시간가중', r.irr, r.cagr, 1e-6);
+  check('현금수령 거치식 내 돈 기준 = (최종/원금)^(1/년)−1', c.irr, Math.pow(c.finalValue / c.invested, 1 / c.years) - 1, 1e-6);
+  if (!(c.irr < c.cagr)) { fail++; console.log('✗ 현금수령 내 돈 기준이 시간가중보다 낮아야 함'); }
+}
+
+// 6-3) 종목별 가격 변동 — 원화 환산이면 환율 포함, 환율 고정이면 달러 기준과 같다
+{
+  const a = asset('U:SCHD');
+  const k = BT.simulate({ ...base, fxMode: 'krw', assets: [a], start: '2014-12', end: '2024-12' }).perAsset[0];
+  const u = BT.simulate({ ...base, fxMode: 'fixed', assets: [a], start: '2014-12', end: '2024-12' }).perAsset[0];
+  console.log(`  SCHD 가격 변동 원화 ${(k.priceRet * 100).toFixed(2)}% · 달러 ${(k.priceRetLocal * 100).toFixed(2)}%`);
+  check('원화 가격 변동 = (1+달러 변동)×(1+환율 변동)−1', k.priceRet, (1 + k.priceRetLocal) * fx.get('2024-12') / fx.get('2014-12') - 1, 1e-9);
+  check('환율 고정이면 가격 변동 = 달러 기준', u.priceRet, u.priceRetLocal, 1e-12);
+}
+
 // 7) 리밸런싱 — 50:50 두 종목, 매년 맞춘 뒤 비중이 다시 50:50
 {
   const r = BT.simulate({ ...base, rebalance: 12, assets: [asset('U:SPY', 50), asset('U:TLT', 50)], start: '2014-12', end: '2024-12' });
