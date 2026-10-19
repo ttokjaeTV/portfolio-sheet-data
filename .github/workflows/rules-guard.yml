@@ -1,0 +1,18 @@
+# 기준값·계산 자동 검사 — 검사 내용은 허브(ttokjaeTV/ttokjaetv.github.io)의 공용 워크플로 한 곳에서 관리한다.
+# 제도 숫자를 코드에 직접 적거나(→ rules.js 값으로), 빌드·테스트가 맞지 않으면 실패하고 이슈로 알린다.
+name: 기준값·계산 검사
+
+on:
+  push:
+    branches: [master]
+    paths-ignore: ['data/**', '**.md', 'legacy/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  guard:
+    uses: ttokjaeTV/ttokjaetv.github.io/.github/workflows/rules-guard.yml@main
