@@ -1613,7 +1613,7 @@ const mnum = m => +m.slice(0, 4) * 12 + (+m.slice(5, 7) - 1);
 const fromNum = x => `${Math.floor(x / 12)}-${String(x % 12 + 1).padStart(2, '0')}`;
 const maxM = (a, b) => (a > b ? a : b), minM = (a, b) => (a < b ? a : b);
 function prevMonth() { const d = new Date(); return fromNum(d.getFullYear() * 12 + d.getMonth() - 1); }
-function spanText(n) { const y = Math.floor(n / 12), m = n % 12; return (y ? `${y}년` : '') + (m ? ` ${m}개월` : '') || '0개월'; }
+function spanText(n) { const y = Math.floor(n / 12), m = n % 12; return [y ? `${y}년` : '', m ? `${m}개월` : ''].filter(Boolean).join(' ') || '0개월'; }   // 1년 미만도 앞 공백 없이 '6개월'
 
 function fmtWon(n) {                              // 결과 카드: 1억 4,748만원
   n = Number(n); if (!isFinite(n)) return '-';
@@ -1625,6 +1625,11 @@ function fmtWon(n) {                              // 결과 카드: 1억 4,748�
   } else s = `${Math.round(a).toLocaleString()}원`;
   return (neg ? '-' : '') + s;
 }
+function fmtWonFine(n) {                          // 월평균 배당처럼 작은 금액: 10만원 미만은 원 단위까지(33,837원 → '3만원'으로 뭉개지지 않게), 그 이상은 기존 만원 표기
+  n = Number(n); if (!isFinite(n)) return '-';
+  return Math.abs(n) < 1e5 ? (n < 0 ? '-' : '') + Math.round(Math.abs(n)).toLocaleString() + '원' : fmtWon(n);
+}
+const divAvgMonths = r => Math.min(12, r.n);      // 월평균 배당을 낸 개월 수 — 엔진 monthlyDivAvg(최근 배당 합 ÷ min(12, n))와 같게
 function fmtShort(n) {                            // 차트 축: 1.5억 / 3,000만
   const a = Math.abs(n), sg = n < 0 ? '-' : '';
   if (a >= 1e8) return sg + (a / 1e8).toFixed(a >= 1e9 ? 0 : 1).replace(/\.0$/, '') + '억';
@@ -2054,7 +2059,7 @@ function render(r, hs, range, amt) {
     ['r-worst', 'r-best'].forEach(id => { $(id).textContent = '-'; $(id).className = 'stat-value'; $(id + '-sub').textContent = '1월~12월이 다 들어간 해가 없음'; });
   }
   $('r-div').textContent = fmtWon(r.totalDiv);
-  $('r-div-sub').textContent = r.totalDiv > 0 ? `최근 12개월 월평균 ${fmtWon(r.monthlyDivAvg)}` : '받은 배당 없음';
+  $('r-div-sub').textContent = r.totalDiv > 0 ? `최근 ${divAvgMonths(r)}개월 월평균 ${fmtWonFine(r.monthlyDivAvg)}` : '받은 배당 없음';
 
   drawCharts(r);
   drawTables(r, hs);
@@ -2124,7 +2129,7 @@ function drawInsight(r, hs, rec) {
     const fxr = r.fxN / r.fx0 - 1;
     d += `<br><br>💱 같은 기간 원/달러 환율은 ${r.fx0.toLocaleString()}원 → ${r.fxN.toLocaleString()}원(${pct(fxr)})으로, 미국 종목 결과에 그만큼 ${fxr >= 0 ? '보탬이' : '손해가'} 됐습니다. 위 환율 스위치를 끄면 달러 기준 성과를 볼 수 있습니다.`;
   }
-  if (!S.reinvest && r.totalDiv > 0) d += `<br><br>💵 배당을 현금으로 받았다면 최근 12개월 동안 한 달 평균 <strong>${fmtWon(r.monthlyDivAvg)}</strong>을 받은 셈입니다.`;
+  if (!S.reinvest && r.totalDiv > 0) d += `<br><br>💵 배당을 현금으로 받았다면 최근 ${divAvgMonths(r)}개월 동안 한 달 평균 <strong>${fmtWonFine(r.monthlyDivAvg)}</strong>을 받은 셈입니다.`;
   $('insight-desc').innerHTML = d;
 }
 
