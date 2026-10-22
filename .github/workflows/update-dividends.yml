@@ -98,16 +98,21 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- data/dividends.csv data/high_dividend.json; then
+          # ★ dividend_history.csv 도 같이 올린다. build_dividends.py 가 매번 덧붙여 쓰는데
+          #   빠져 있어서 ① 이력이 한 번도 커밋되지 않았고 ② 커밋 안 된 변경이 남아
+          #   아래 pull --rebase 가 거부됐다(2026-10 실패 메일 원인).
+          FILES="data/dividends.csv data/dividend_history.csv data/high_dividend.json"
+          if git diff --quiet -- $FILES; then
             echo "변경 없음"; exit 0
           fi
-          git add data/dividends.csv data/high_dividend.json
+          git add $FILES
           git commit -m "배당 갱신: $(TZ=Asia/Seoul date '+%Y-%m-%d')"
           # 계산이 5분 넘게 걸려 그 사이 시세 워크플로가 커밋을 올리면 push 가 거절되고
           # 5분치 결과가 통째로 버려진다(2026-09-04 실패 원인). rebase 로 얹고 재시도한다.
           for i in 1 2 3; do
             git push && exit 0
             echo "push 거절 — pull --rebase 후 재시도 ($i/3)"
-            git pull --rebase origin master || exit 1
+            # --autostash: 커밋 대상이 아닌 파일이 바뀌어 있어도 rebase 가 멈추지 않게
+            git pull --rebase --autostash -X theirs origin master || exit 1
           done
           exit 1
