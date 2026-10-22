@@ -49,13 +49,41 @@ def get(url, timeout=40, raw=False):
     return data if raw else json.loads(data.decode("utf-8"))
 
 
+def load_previous():
+    """지난번 kr_stocks.csv 의 종목 목록. KIND 가 안 열릴 때 대신 쓴다.
+
+    상장 종목은 하루 사이 거의 안 바뀌므로, 이번 회차만 지난 목록으로 시세를 받는다.
+    (2026-10 실패 메일 일부가 KIND 다운로드 한 번 실패로 전체 갱신이 멈춘 것)
+    """
+    out = []
+    if os.path.exists(OUT_PATH):
+        with open(OUT_PATH, encoding="utf-8") as f:
+            for row in csv.reader(f):
+                if len(row) >= 4 and row[0] != "종목코드":
+                    out.append({"code": row[0].upper(), "name": row[1],
+                                "market": row[2], "industry": row[3]})
+    if not out:
+        print("KIND 목록도, 지난 목록도 없습니다.", file=sys.stderr)
+        sys.exit(1)
+    print(f"  [warn] KIND 대신 지난 목록 {len(out)}종목으로 조회", file=sys.stderr)
+    return out
+
+
 def load_kind():
     """KIND 상장법인목록에서 (코드, 회사명, 시장, 업종) 추출."""
-    page = get(KIND_URL, raw=True).decode("euc-kr", "replace")
+    page = ""
+    for attempt in range(RETRY):
+        try:
+            page = get(KIND_URL, raw=True).decode("euc-kr", "replace")
+            break
+        except OSError as exc:              # URLError·타임아웃·연결 끊김
+            print(f"  [warn] KIND 다운로드 실패 ({attempt + 1}/{RETRY}): {exc}", file=sys.stderr)
+            if attempt < RETRY - 1:
+                time.sleep(5 * (attempt + 1))
     rows = ROW_RE.findall(page)
     if not rows:
-        print("KIND 목록을 읽지 못했습니다.", file=sys.stderr)
-        sys.exit(1)
+        print("  [warn] KIND 목록을 읽지 못했습니다.", file=sys.stderr)
+        return load_previous()
 
     def cells(r):
         return [html.unescape(TAG_RE.sub("", c)).strip() for c in CELL_RE.findall(r)]
