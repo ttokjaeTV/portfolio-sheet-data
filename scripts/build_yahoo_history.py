@@ -30,6 +30,7 @@
 사용: python scripts/build_yahoo_history.py us|kr_split
 """
 
+import bisect
 import csv
 import json
 import os
@@ -87,6 +88,25 @@ def _result(url):
         return None
 
 
+def _crowded(res):
+    """월봉·분기봉 events 에서 회차가 빠졌을 수 있으면 True.
+
+    ★★ 야후는 배당·분할을 막대 timestamp 를 키로 붙인다 (2026-10-24 실측).
+       한 막대에 두 회차가 들면(12월 정기분+연말분·특별배당·주간 분배) 남는 회차를 다음 막대 키로
+       밀어 넣고, 밀다가 막대가 모자라면 최근 회차를 말없이 버린다.
+         MINT 2026-06~09 · JPST 2026-08·09 · TBIL 2026-07·08 누락, 주간 분배 ULTY 98회 중 33회만 옴.
+       그래서 키가 배당락일이 속한 막대와 다른 회차가 하나라도 있으면 일봉 events 로 다시 받는다.
+       일봉은 막대가 회차보다 훨씬 많아 빠지지 않는다(전 기간 일봉이라 응답이 수백 KB — 이때만 받는다)."""
+    ts = res.get("timestamp") or []
+    ev = res.get("events") or {}
+    for kind in ("dividends", "splits"):
+        for k, v in (ev.get(kind) or {}).items():
+            i = bisect.bisect_right(ts, int(v.get("date", k))) - 1
+            if i < 0 or ts[i] != int(k):
+                return True
+    return False
+
+
 def yahoo(sym, interval):
     """→ {"m": [[월, 종가], ...], "div": [[월, 금액]], "split": [[월, "a:b"]]} 또는 None
 
@@ -106,6 +126,10 @@ def yahoo(sym, interval):
     got = (res.get("meta") or {}).get("dataGranularity")
     if got and got != interval:
         raise ValueError(f"{sym} 간격 {got} ≠ 요청 {interval}")
+    if interval != "1d" and _crowded(res):
+        day = _result(url.replace(f"interval={interval}", "interval=1d"))
+        if day:
+            res["events"] = day.get("events") or {}     # 가격은 그대로 월봉, 배당·분할만 일봉 것
     parts = [res]
 
     month, divd, spl = {}, {}, {}
