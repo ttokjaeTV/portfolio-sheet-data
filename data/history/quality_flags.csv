@@ -926,7 +926,6 @@ us,CYN,2025-02,jump,0.169
 us,CYPH,2025-01,jump,0.195
 us,CYRX,2007-01,jump,5.464
 us,DAIC,2026-08,jump,5.273
-us,DAT,2021-09,gap,44/61
 us,DBVT,2024-11,jump,5.013
 us,DCX,2025-09,jump,0.092
 us,DCX,2026-09,jump,0.033
@@ -1079,14 +1078,12 @@ us,HYFT,2015-12,jump,0.048
 us,HYFT,2017-01,jump,859.000
 us,HYMC,2022-03,jump,7.419
 us,HYPD,2025-06,jump,6.216
-us,IAE,2007-03,gap,218/235
 us,IBCA,2025-03,jump,24.832
 us,IBIO,2020-02,jump,8.750
 us,ICON,2025-01,jump,0.177
 us,IDCC,1999-12,jump,7.407
 us,IFRX,2019-06,jump,0.088
 us,IGC,2019-02,jump,6.622
-us,IHD,2011-04,gap,169/186
 us,IMMP,2026-03,jump,0.125
 us,IMNN,2013-01,jump,0.184
 us,IMTE,2018-05,jump,7.703
@@ -1138,7 +1135,6 @@ us,KCA.U,2022-04,gap,12/54
 us,KCAC.U,2020-06,gap,29/76
 us,KDP,2018-07,jump,0.197
 us,KIDZ,2026-06,jump,0.169
-us,KNDI,2007-07,jump,7.157
 us,KOD,2022-02,jump,0.147
 us,KODK,2020-07,flicker,9.798
 us,KOSS,2021-01,flicker,18.605
@@ -1207,7 +1203,6 @@ us,MNDR,2024-05,jump,0.058
 us,MNTS,2023-09,jump,0.196
 us,MNY,2023-10,jump,0.128
 us,MPU,2020-12,jump,5.023
-us,MPU,2026-01,jump,14.505
 us,MRDN,2015-10,jump,0.012
 us,MRDN,2016-01,jump,0.100
 us,MRDN,2016-04,jump,0.033
@@ -1249,8 +1244,7 @@ us,NEXR,2024-11,jump,8.116
 us,NGNE,2015-08,jump,9.299
 us,NGNE,2018-06,jump,0.185
 us,NIKI,2024-03,jump,5.755
-us,NIVF,2024-04,jump,0.186
-us,NIVF,2026-09,jump,0.124
+us,NIVF,2026-09,jump,0.125
 us,NIXX,2015-03,flicker,25.806
 us,NIXX,2015-04,jump,0.013
 us,NIXX,2016-06,flicker,0.066
@@ -1635,3 +1629,4 @@ us,ZKIN,2025-01,jump,5.300
 us,ZNB,2024-10,jump,0.147
 us,ZNB,2025-08,jump,0.074
 us,ZNB,2026-03,jump,0.076
+us,ZSB,2023-01,gap,28/45
