@@ -852,7 +852,6 @@ us,BTCS,2016-06,jump,0.114
 us,BTCS,2016-07,jump,0.167
 us,BTCS,2021-01,jump,8.947
 us,BTCT,2024-11,jump,9.802
-us,BVC,2026-01,jump,7.702
 us,BYAH,2025-07,jump,0.021
 us,CALC,2026-01,jump,0.137
 us,CAPNR,2011-05,jump,0.009
@@ -985,6 +984,7 @@ us,ESYN,2024-01,jump,0.115
 us,EZGO,2023-09,jump,0.058
 us,EZGO,2026-05,jump,0.007
 us,FAMI,2026-06,jump,0.178
+us,FCDH,2023-10,jump,0.191
 us,FCEL,2019-06,jump,0.151
 us,FCEL,2020-11,jump,5.100
 us,FCHL,2026-04,jump,0.051
@@ -994,6 +994,7 @@ us,FEMY,2023-09,jump,6.757
 us,FFAI,2023-09,jump,0.177
 us,FFAI,2024-05,jump,13.250
 us,FFAI,2026-07,jump,0.171
+us,FFTT,2025-10,jump,0.077
 us,FGL,2026-08,jump,0.154
 us,FIEE,2023-11,jump,5.209
 us,FIEE,2024-10,jump,0.181
@@ -1244,7 +1245,8 @@ us,NEXR,2024-11,jump,8.116
 us,NGNE,2015-08,jump,9.299
 us,NGNE,2018-06,jump,0.185
 us,NIKI,2024-03,jump,5.755
-us,NIVF,2026-09,jump,0.125
+us,NIVF,2024-04,jump,0.186
+us,NIVF,2026-09,jump,0.124
 us,NIXX,2015-03,flicker,25.806
 us,NIXX,2015-04,jump,0.013
 us,NIXX,2016-06,flicker,0.066
@@ -1353,6 +1355,7 @@ us,PSHG,2017-07,jump,0.031
 us,PSHG,2017-08,jump,0.160
 us,PSHG,2020-11,jump,12.651
 us,PSIG,2026-06,jump,0.153
+us,PTIV,2025-05,jump,0.186
 us,PUSA,2025-03,jump,0.127
 us,PVLA,2023-06,jump,0.196
 us,PWR,2002-07,jump,0.194
@@ -1409,7 +1412,7 @@ us,RPGL,2026-05,jump,0.128
 us,RPGL,2026-06,jump,0.199
 us,RTB,2018-07,jump,6.000
 us,RUBI,2026-02,jump,0.144
-us,RUBI,2026-05,jump,0.166
+us,RUBI,2026-05,jump,0.165
 us,RVSN,2024-01,flicker,9.777
 us,RVSN,2024-02,jump,0.192
 us,RVSN,2026-02,jump,0.029
@@ -1528,6 +1531,7 @@ us,TOP,2023-05,jump,0.085
 us,TOPS,2017-05,jump,0.055
 us,TOPS,2017-06,jump,0.087
 us,TOPS,2017-08,jump,0.073
+us,TOT,2025-09,gap,10/13
 us,TPST,2023-10,jump,13.443
 us,TRON,2025-06,jump,13.478
 us,TVGN,2024-10,jump,6.875
@@ -1629,4 +1633,3 @@ us,ZKIN,2025-01,jump,5.300
 us,ZNB,2024-10,jump,0.147
 us,ZNB,2025-08,jump,0.074
 us,ZNB,2026-03,jump,0.076
-us,ZSB,2023-01,gap,28/45
